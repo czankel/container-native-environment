@@ -36,6 +36,27 @@ func printStruct(fieldHdr string, valueHdr string, items interface{}) {
 	}
 }
 
+// printValue prints the content of the provided reflect.Value, which can be a string
+// or a struct.
+func printValue(fieldHdr string, valueHdr string, prefix string, value interface{}) {
+
+	w := new(tabwriter.Writer)
+	w.Init(os.Stdout, 8, 8, 0, '\t', 0)
+	defer w.Flush()
+
+	fmt.Fprintf(w, "%s\t%s\n", strings.ToUpper(fieldHdr), strings.ToUpper(valueHdr))
+
+	elem := reflect.ValueOf(value)
+	elemType := elem.Type()
+	if elemType.Kind() == reflect.Struct {
+		for i := 0; i < elem.NumField(); i++ {
+			printStructElem(w, prefix+elemType.Field(i).Name, elem.Field(i))
+		}
+	} else {
+		printStructElem(w, prefix, elem)
+	}
+}
+
 // printList prints a list (slice of structures) using the field names as the header
 func printList(list interface{}) {
 

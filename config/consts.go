@@ -5,6 +5,7 @@ const (
 	SystemConfigFile = "/etc/cneconfig"
 	ConfigFilePerms  = 0644
 
-	DefaultExecRuntime = "containerd"
-	DefaultExecRunSock = "/run/containerd/containerd.sock"
+	DefaultExecRuntime   = "containerd"
+	DefaultExecRunSock   = "/run/containerd/containerd.sock"
+	DefaultExecNamespace = "cne"
 )

@@ -74,49 +74,59 @@ func LoadUserConfig() *Config {
 }
 
 // getValue returns the reflect.Value for the element in the nested structure by the
-// concatenated name (using '.' as the separator). The name is case-insensitive.
+// concatenated filter (using '.' as the separator). The filter is case-insensitive.
 // This function also returns the actual path using the correctly capitalized letters
-func (conf *Config) getValue(path string) (string, reflect.Value) {
+func (conf *Config) getValue(filter string) (string, reflect.Value) {
 
 	var realPath string
 
 	elem := reflect.ValueOf(conf).Elem()
-	fields := strings.Split(path, ".")
+	path := strings.Split(filter, ".")
 
-	for i, f := range fields {
+	for _, f := range path {
 		elem = elem.FieldByNameFunc(func(fn string) bool {
-			if len(realPath) != 0 {
-				realPath = realPath + "."
+			if strings.ToLower(f) != strings.ToLower(fn) {
+				return false
 			}
+
 			realPath = realPath + fn
-			return strings.ToLower(f) == strings.ToLower(fn)
+			return true
 		})
 		if !elem.IsValid() {
 			return realPath, elem
 		}
-		if i < len(fields)-1 && elem.Kind() != reflect.Struct {
-			return realPath, reflect.Value{}
+		if elem.Kind() != reflect.String {
+			realPath = realPath + "."
 		}
-
 	}
 
 	return realPath, elem
 }
 
 // Set updates the value of the configuration field
-func (conf *Config) Set(name string, value string) (string, error) {
+// Returns the actual case-corrected path and value of the field
+// Errors:
+//  - ErrNoSuchResource if the specified configuration field cannot be found
+//  - ErrInvalidArgument if the specified configuration field is a structure
+
+func (conf *Config) SetByName(name string, value string) (string, error) {
 
 	path, field := conf.getValue(name)
 	if !field.IsValid() {
 		return path, errdefs.ErrNoSuchResource
+	}
+	if field.Kind() != reflect.String {
+		return "", errdefs.ErrInvalidArgument
 	}
 
 	field.SetString(value)
 	return path, nil
 }
 
-// Get returns the value of the configuration field
-func (conf *Config) Get(name string) (string, string, error) {
+// Get returns the value of the configuration field specified by the filter
+// Errors:
+//  - ErrNoSuchResource if the specified configuration field cannot be found
+func (conf *Config) GetByName(name string) (string, string, error) {
 
 	path, field := conf.getValue(name)
 	if !field.IsValid() {
@@ -124,6 +134,20 @@ func (conf *Config) Get(name string) (string, string, error) {
 	}
 
 	return path, field.String(), nil
+}
+
+// GetAllByName returns a 'reflect.Value' for the selected field, which
+// can be a structure for nested structures.
+// Errors:
+//  - ErrNoSuchResource if the specified configuration field cannot be found
+func (conf *Config) GetAllByName(filter string) (string, interface{}, error) {
+
+	path, field := conf.getValue(filter)
+	if !field.IsValid() {
+		return "", reflect.Value{}, errdefs.ErrNoSuchResource
+	}
+
+	return path, field.Interface(), nil
 }
 
 // WriteSystemConfig writes the system configuration to /etc/cneconfig.

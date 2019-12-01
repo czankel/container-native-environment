@@ -37,12 +37,12 @@ func setConfigRunE(cmd *cobra.Command, args []string) error {
 	name := args[0]
 	newVal := args[1]
 
-	path, oldVal, err := conf.Get(name)
+	path, oldVal, err := conf.GetByName(name)
 	if err != nil {
 		return err
 	}
 
-	_, err = conf.Set(name, newVal)
+	_, err = conf.SetByName(name, newVal)
 	if err != nil {
 		return err
 	}

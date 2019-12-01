@@ -44,15 +44,11 @@ func showConfigRunE(cmd *cobra.Command, args []string) error {
 		printStruct("Configuration", "Value", conf)
 	} else {
 		name := args[0]
-		path, val, err := conf.Get(name)
+		prefix, val, err := conf.GetAllByName(name)
 		if err != nil {
 			return err
 		}
-
-		printList([]struct {
-			Configuration string
-			Value         string
-		}{{path, val}})
+		printValue("Configuration", "Value", prefix, val)
 	}
 
 	return nil
