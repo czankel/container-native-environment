@@ -5,6 +5,8 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/namespaces"
+
+	"github.com/czankel/cne/config"
 )
 
 // containerdRuntime provides the runtime implementation for the containerd daemon
@@ -26,14 +28,14 @@ func init() {
 // Runtime Interface
 
 // Open opens the containerd runtime under the default context name
-func (r *containerdRuntimeType) Open(sockName string) (Runtime, error) {
+func (r *containerdRuntimeType) Open(confRun config.Runtime) (Runtime, error) {
 
-	c, err := containerd.New(sockName)
+	c, err := containerd.New(confRun.SocketName)
 	if err != nil {
 		return nil, err
 	}
 
-	ctx := namespaces.WithNamespace(context.Background(), contextName)
+	ctx := namespaces.WithNamespace(context.Background(), confRun.Namespace)
 
 	return &containerdRuntime{
 		client:  c,

@@ -5,7 +5,8 @@
 package runtime
 
 import (
-	"github.com/pkg/errors"
+	"github.com/czankel/cne/config"
+	"github.com/czankel/cne/errdefs"
 )
 
 // Runtime is the main interface for managing containers and images, which provide additional
@@ -17,7 +18,7 @@ type Runtime interface {
 }
 
 type runtimeType interface {
-	Open(string) (Runtime, error)
+	Open(config.Runtime) (Runtime, error)
 }
 
 var runtimes map[string]runtimeType
@@ -45,10 +46,10 @@ func Runtimes() []string {
 }
 
 // Open opens a new runtime for the specified name
-func Open(name string, sockName string) (Runtime, error) {
-	reg, ok := runtimes[name]
+func Open(confRun config.Runtime) (Runtime, error) {
+	reg, ok := runtimes[confRun.Name]
 	if !ok {
 		return nil, errdefs.ErrNoSuchResource
 	}
-	return reg.Open(sockName)
+	return reg.Open(confRun)
 }

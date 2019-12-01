@@ -16,8 +16,9 @@ import (
 )
 
 type Runtime struct {
-	Name   string
-	Socket string
+	Name       string
+	SocketName string
+	Namespace  string `cne:"ReadOnly"`
 }
 
 type Config struct {
@@ -36,8 +37,9 @@ func Load() *Config {
 
 	conf := &Config{
 		Runtime: Runtime{
-			Name:   DefaultExecRuntime,
-			Socket: DefaultExecRunSock,
+			Name:       DefaultExecRuntimeName,
+			SocketName: DefaultExecRuntimeSocketName,
+			Namespace:  DefaultExecRuntimeNamespace,
 		},
 	}
 
@@ -76,14 +78,17 @@ func LoadUserConfig() *Config {
 // getValue returns the reflect.Value for the element in the nested structure by the
 // concatenated filter (using '.' as the separator). The filter is case-insensitive.
 // This function also returns the actual path using the correctly capitalized letters
-func (conf *Config) getValue(filter string) (string, reflect.Value) {
+func (conf *Config) getValue(filter string) (string, reflect.Value, string) {
 
 	var realPath string
+	var tag string
 
 	elem := reflect.ValueOf(conf).Elem()
 	path := strings.Split(filter, ".")
 
-	for _, f := range path {
+	for i, f := range path {
+		var fieldName string
+		strElem := elem
 		elem = elem.FieldByNameFunc(func(fn string) bool {
 			if strings.ToLower(f) != strings.ToLower(fn) {
 				return false
@@ -93,14 +98,17 @@ func (conf *Config) getValue(filter string) (string, reflect.Value) {
 			return true
 		})
 		if !elem.IsValid() {
-			return realPath, elem
+			return realPath, elem, ""
 		}
-		if elem.Kind() != reflect.String {
+		if i == len(path)-1 && elem.Kind() == reflect.String {
+			field, _ := strElem.Type().FieldByName(fieldName)
+			tag = field.Tag.Get("cne")
+		} else {
 			realPath = realPath + "."
 		}
 	}
 
-	return realPath, elem
+	return realPath, elem, tag
 }
 
 // Set updates the value of the configuration field
@@ -108,15 +116,20 @@ func (conf *Config) getValue(filter string) (string, reflect.Value) {
 // Errors:
 //  - ErrNoSuchResource if the specified configuration field cannot be found
 //  - ErrInvalidArgument if the specified configuration field is a structure
+//  - ErrReadOnly if the specified configuration field cannot be written
 
 func (conf *Config) SetByName(name string, value string) (string, error) {
 
-	path, field := conf.getValue(name)
+	path, field, tag := conf.getValue(name)
 	if !field.IsValid() {
 		return path, errdefs.ErrNoSuchResource
 	}
 	if field.Kind() != reflect.String {
 		return "", errdefs.ErrInvalidArgument
+	}
+
+	if tag == "ReadOnly" {
+		return "", errdefs.ErrReadOnly
 	}
 
 	field.SetString(value)
@@ -128,7 +141,7 @@ func (conf *Config) SetByName(name string, value string) (string, error) {
 //  - ErrNoSuchResource if the specified configuration field cannot be found
 func (conf *Config) GetByName(name string) (string, string, error) {
 
-	path, field := conf.getValue(name)
+	path, field, _ := conf.getValue(name)
 	if !field.IsValid() {
 		return "", "", errdefs.ErrNoSuchResource
 	}
@@ -142,7 +155,7 @@ func (conf *Config) GetByName(name string) (string, string, error) {
 //  - ErrNoSuchResource if the specified configuration field cannot be found
 func (conf *Config) GetAllByName(filter string) (string, interface{}, error) {
 
-	path, field := conf.getValue(filter)
+	path, field, _ := conf.getValue(filter)
 	if !field.IsValid() {
 		return "", reflect.Value{}, errdefs.ErrNoSuchResource
 	}
