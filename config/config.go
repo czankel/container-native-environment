@@ -190,11 +190,11 @@ func (conf *Config) WriteSystemConfig() error {
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 	defer file.Sync()
 
 	writer := bufio.NewWriter(file)
-	err = toml.NewEncoder(writer).Encode(conf)
-	return err
+	return toml.NewEncoder(writer).Encode(conf)
 }
 
 // WriteUserConfig writes the user configuration in the home directory of the current user.
@@ -210,6 +210,7 @@ func (conf *Config) WriteUserConfig() error {
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 	defer file.Sync()
 
 	euid := os.Geteuid()
