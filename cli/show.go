@@ -41,7 +41,7 @@ func showConfigRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(args) == 0 {
-		printStruct("Configuration", "Value", conf)
+		printValue("Configuration", "Value", "", conf)
 	} else {
 		name := args[0]
 		prefix, val, err := conf.GetAllByName(name)

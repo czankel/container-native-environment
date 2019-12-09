@@ -78,33 +78,50 @@ func LoadUserConfig() *Config {
 // getValue returns the reflect.Value for the element in the nested structure by the
 // concatenated filter (using '.' as the separator). The filter is case-insensitive.
 // This function also returns the actual path using the correctly capitalized letters
-func (conf *Config) getValue(filter string) (string, reflect.Value, string) {
-
+func (conf *Config) getValue(filter string, makeMap bool) (string, reflect.Value, string) {
 	var realPath string
 	var tag string
 
 	elem := reflect.ValueOf(conf).Elem()
 	path := strings.Split(filter, ".")
 
-	for i, f := range path {
-		var fieldName string
-		strElem := elem
-		elem = elem.FieldByNameFunc(func(fn string) bool {
-			if strings.ToLower(f) != strings.ToLower(fn) {
+	for i, fieldName := range path {
+		curElem := elem
+		if elem.Kind() == reflect.Struct {
+			elem = elem.FieldByNameFunc(func(fn string) bool {
+				if strings.ToLower(fieldName) == strings.ToLower(fn) {
+					fieldName = fn
+					return true
+				}
 				return false
-			}
+			})
+		} else if elem.Kind() == reflect.Map {
+			elem = elem.MapIndex(reflect.ValueOf(fieldName))
+			if !elem.IsValid() {
+				if !makeMap {
+					return realPath, elem, ""
+				}
 
-			realPath = realPath + fn
-			return true
-		})
+				if curElem.IsNil() {
+					curElem.Set(reflect.MakeMap(curElem.Type()))
+				}
+				elem = reflect.New(curElem.Type().Elem().Elem()).Elem().Addr()
+				curElem.SetMapIndex(reflect.ValueOf(fieldName), elem)
+			}
+			elem = elem.Elem()
+		} else {
+			return realPath, elem, ""
+		}
+		realPath = realPath + fieldName
+
 		if !elem.IsValid() {
 			return realPath, elem, ""
 		}
-		if i == len(path)-1 && elem.Kind() == reflect.String {
-			field, _ := strElem.Type().FieldByName(fieldName)
-			tag = field.Tag.Get("cne")
-		} else {
+		if i != len(path)-1 {
 			realPath = realPath + "."
+		} else if elem.Kind() == reflect.String {
+			field, _ := curElem.Type().FieldByName(fieldName)
+			tag = field.Tag.Get("cne")
 		}
 	}
 
@@ -118,22 +135,24 @@ func (conf *Config) getValue(filter string) (string, reflect.Value, string) {
 //  - ErrInvalidArgument if the specified configuration field is a structure
 //  - ErrReadOnly if the specified configuration field cannot be written
 
-func (conf *Config) SetByName(name string, value string) (string, error) {
+func (conf *Config) SetByName(name string, value string) (string, string, error) {
 
-	path, field, tag := conf.getValue(name)
+	path, field, tag := conf.getValue(name, true)
 	if !field.IsValid() {
-		return path, errdefs.ErrNoSuchResource
+		return "", path, errdefs.ErrNoSuchResource
 	}
 	if field.Kind() != reflect.String {
-		return "", errdefs.ErrInvalidArgument
+		return "", "", errdefs.ErrInvalidArgument
 	}
 
 	if tag == "ReadOnly" {
-		return "", errdefs.ErrReadOnly
+		return "", "", errdefs.ErrReadOnly
 	}
 
+	oldValue := field.String()
 	field.SetString(value)
-	return path, nil
+
+	return oldValue, path, nil
 }
 
 // Get returns the value of the configuration field specified by the filter
@@ -141,7 +160,7 @@ func (conf *Config) SetByName(name string, value string) (string, error) {
 //  - ErrNoSuchResource if the specified configuration field cannot be found
 func (conf *Config) GetByName(name string) (string, string, error) {
 
-	path, field, _ := conf.getValue(name)
+	path, field, _ := conf.getValue(name, false)
 	if !field.IsValid() {
 		return "", "", errdefs.ErrNoSuchResource
 	}
@@ -155,7 +174,7 @@ func (conf *Config) GetByName(name string) (string, string, error) {
 //  - ErrNoSuchResource if the specified configuration field cannot be found
 func (conf *Config) GetAllByName(filter string) (string, interface{}, error) {
 
-	path, field, _ := conf.getValue(filter)
+	path, field, _ := conf.getValue(filter, false)
 	if !field.IsValid() {
 		return "", reflect.Value{}, errdefs.ErrNoSuchResource
 	}

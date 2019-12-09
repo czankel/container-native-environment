@@ -8,56 +8,54 @@ import (
 	"text/tabwriter"
 )
 
-func printStructElem(w *tabwriter.Writer, name string, field reflect.Value) {
-	if field.Kind() == reflect.Struct {
-		fieldType := field.Type()
-		for i := 0; i < field.NumField(); i++ {
-			printStructElem(w, name+"."+fieldType.Field(i).Name, field.Field(i))
+// printValue prints the provided value as two columns for name and value content.
+// Struct  Each element is printed as a single row with the provided prefix for the name field
+//         For nested structures, the field names of each substructure are concatenated by '.'
+// Map     Similar to Struct, but using the keys as the prefix instead of the structure elements.
+// <other> Printed as two columns using the prefix as the name for the value content.
+func printValueElem(w *tabwriter.Writer, prefix string, elem reflect.Value) {
+
+	kind := elem.Kind()
+
+	if prefix != "" && (kind == reflect.Struct || kind == reflect.Map) {
+		prefix = prefix + "."
+	}
+
+	if kind == reflect.Struct {
+		elemType := elem.Type()
+		for i := 0; i < elem.NumField(); i++ {
+			printValueElem(w, prefix+elemType.Field(i).Name, elem.Field(i))
 		}
-	} else {
-		fmt.Fprintf(w, "%s\t%s\n", name, field.Interface())
+	} else if kind == reflect.Map {
+		iter := elem.MapRange()
+		for iter.Next() {
+			k := iter.Key()
+			v := iter.Value()
+			printValueElem(w, prefix+k.String(), v)
+		}
+	} else if kind == reflect.Ptr {
+		printValueElem(w, prefix, elem.Elem())
+	} else if elem.CanInterface() {
+		fmt.Fprintf(w, "%s\t%v\n", prefix, elem.Interface())
 	}
 }
 
-// printStruct prints the field and value of all elements of a structure using the provided
-// header names. It supports only 2-level structures
-func printStruct(fieldHdr string, valueHdr string, items interface{}) {
-
-	w := new(tabwriter.Writer)
-	w.Init(os.Stdout, 8, 8, 0, '\t', 0)
-	defer w.Flush()
-
-	fmt.Fprintf(w, "%s\t%s\n", strings.ToUpper(fieldHdr), strings.ToUpper(valueHdr))
-
-	elem := reflect.ValueOf(items).Elem()
-	elemType := elem.Type()
-	for i := 0; i < elem.NumField(); i++ {
-		printStructElem(w, elemType.Field(i).Name, elem.Field(i))
-	}
-}
-
-// printValue prints the content of the provided reflect.Value, which can be a string
-// or a struct.
+// printValue prints the content of the provided value in two columns.
+//  struct: field name, value
+//  map:    key, value
+//  slice:  index, value
+//  <type>: prefix, value
 func printValue(fieldHdr string, valueHdr string, prefix string, value interface{}) {
 
 	w := new(tabwriter.Writer)
-	w.Init(os.Stdout, 8, 8, 0, '\t', 0)
+	w.Init(os.Stdout, 8, 0, 1, ' ', 0)
 	defer w.Flush()
 
 	fmt.Fprintf(w, "%s\t%s\n", strings.ToUpper(fieldHdr), strings.ToUpper(valueHdr))
-
-	elem := reflect.ValueOf(value)
-	elemType := elem.Type()
-	if elemType.Kind() == reflect.Struct {
-		for i := 0; i < elem.NumField(); i++ {
-			printStructElem(w, prefix+elemType.Field(i).Name, elem.Field(i))
-		}
-	} else {
-		printStructElem(w, prefix, elem)
-	}
+	printValueElem(w, prefix, reflect.ValueOf(value))
 }
 
-// printList prints a list (slice of structures) using the field names as the header
+// printList prints a slice of structures using the field names as the header
 func printList(list interface{}) {
 
 	if reflect.TypeOf(list).Kind() != reflect.Slice {
@@ -69,7 +67,7 @@ func printList(list interface{}) {
 	}
 
 	w := new(tabwriter.Writer)
-	w.Init(os.Stdout, 8, 8, 0, '\t', 0)
+	w.Init(os.Stdout, 8, 0, 1, ' ', 0)
 	defer w.Flush()
 
 	hdr := reflect.TypeOf(list).Elem()
