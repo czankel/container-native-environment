@@ -83,7 +83,7 @@ func (conf *Config) getValue(filter string, makeMap bool) (string, reflect.Value
 	var tag string
 
 	elem := reflect.ValueOf(conf).Elem()
-	path := strings.Split(filter, ".")
+	path := strings.Split(filter, "/")
 
 	for i, fieldName := range path {
 		curElem := elem
@@ -118,7 +118,7 @@ func (conf *Config) getValue(filter string, makeMap bool) (string, reflect.Value
 			return realPath, elem, ""
 		}
 		if i != len(path)-1 {
-			realPath = realPath + "."
+			realPath = realPath + "/"
 		} else if elem.Kind() == reflect.String {
 			field, _ := curElem.Type().FieldByName(fieldName)
 			tag = field.Tag.Get("cne")

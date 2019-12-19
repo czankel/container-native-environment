@@ -18,7 +18,7 @@ func printValueElem(w *tabwriter.Writer, prefix string, elem reflect.Value) {
 	kind := elem.Kind()
 
 	if prefix != "" && (kind == reflect.Struct || kind == reflect.Map) {
-		prefix = prefix + "."
+		prefix = prefix + "/"
 	}
 
 	if kind == reflect.Struct {

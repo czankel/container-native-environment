@@ -104,7 +104,7 @@ func TestPrintValueSimpleStructWithPrefix(t *testing.T) {
 		fieldABC: "ValueABC",
 	}
 
-	const expected = "NAME           VALUE\nPrefix.FieldA  ValueA\nPrefix.FieldAB ValueAB\n"
+	const expected = "NAME           VALUE\nPrefix/FieldA  ValueA\nPrefix/FieldAB ValueAB\n"
 	errPos, out := compareFuncOutput(
 		func() { printValue("NAME", "VALUE", "Prefix", &testStruct) }, expected)
 	if errPos != -1 {
@@ -130,7 +130,7 @@ func TestPrintValueNestedStruct(t *testing.T) {
 		},
 	}
 
-	const expected = "NAME           VALUE\nFieldA.FieldAA ValueAA\nFieldA.FieldAB ValueAB\n"
+	const expected = "NAME           VALUE\nFieldA/FieldAA ValueAA\nFieldA/FieldAB ValueAB\n"
 	errPos, out := compareFuncOutput(
 		func() { printValue("NAME", "VALUE", "", &testStruct) }, expected)
 	if errPos != -1 {
@@ -159,10 +159,10 @@ func TestPrintValueStructMap(t *testing.T) {
 	}
 
 	const expected = `NAME               VALUE
-Prefix.KeyA.FieldA ValueAA
-Prefix.KeyA.FieldB ValueAB
-Prefix.KeyB.FieldA ValueBA
-Prefix.KeyB.FieldB ValueBB
+Prefix/KeyA/FieldA ValueAA
+Prefix/KeyA/FieldB ValueAB
+Prefix/KeyB/FieldA ValueBA
+Prefix/KeyB/FieldB ValueBB
 `
 	errPos, out := compareFuncOutput(
 		func() { printValue("NAME", "VALUE", "Prefix", &testMap) }, expected)
