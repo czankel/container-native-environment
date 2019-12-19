@@ -16,9 +16,9 @@ import (
 )
 
 type Runtime struct {
-	Name       string
-	SocketName string
-	Namespace  string `cne:"ReadOnly"`
+	Name       string `toml:"Name,omitempty"`
+	SocketName string `toml:"SocketName,omitempty"`
+	Namespace  string `cne:"ReadOnly" toml:"Namespace,omitempty"`
 }
 
 type Config struct {
