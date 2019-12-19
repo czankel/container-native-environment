@@ -21,8 +21,14 @@ type Runtime struct {
 	Namespace  string `cne:"ReadOnly" toml:"Namespace,omitempty"`
 }
 
+type Registry struct {
+	Domain   string
+	RepoName string
+}
+
 type Config struct {
-	Runtime Runtime
+	Runtime  Runtime `toml:"Runtime,omitempty"`
+	Registry map[string]*Registry
 }
 
 // update updates the configuration with the values from the specified configuration file
@@ -40,6 +46,12 @@ func Load() *Config {
 			Name:       DefaultExecRuntimeName,
 			SocketName: DefaultExecRuntimeSocketName,
 			Namespace:  DefaultExecRuntimeNamespace,
+		},
+		Registry: map[string]*Registry{
+			DefaultRegistryName: &Registry{
+				Domain:   DefaultRegistryDomain,
+				RepoName: DefaultRegistryRepoName,
+			},
 		},
 	}
 

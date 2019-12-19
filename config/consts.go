@@ -10,4 +10,8 @@ const (
 	DefaultExecRuntimeName       = "containerd"
 	DefaultExecRuntimeSocketName = "/run/containerd/containerd.sock"
 	DefaultExecRuntimeNamespace  = "cne"
+
+	DefaultRegistryName     = "docker.io"
+	DefaultRegistryDomain   = "docker.io"
+	DefaultRegistryRepoName = "library"
 )
