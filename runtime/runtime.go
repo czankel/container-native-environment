@@ -5,6 +5,11 @@
 package runtime
 
 import (
+	"time"
+
+	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/image-spec/specs-go/v1"
+
 	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/errdefs"
 )
@@ -15,6 +20,31 @@ type Runtime interface {
 
 	// Close closes the runtime and any open descriptors
 	Close()
+
+	// Images returns a list of images that are registered in the runtime
+	Images() ([]Image, error)
+
+	// PullImage returns a locally cached image or pulls the image from the registry
+	PullImage(name string) (Image, error)
+}
+
+// Image describes an image
+type Image interface {
+
+	// Config returns the configuration of the image
+	Config() (*v1.ImageConfig, error)
+
+	// Digest returns the digest of the image
+	Digest() digest.Digest
+
+	// Name returns the image name
+	Name() string
+
+	// Created returns the data the image was created
+	Created() time.Time
+
+	// Size returns the size of the image
+	Size() int64
 }
 
 type runtimeType interface {
