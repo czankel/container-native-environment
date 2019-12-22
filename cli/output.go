@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"sort"
 	"strings"
 	"text/tabwriter"
 )
@@ -27,11 +28,14 @@ func printValueElem(w *tabwriter.Writer, prefix string, elem reflect.Value) {
 			printValueElem(w, prefix+elemType.Field(i).Name, elem.Field(i))
 		}
 	} else if kind == reflect.Map {
-		iter := elem.MapRange()
-		for iter.Next() {
-			k := iter.Key()
-			v := iter.Value()
-			printValueElem(w, prefix+k.String(), v)
+		m := elem.MapKeys()
+		keys := make([]string, len(m))
+		for i := 0; i < len(m); i++ {
+			keys[i] = m[i].String()
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			printValueElem(w, prefix+k, elem.MapIndex(reflect.ValueOf(k)))
 		}
 	} else if kind == reflect.Ptr {
 		printValueElem(w, prefix, elem.Elem())

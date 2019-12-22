@@ -46,6 +46,7 @@ func compareFuncOutput(printFunc func(), expected string) (int, string) {
 
 	printFunc()
 
+	w.Sync()
 	w.Close()
 	os.Stdout = oldStdout // restoring the real stdout
 	out := <-outC
@@ -167,7 +168,7 @@ Prefix/KeyB/FieldB ValueBB
 	errPos, out := compareFuncOutput(
 		func() { printValue("NAME", "VALUE", "Prefix", &testMap) }, expected)
 	if errPos != -1 {
-		t.Errorf("Failed to print simple structure with prefix (pos %d)", errPos)
+		t.Errorf("Failed to print map (pos %d)", errPos)
 		t.Errorf("\n" + out)
 	}
 }
