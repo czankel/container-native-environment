@@ -40,8 +40,8 @@ type Image interface {
 	// Name returns the image name
 	Name() string
 
-	// Created returns the data the image was created
-	Created() time.Time
+	// CreatedAt returns the data the image was created
+	CreatedAt() time.Time
 
 	// Size returns the size of the image
 	Size() int64

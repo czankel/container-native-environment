@@ -87,7 +87,7 @@ func (img image) Name() string {
 	return img.contdImage.Name()
 }
 
-func (img image) Created() time.Time {
+func (img image) CreatedAt() time.Time {
 	/* Will be in containerd 1.3.3
 	return img.contdImage.Metadata().CreatedAt
 	*/
