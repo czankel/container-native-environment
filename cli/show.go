@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/czankel/cne/config"
+	"github.com/czankel/cne/project"
 )
 
 var showCmd = &cobra.Command{
@@ -54,6 +55,25 @@ func showConfigRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+var showProjectCmd = &cobra.Command{
+	Use:     "project",
+	Short:   "Show the project configuration",
+	Aliases: []string{"prj"},
+	RunE:    showProjectRunE,
+	Args:    cobra.NoArgs,
+}
+
+func showProjectRunE(cmd *cobra.Command, args []string) error {
+
+	prj, err := project.Load()
+	if err != nil {
+		return err
+	}
+
+	printValue("Field", "Value", "", prj)
+
+	return nil
+}
 func init() {
 	rootCmd.AddCommand(showCmd)
 	showCmd.AddCommand(showConfigCmd)
@@ -61,4 +81,5 @@ func init() {
 		&showSystemConfig, "system", "", false, "Show only system configurations")
 	showConfigCmd.Flags().BoolVarP(
 		&showUserConfig, "user", "", false, "Show only user configurations")
+	showCmd.AddCommand(showProjectCmd)
 }
