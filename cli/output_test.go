@@ -206,3 +206,35 @@ ValueBA ValueBB ValueBC
 		t.Errorf("\n" + out)
 	}
 }
+
+func TestPrintValueSlice(t *testing.T) {
+
+	type testStruct struct {
+		FieldA  string
+		FieldBB string
+	}
+
+	testSlice := []testStruct{
+		testStruct{
+			FieldA:  "ValueAA",
+			FieldBB: "ValueABB",
+		},
+		testStruct{
+			FieldA:  "ValueBA",
+			FieldBB: "ValueXYZ",
+		},
+	}
+
+	const expected = `FIELD     VALUE
+0/FieldA  ValueAA
+0/FieldBB ValueABB
+1/FieldA  ValueBA
+1/FieldBB ValueXYZ
+`
+	errPos, out := compareFuncOutput(
+		func() { printValue("Field", "Value", "", testSlice) }, expected)
+	if errPos != -1 {
+		t.Errorf("Failed to print simple structure with prefix (pos %d)", errPos)
+		t.Errorf("\n" + out)
+	}
+}

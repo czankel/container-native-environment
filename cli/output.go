@@ -5,6 +5,7 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"text/tabwriter"
 )
@@ -18,7 +19,7 @@ func printValueElem(w *tabwriter.Writer, prefix string, elem reflect.Value) {
 
 	kind := elem.Kind()
 
-	if prefix != "" && (kind == reflect.Struct || kind == reflect.Map) {
+	if prefix != "" && (kind == reflect.Struct || kind == reflect.Map || kind == reflect.Slice) {
 		prefix = prefix + "/"
 	}
 
@@ -36,6 +37,10 @@ func printValueElem(w *tabwriter.Writer, prefix string, elem reflect.Value) {
 		sort.Strings(keys)
 		for _, k := range keys {
 			printValueElem(w, prefix+k, elem.MapIndex(reflect.ValueOf(k)))
+		}
+	} else if kind == reflect.Slice {
+		for i := 0; i < elem.Len(); i++ {
+			printValueElem(w, prefix+strconv.Itoa(i), elem.Index(i))
 		}
 	} else if kind == reflect.Ptr {
 		printValueElem(w, prefix, elem.Elem())
