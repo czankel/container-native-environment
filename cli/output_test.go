@@ -16,13 +16,13 @@ func compareStrings(l, r string) int {
 	if len(r) < maxLen {
 		maxLen = len(r)
 	}
-	if len(l) != len(r) {
-		return maxLen
-	}
 	for i := 0; i < maxLen; i++ {
 		if l[i] != r[i] {
 			return i
 		}
+	}
+	if len(l) != len(r) {
+		return maxLen
 	}
 	return -1
 }

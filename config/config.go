@@ -237,3 +237,23 @@ func (conf *Config) WriteUserConfig() error {
 	writer := bufio.NewWriter(file)
 	return toml.NewEncoder(writer).Encode(conf)
 }
+
+func (conf *Config) FullImageName(name string) string {
+
+	reg, foundReg := conf.Registry[DefaultRegistryName]
+	domEnd := strings.Index(name, "/") + 1
+	if domEnd > 1 {
+		reg, foundReg = conf.Registry[name[:domEnd-1]]
+	}
+
+	if foundReg {
+		name = reg.Domain + "/" + reg.RepoName + "/" + name[domEnd:]
+	}
+
+	v := strings.LastIndex(name, ":")
+	if v == -1 || v < domEnd {
+		name = name + ":" + DefaultPackageVersion
+	}
+
+	return name
+}
