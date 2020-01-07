@@ -4,6 +4,8 @@ package project
 import (
 	"io/ioutil"
 	"os"
+	"syscall"
+	"time"
 
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v2"
@@ -26,8 +28,10 @@ type Project struct {
 	Name                  string
 	UUID                  string // Unique id for the project
 	Workspaces            []Workspace
-	currentWorkspaceIndex int // the main workspace must be at index 0!
 	path                  string
+	currentWorkspaceIndex int // the main workspace must be at index 0!
+	instanceID            uint64
+	modifiedAt            time.Time
 }
 
 // Workspace is a specific environment of the project. They allow for building a development
@@ -82,10 +86,18 @@ func Create(name string, path string) (*Project, error) {
 	}
 	file.Close()
 
+	fileinfo, err := os.Stat(path)
+
 	prj := &Project{
-		Name: name,
-		UUID: uuid.New().String(),
-		path: path,
+		Name:       name,
+		UUID:       uuid.New().String(),
+		modifiedAt: fileinfo.ModTime(),
+		path:       path,
+	}
+
+	stat, ok := fileinfo.Sys().(*syscall.Stat_t)
+	if ok {
+		prj.instanceID = stat.Ino
 	}
 
 	err = prj.Write()
@@ -118,7 +130,13 @@ func LoadFrom(path string) (*Project, error) {
 	var prj Project
 	yaml.Unmarshal(str, &prj)
 
+	fileinfo, err := os.Stat(path)
 	prj.path = path
+	prj.modifiedAt = fileinfo.ModTime()
+	stat, ok := fileinfo.Sys().(*syscall.Stat_t)
+	if ok {
+		prj.instanceID = stat.Ino
+	}
 
 	return &prj, nil
 }

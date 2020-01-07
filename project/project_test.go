@@ -2,7 +2,9 @@ package project
 
 import (
 	"testing"
+	"time"
 
+	"io"
 	"io/ioutil"
 	"os"
 
@@ -27,6 +29,14 @@ func TestProjectCreate(t *testing.T) {
 	prj, err := Create("test", dir)
 	if err != nil {
 		t.Fatalf("Failed to create new project: %v", err)
+	}
+
+	timediff := time.Now().Sub(prj.modifiedAt)
+	if timediff < 0 {
+		t.Errorf("modifiedAt later than 'Now': %v", timediff)
+	}
+	if timediff > 1000000000 {
+		t.Errorf("modifiedAt earlier than 1s: %v", timediff)
 	}
 
 	prjChk, err := LoadFrom(dir)
@@ -65,6 +75,98 @@ func TestProjectCreateExistingProject(t *testing.T) {
 		}
 	}
 }
+
+// create project in dir test1
+// copy project to test2
+// update project
+func TestCopy(t *testing.T) {
+
+	dir, err := ioutil.TempDir("", testDir)
+	if err != nil {
+		t.Fatalf("Failed to create a temporary directory")
+	}
+	defer os.RemoveAll(dir)
+
+	prj, err := Create("test", dir+"/test1")
+	if err != nil {
+		t.Errorf("Failed to create new project: %v", err)
+	}
+	if prj.instanceID == 0 {
+		t.Errorf("Project ID still 0")
+	}
+
+	src, err := os.Open(dir + "/test1/" + projectDirName + projectFileName)
+	if err != nil {
+		t.Fatalf("Failed to open project file: %v", err)
+	}
+	defer src.Close()
+
+	err = os.MkdirAll(dir+"/test2/"+projectDirName, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create destination directory")
+	}
+
+	dst, err := os.Create(dir + "/test2/" + projectDirName + projectFileName)
+	if err != nil {
+		t.Fatalf("Failed to create destination file")
+	}
+	defer dst.Close()
+
+	wr, err := io.Copy(dst, src)
+	if err != nil {
+		t.Fatalf("Failed to copy project %s", err)
+	}
+	if wr == 0 {
+		t.Fatalf("0 bytes copied")
+	}
+
+	prjChk, err := LoadFrom(dir + "/test2")
+	if prjChk.instanceID == prj.instanceID {
+		t.Fatalf("Copying project should have changed node id")
+	}
+
+	err = prjChk.Write()
+
+	prj3, err := LoadFrom(dir + "/test2")
+	if err != nil {
+		t.Fatalf("Failed to load project")
+	} else if prj3.instanceID != prjChk.instanceID {
+		t.Fatalf("Project instanceID should have been saved")
+	}
+
+}
+
+func TestTwoProjects(t *testing.T) {
+	dir1, err := ioutil.TempDir("", testDir)
+	if err != nil {
+		t.Fatalf("Failed to create a temporary directory")
+	}
+	defer os.RemoveAll(dir1)
+
+	dir2, err := ioutil.TempDir("", testDir)
+	if err != nil {
+		t.Fatalf("Failed to create a temporary directory")
+	}
+	defer os.RemoveAll(dir2)
+
+	prj1, err := Create("test1", dir1)
+	if err != nil {
+		t.Fatalf("Failed to create first project")
+	}
+
+	prj2, err := Create("test2", dir2)
+	if err != nil {
+		t.Fatalf("Failed to create second project")
+	}
+
+	if prj1.instanceID == 0 {
+		t.Errorf("Invalid project id for first project")
+	}
+	if prj1.instanceID == prj2.instanceID {
+		t.Errorf("Two projects cannot have the same instanceID")
+	}
+}
+
 func TestWorkspaceAddRemove(t *testing.T) {
 
 	dir, err := ioutil.TempDir("", testDir)
