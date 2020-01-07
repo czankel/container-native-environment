@@ -31,17 +31,17 @@ type Runtime interface {
 // Image describes an image
 type Image interface {
 
-	// Config returns the configuration of the image
-	Config() (*v1.ImageConfig, error)
+	// Name returns the image name
+	Name() string
 
 	// Digest returns the digest of the image
 	Digest() digest.Digest
 
-	// Name returns the image name
-	Name() string
-
 	// CreatedAt returns the data the image was created
 	CreatedAt() time.Time
+
+	// Config returns the configuration of the image
+	Config() (*v1.ImageConfig, error)
 
 	// Size returns the size of the image
 	Size() int64
