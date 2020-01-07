@@ -23,9 +23,19 @@ type Header struct {
 
 // Project
 type Project struct {
-	Name string
-	UUID string // Unique id for the project
-	path string
+	Name                  string
+	UUID                  string // Unique id for the project
+	Workspaces            []Workspace
+	currentWorkspaceIndex int // the main workspace must be at index 0!
+	path                  string
+}
+
+// Workspace is a specific environment of the project. They allow for building a development
+// pipeline by propagating results to the following workspace.
+// Note that Image cannot be changed and requires to create a new workspace
+type Workspace struct {
+	Name   string // Name of the workspace (must be unique)
+	Origin string // Name or link of the base image
 }
 
 // New defines a new project with the provided name and path.
@@ -141,4 +151,80 @@ func (prj *Project) Write() error {
 	}
 
 	return ioutil.WriteFile(prj.path+projectFileName, append(hStr, pStr...), projectFilePerm)
+}
+
+// NewWorkspace creates a new workspace
+func (prj *Project) NewWorkspace(name string) Workspace {
+
+	ws := Workspace{
+		Name: name,
+	}
+
+	return ws
+}
+
+// CurrentWorkspace retuns the current workspace. Returns NIL if current index it out of scope.
+func (prj *Project) CurrentWorkspace() *Workspace {
+
+	if prj.currentWorkspaceIndex >= len(prj.Workspaces) {
+		return nil
+	}
+
+	return &prj.Workspaces[prj.currentWorkspaceIndex]
+}
+
+// SetCurrentWorkspace sets the current workspace;
+func (prj *Project) SetCurrentWorkspace(name string) error {
+
+	for i, ws := range prj.Workspaces {
+		if name == ws.Name {
+			prj.currentWorkspaceIndex = i
+			return nil
+		}
+	}
+
+	return errdefs.ErrNoSuchResource
+}
+
+// InsertWorkspace adds a workspace to the project before the provided workspace or at the end
+// if 'before' is an empty string
+func (prj *Project) InsertWorkspace(workspace Workspace, before string) error {
+
+	idx := len(prj.Workspaces)
+	for i, ws := range prj.Workspaces {
+		if before == ws.Name {
+			idx = i
+		}
+		if ws.Name == workspace.Name {
+			return errdefs.ErrResourceExists
+		}
+	}
+	if before != "" && idx == len(prj.Workspaces) {
+		return errdefs.ErrNoSuchResource
+	}
+	prj.Workspaces = append(prj.Workspaces[:idx],
+		append([]Workspace{workspace}, prj.Workspaces[idx:]...)...)
+
+	return nil
+}
+
+// RemoveWorkspace removes the specified workspace.
+// If it was the current workspace, the current workspace will be
+// set to the main workspace. Note that the main workspace cannot be removed
+func (prj *Project) RemoveWorkspace(name string) error {
+
+	for i, ws := range prj.Workspaces {
+		if name == ws.Name {
+			prj.Workspaces = append(prj.Workspaces[:i], prj.Workspaces[i+1:]...)
+			// FIXME simply go back index or use invalid index??
+			if prj.currentWorkspaceIndex == i &&
+				prj.currentWorkspaceIndex < len(prj.Workspaces) &&
+				prj.currentWorkspaceIndex > 0 {
+				prj.currentWorkspaceIndex--
+			}
+			return nil
+		}
+	}
+
+	return errdefs.ErrNoSuchResource
 }
