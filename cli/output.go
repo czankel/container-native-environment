@@ -13,6 +13,7 @@ import (
 // printValue prints the provided value as two columns for name and value content.
 // Struct  Each element is printed as a single row with the provided prefix for the name field
 //         For nested structures, the field names of each substructure are concatenated by '.'
+//         Use the output:"-" tag to omit a field.
 // Map     Similar to Struct, but using the keys as the prefix instead of the structure elements.
 // <other> Printed as two columns using the prefix as the name for the value content.
 func printValueElem(w *tabwriter.Writer, prefix string, elem reflect.Value) {
@@ -26,7 +27,9 @@ func printValueElem(w *tabwriter.Writer, prefix string, elem reflect.Value) {
 	if kind == reflect.Struct {
 		elemType := elem.Type()
 		for i := 0; i < elem.NumField(); i++ {
-			printValueElem(w, prefix+elemType.Field(i).Name, elem.Field(i))
+			if elemType.Field(i).Tag.Get("output") != "-" {
+				printValueElem(w, prefix+elemType.Field(i).Name, elem.Field(i))
+			}
 		}
 	} else if kind == reflect.Map {
 		m := elem.MapKeys()
