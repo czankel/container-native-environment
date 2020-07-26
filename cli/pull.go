@@ -1,12 +1,15 @@
 package cli
 
 import (
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
 	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/runtime"
 )
+
+func pullImage(run runtime.Runtime, imageName string) (runtime.Image, error) {
+	return run.PullImage(imageName)
+}
 
 var pullCmd = &cobra.Command{
 	Use:   "pull [REGISTRY]PACKAGE[:TAG|@DIGEST]",
@@ -23,12 +26,14 @@ registry is used.`,
 func pullImageRunE(cmd *cobra.Command, args []string) error {
 
 	conf := config.Load()
+
 	run, err := runtime.Open(conf.Runtime)
 	if err != nil {
-		return errors.Wrap(err, "Failed to open runtime:")
+		return err
 	}
+	defer run.Close()
+	_, err = pullImage(run, conf.FullImageName(args[0]))
 
-	_, err = run.PullImage(conf.FullImageName(args[0]))
 	return err
 }
 
