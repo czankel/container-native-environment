@@ -167,7 +167,7 @@ func TestTwoProjects(t *testing.T) {
 	}
 }
 
-func TestWorkspaceAddRemove(t *testing.T) {
+func TestProjectWorkspace(t *testing.T) {
 
 	dir, err := ioutil.TempDir("", testDir)
 	if err != nil {
@@ -180,22 +180,14 @@ func TestWorkspaceAddRemove(t *testing.T) {
 		t.Fatalf("Failed to create project")
 	}
 
-	ws0 := Workspace{
-		Name:   "Workspace 0",
-		Origin: "image0",
-	}
-	ws1 := Workspace{
-		Name:   "Workspace 1",
-		Origin: "image1",
-	}
-	ws2 := Workspace{
-		Name:   "Workspace 2",
-		Origin: "image2",
-	}
-	ws3 := Workspace{
-		Name:   "Workspace 3",
-		Origin: "image3",
-	}
+	ws0Name := "Workspace 0"
+	ws0Origin := "image0"
+	ws1Name := "Workspace 1"
+	ws1Origin := "image1"
+	ws2Name := "Workspace 2"
+	ws2Origin := "image2"
+	ws3Name := "Workspace 3"
+	ws3Origin := "image3"
 
 	// default should have no workspaces
 	if len(prj.Workspaces) != 0 {
@@ -203,79 +195,78 @@ func TestWorkspaceAddRemove(t *testing.T) {
 	}
 
 	// append: [Workspace 0]
-	err = prj.InsertWorkspace(ws0, "")
+	_, err = prj.CreateWorkspace(ws0Name, ws0Origin, "")
 	if err != nil {
 		t.Errorf("Failed to add Workspace 0")
 	}
 	if len(prj.Workspaces) != 1 {
 		t.Errorf("Invalid number of workspaces after adding Workspace 0")
 	}
-	if prj.Workspaces[0].Name != ws0.Name {
+	if prj.Workspaces[0].Name != ws0Name {
 		t.Errorf("Workspace 0 should be at index 0: " + prj.Workspaces[0].Name)
 	}
 
 	// append: [ws0], [ws1]
-	err = prj.InsertWorkspace(ws1, "")
+	_, err = prj.CreateWorkspace(ws1Name, ws1Origin, "")
 	if err != nil {
 		t.Errorf("Failed to add Workspace 1")
 	}
 	if len(prj.Workspaces) != 2 {
 		t.Errorf("Invalid number of workspaces after adding Workspace 1")
 	}
-	if prj.Workspaces[0].Name != ws0.Name {
+	if prj.Workspaces[0].Name != ws0Name {
 		t.Errorf("Workspace 0 should be at index 0: " + prj.Workspaces[0].Name)
 	}
-	if prj.Workspaces[1].Name != ws1.Name {
+	if prj.Workspaces[1].Name != ws1Name {
 		t.Errorf("Workspace 1 should be at index 1: " + prj.Workspaces[1].Name)
 	}
 
 	// insert: [ws0], [ws2], [ws1]
-	err = prj.InsertWorkspace(ws2, "Workspace 1")
+	_, err = prj.CreateWorkspace(ws2Name, ws2Origin, "Workspace 1")
 	if err != nil {
 		t.Errorf("Failed to add Workspace 2")
 	}
 	if len(prj.Workspaces) != 3 {
 		t.Errorf("Invalid number of workspaces after adding Workspace3")
 	}
-	if prj.Workspaces[0].Name != ws0.Name {
+	if prj.Workspaces[0].Name != ws0Name {
 		t.Errorf("Workspace 0 should be at index 0: " + prj.Workspaces[0].Name)
 	}
-	if prj.Workspaces[1].Name != ws2.Name {
+	if prj.Workspaces[1].Name != ws2Name {
 		t.Errorf("Workspace 2 should be at index 1: " + prj.Workspaces[1].Name)
 	}
-	if prj.Workspaces[2].Name != ws1.Name {
+	if prj.Workspaces[2].Name != ws1Name {
 		t.Errorf("Workspace 1 should be at index 2: " + prj.Workspaces[2].Name)
 	}
 
 	// insert first: [ws3], [ws0], [ws2], [ws1]
-	err = prj.InsertWorkspace(ws3, "Workspace 0")
+	_, err = prj.CreateWorkspace(ws3Name, ws3Origin, "Workspace 0")
 	if err != nil {
 		t.Errorf("Failed to add Workspace 3")
 	}
 	if len(prj.Workspaces) != 4 {
 		t.Errorf("Invalid number of workspaces after adding Workspace 3")
 	}
-	if prj.Workspaces[0].Name != ws3.Name {
+	if prj.Workspaces[0].Name != ws3Name {
 		t.Errorf("Workspace 3 should be at index 0: " + prj.Workspaces[0].Name)
 	}
-	if prj.Workspaces[1].Name != ws0.Name {
+	if prj.Workspaces[1].Name != ws0Name {
 		t.Errorf("Workspace 0 should be at index 1: " + prj.Workspaces[1].Name)
 	}
-	if prj.Workspaces[2].Name != ws2.Name {
+	if prj.Workspaces[2].Name != ws2Name {
 		t.Errorf("Workspace 2 should be at index 2: " + prj.Workspaces[2].Name)
 	}
-	if prj.Workspaces[3].Name != ws1.Name {
+	if prj.Workspaces[3].Name != ws1Name {
 		t.Errorf("Workspace 1 should be at index 3: " + prj.Workspaces[3].Name)
 	}
 
-	ws2a := ws2
-	err = prj.InsertWorkspace(ws2a, "")
+	_, err = prj.CreateWorkspace(ws2Name, ws2Origin, "")
 	if err == nil {
 		t.Errorf("Should have failed to add workspace with same name")
 	}
 
 	// remove ws0 inside: [ws3], [ws0], [ws2], [ws1]
-	if prj.RemoveWorkspace("Workspace 0") != nil {
+	if prj.DeleteWorkspace(ws0Name) != nil {
 		t.Errorf("Failed to remove Workspace 0")
 	}
 	if len(prj.Workspaces) != 3 {
@@ -283,21 +274,21 @@ func TestWorkspaceAddRemove(t *testing.T) {
 	}
 
 	// remove ws1 at the end: [ws3], [ws2], [ws1]
-	if prj.RemoveWorkspace("Workspace 1") != nil {
+	if prj.DeleteWorkspace(ws1Name) != nil {
 		t.Errorf("Failed to remove Workspace 1")
 	}
 	if len(prj.Workspaces) != 2 {
 		t.Errorf("Invalid number of workspaces after removing Workspace 1")
 	}
 	// remove ws3 at the beginning: [ws3], [ws2]
-	if prj.RemoveWorkspace("Workspace 3") != nil {
+	if prj.DeleteWorkspace(ws3Name) != nil {
 		t.Errorf("Failed to remove Workspace 3")
 	}
 	if len(prj.Workspaces) != 1 {
 		t.Errorf("Invalid number of workspaces after removing Workspace 3")
 	}
 	// remove last ws2: [ws2]
-	if prj.RemoveWorkspace("Workspace 2") != nil {
+	if prj.DeleteWorkspace(ws2Name) != nil {
 		t.Errorf("Failed to remove Workspace 2")
 	}
 	if len(prj.Workspaces) != 0 {

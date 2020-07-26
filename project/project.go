@@ -4,6 +4,7 @@ package project
 import (
 	"io/ioutil"
 	"os"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -204,37 +205,58 @@ func (prj *Project) SetCurrentWorkspace(name string) error {
 	return errdefs.ErrNoSuchResource
 }
 
-// InsertWorkspace adds a workspace to the project before the provided workspace or at the end
-// if 'before' is an empty string
-func (prj *Project) InsertWorkspace(workspace Workspace, before string) error {
+// CreateWorkspace creates a new workspace in the project before the provided workspace
+// or at the end if 'before' is an empty string
+// FIXME: returns pointer to workspace...
+func (prj *Project) CreateWorkspace(name string, origin string, before string) (*Workspace, error) {
 
+	if name == "" {
+		name = "main"
+		idx := 0
+		for i := 0; i < len(prj.Workspaces); i++ {
+			if name == prj.Workspaces[i].Name {
+				name = "ws-" + strconv.Itoa(idx)
+				idx++
+				i = 0
+			}
+		}
+	}
+
+	workspace := Workspace{
+		Name:   name,
+		Origin: origin,
+	}
 	idx := len(prj.Workspaces)
 	for i, ws := range prj.Workspaces {
 		if before == ws.Name {
 			idx = i
 		}
 		if ws.Name == workspace.Name {
-			return errdefs.ErrResourceExists
+			return nil, errdefs.ErrResourceExists
 		}
 	}
 	if before != "" && idx == len(prj.Workspaces) {
-		return errdefs.ErrNoSuchResource
+		return nil, errdefs.ErrNoSuchResource
 	}
+
+	if len(prj.Workspaces) > 0 && idx <= prj.currentWorkspaceIndex {
+		prj.currentWorkspaceIndex = prj.currentWorkspaceIndex + 1
+	}
+
 	prj.Workspaces = append(prj.Workspaces[:idx],
 		append([]Workspace{workspace}, prj.Workspaces[idx:]...)...)
 
-	return nil
+	return &prj.Workspaces[idx], nil
 }
 
-// RemoveWorkspace removes the specified workspace.
+// DeleteWorkspace removes the specified workspace.
 // If it was the current workspace, the current workspace will be
 // set to the main workspace. Note that the main workspace cannot be removed
-func (prj *Project) RemoveWorkspace(name string) error {
+func (prj *Project) DeleteWorkspace(name string) error {
 
 	for i, ws := range prj.Workspaces {
 		if name == ws.Name {
 			prj.Workspaces = append(prj.Workspaces[:i], prj.Workspaces[i+1:]...)
-			// FIXME simply go back index or use invalid index??
 			if prj.currentWorkspaceIndex == i &&
 				prj.currentWorkspaceIndex < len(prj.Workspaces) &&
 				prj.currentWorkspaceIndex > 0 {

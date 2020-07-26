@@ -1,8 +1,6 @@
 package cli
 
 import (
-	"strconv"
-
 	"github.com/spf13/cobra"
 
 	"github.com/czankel/cne/config"
@@ -37,39 +35,31 @@ func createWorkspaceRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	var wsName string
-	if len(args) > 0 {
+	wsName := ""
+	if len(args) != 0 {
 		wsName = args[0]
-	} else {
-		wsName = "main"
-		idx := 0
-		for i := 0; i < len(prj.Workspaces); i++ {
-			if wsName == prj.Workspaces[idx].Name {
-				wsName = "ws-" + strconv.Itoa(idx)
-				idx++
-				i = 0
-			}
+	}
+
+	imgName := ""
+	if createWorkspaceFrom != "" {
+
+		run, err := runtime.Open(conf.Runtime)
+		if err != nil {
+			return err
+		}
+		defer run.Close()
+
+		imgName = conf.FullImageName(createWorkspaceFrom)
+		_, err = pullImage(run, imgName)
+		if err != nil {
+			return err
 		}
 	}
 
-	ws := prj.NewWorkspace(wsName)
-	err = prj.InsertWorkspace(ws, createWorkspaceInsert)
+	_, err = prj.CreateWorkspace(wsName, imgName, createWorkspaceInsert)
 	if err != nil {
 		return err
 	}
-
-	run, err := runtime.Open(conf.Runtime)
-	if err != nil {
-		return err
-	}
-	defer run.Close()
-
-	imgName := conf.FullImageName(createWorkspaceFrom)
-	_, err = run.PullImage(imgName)
-	if err != nil {
-		return err
-	}
-	ws.Origin = imgName
 
 	return prj.Write()
 }
