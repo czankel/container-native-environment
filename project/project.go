@@ -86,16 +86,16 @@ func Create(name string, path string) (*Project, error) {
 	}
 	file.Close()
 
-	fileinfo, err := os.Stat(path)
+	fileInfo, err := os.Stat(path)
 
 	prj := &Project{
 		Name:       name,
 		UUID:       uuid.New().String(),
-		modifiedAt: fileinfo.ModTime(),
+		modifiedAt: fileInfo.ModTime(),
 		path:       path,
 	}
 
-	stat, ok := fileinfo.Sys().(*syscall.Stat_t)
+	stat, ok := fileInfo.Sys().(*syscall.Stat_t)
 	if ok {
 		prj.instanceID = stat.Ino
 	}
@@ -130,10 +130,10 @@ func LoadFrom(path string) (*Project, error) {
 	var prj Project
 	yaml.Unmarshal(str, &prj)
 
-	fileinfo, err := os.Stat(path)
+	fileInfo, err := os.Stat(path)
 	prj.path = path
-	prj.modifiedAt = fileinfo.ModTime()
-	stat, ok := fileinfo.Sys().(*syscall.Stat_t)
+	prj.modifiedAt = fileInfo.ModTime()
+	stat, ok := fileInfo.Sys().(*syscall.Stat_t)
 	if ok {
 		prj.instanceID = stat.Ino
 	}
