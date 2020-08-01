@@ -37,7 +37,7 @@ func updateWorkspaceRunE(cmd *cobra.Command, args []string) error {
 	if updateWorkspaceName != "" {
 		for _, ws := range prj.Workspaces {
 			if ws.Name == updateWorkspaceName {
-				return errdefs.ErrResourceExists
+				return errdefs.AlreadyExists("workspace", updateWorkspaceName)
 			} else if ws.Name == wsName {
 				ws.Name = wsName
 			}

@@ -34,7 +34,10 @@ type Config struct {
 // update updates the configuration with the values from the specified configuration file
 func (conf *Config) update(path string) error {
 	_, err := toml.DecodeFile(path, conf)
-	return err
+	if err != nil {
+		return errdefs.InvalidArgument("config file '%s' corrupt", path)
+	}
+	return nil
 }
 
 // Load returns the default configuration amended by the configuration stored in the
@@ -151,14 +154,14 @@ func (conf *Config) SetByName(name string, value string) (string, string, error)
 
 	path, field, tag := conf.getValue(name, true)
 	if !field.IsValid() {
-		return "", path, errdefs.ErrNoSuchResource
+		return "", path, errdefs.NotFound("configuration", name)
 	}
 	if field.Kind() != reflect.String {
-		return "", "", errdefs.ErrInvalidArgument
+		return "", "", errdefs.InvalidArgument("cannot set configuration '%s'", name)
 	}
 
 	if tag == "ReadOnly" {
-		return "", "", errdefs.ErrReadOnly
+		return "", "", errdefs.InvalidArgument("configuration '%s' is read-only", name)
 	}
 
 	oldValue := field.String()
@@ -167,14 +170,14 @@ func (conf *Config) SetByName(name string, value string) (string, string, error)
 	return oldValue, path, nil
 }
 
-// Get returns the value of the configuration field specified by the filter
+// Get returns the value of the configuration field specified by name
 // Errors:
-//  - ErrNoSuchResource if the specified configuration field cannot be found
+//  - ErrNotFound if the specified configuration field cannot be found
 func (conf *Config) GetByName(name string) (string, string, error) {
 
 	path, field, _ := conf.getValue(name, false)
 	if !field.IsValid() {
-		return "", "", errdefs.ErrNoSuchResource
+		return "", "", errdefs.NotFound("configuration", name)
 	}
 
 	return path, field.String(), nil
@@ -182,13 +185,11 @@ func (conf *Config) GetByName(name string) (string, string, error) {
 
 // GetAllByName returns a 'reflect.Value' for the selected field, which
 // can be a structure for nested structures.
-// Errors:
-//  - ErrNoSuchResource if the specified configuration field cannot be found
-func (conf *Config) GetAllByName(filter string) (string, interface{}, error) {
+func (conf *Config) GetAllByName(name string) (string, interface{}, error) {
 
-	path, field, _ := conf.getValue(filter, false)
+	path, field, _ := conf.getValue(name, false)
 	if !field.IsValid() {
-		return "", reflect.Value{}, errdefs.ErrNoSuchResource
+		return "", reflect.Value{}, errdefs.NotFound("configuration", name)
 	}
 
 	return path, field.Interface(), nil
@@ -200,13 +201,18 @@ func (conf *Config) WriteSystemConfig() error {
 
 	file, err := os.OpenFile(SystemConfigFile, os.O_TRUNC|os.O_RDWR|os.O_CREATE, ConfigFilePerms)
 	if err != nil {
-		return err
+		return errdefs.SystemError(err, "failed to open configuration file: %s",
+			SystemConfigFile)
 	}
 	defer file.Close()
 	defer file.Sync()
 
 	writer := bufio.NewWriter(file)
-	return toml.NewEncoder(writer).Encode(conf)
+	err = toml.NewEncoder(writer).Encode(conf)
+	if err != nil {
+		return errdefs.SystemError(err, "failed to write configuration file")
+	}
+	return nil
 }
 
 // WriteUserConfig writes the user configuration in the home directory of the current user.
@@ -220,7 +226,7 @@ func (conf *Config) WriteUserConfig() error {
 	path := usr.HomeDir + "/" + UserConfigFile
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, ConfigFilePerms)
 	if err != nil {
-		return err
+		return errdefs.SystemError(err, "failed to write configuration file '%s'", path)
 	}
 	defer file.Close()
 	defer file.Sync()
@@ -230,12 +236,17 @@ func (conf *Config) WriteUserConfig() error {
 	if euid != uid {
 		gid := os.Getgid()
 		if err = file.Chown(uid, gid); err != nil {
-			return err
+			return errdefs.SystemError(err,
+				"failed to update permissions for '%s'", path)
 		}
 	}
 
 	writer := bufio.NewWriter(file)
-	return toml.NewEncoder(writer).Encode(conf)
+	err = toml.NewEncoder(writer).Encode(conf)
+	if err != nil {
+		return errdefs.SystemError(err, "failed to write configuration file '%s'", path)
+	}
+	return nil
 }
 
 func (conf *Config) FullImageName(name string) string {

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 
@@ -30,23 +31,29 @@ func init() {
 // name: optional name for new projects.
 func initProjectRunE(cmd *cobra.Command, args []string) error {
 
-	prj, err := project.Load()
-	if err == errdefs.ErrNoSuchResource {
+	_, err := project.Load()
+	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
+		return err
+	}
+
+	if errors.Is(err, errdefs.ErrNotFound) {
 		var path string
 		path, err = os.Getwd()
 		if err != nil {
-			return err
+			return errdefs.SystemError(err,
+				"failed to setup project in working directory")
 		}
 		name := filepath.Base(path)
 		if len(args) > 0 {
 			name = args[0]
 		}
 		_, err = project.Create(name, path)
+		if err != nil {
+			return err
+		}
 	} else if len(args) > 0 {
-		return errdefs.ErrResourceExists
-	} else if err == errdefs.ErrUninitialized {
-		err = prj.Write()
+		return errdefs.AlreadyExists("project", args[0])
 	}
 
-	return err
+	return nil
 }

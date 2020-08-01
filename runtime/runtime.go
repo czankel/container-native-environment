@@ -5,6 +5,7 @@
 package runtime
 
 import (
+	"fmt"
 	"time"
 
 	digest "github.com/opencontainers/go-digest"
@@ -61,7 +62,7 @@ func Register(name string, runType runtimeType) error {
 
 	_, ok := runtimes[name]
 	if ok {
-		return errdefs.ErrResourceExists
+		return errdefs.AlreadyExists("runtime", name)
 	}
 	runtimes[name] = runType
 	return nil
@@ -79,7 +80,16 @@ func Runtimes() []string {
 func Open(confRun config.Runtime) (Runtime, error) {
 	reg, ok := runtimes[confRun.Name]
 	if !ok {
-		return nil, errdefs.ErrNoSuchResource
+		return nil, errdefs.NotFound("runtime", confRun.Name)
 	}
 	return reg.Open(confRun)
+}
+
+// Errorf returns a runtime error for unspecific errors that cannot be mapped to a error type.
+//
+// This function should be used mostly for internal errors. Others, for example, invalid arguments,
+// already exists, not found, etc. should use the errors defined in errdefs directly.
+func Errorf(format string, args ...interface{}) error {
+	return errdefs.New(errdefs.ErrRuntimeError,
+		fmt.Sprintf("runtime: "+format, args...))
 }

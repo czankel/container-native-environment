@@ -1,6 +1,7 @@
 package project
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -22,7 +23,7 @@ func TestProjectCreate(t *testing.T) {
 	defer os.RemoveAll(dir)
 
 	_, err = LoadFrom(dir)
-	if err != errdefs.ErrNoSuchResource {
+	if !errors.Is(err, errdefs.ErrNotFound) {
 		t.Fatalf("Should have failed to load non-existent project: %v", err)
 	}
 

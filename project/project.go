@@ -52,7 +52,7 @@ func Create(name string, path string) (*Project, error) {
 		var err error
 		path, err = os.Getwd()
 		if err != nil {
-			return nil, err
+			return nil, errdefs.SystemError(err, "failed to get work directory")
 		}
 	} else if path[len(path)-1] != '/' {
 		path = path + "/"
@@ -61,20 +61,22 @@ func Create(name string, path string) (*Project, error) {
 	path = path + projectDirName
 	_, err := os.Stat(path)
 	if err == nil {
-		return nil, errdefs.ErrResourceExists
+		return nil, errdefs.AlreadyExists("project", path)
 	} else if !os.IsNotExist(err) {
-		return nil, errdefs.ErrResourceExists
+		return nil, errdefs.SystemError(err, "cannot read project in '%s'", path)
 	}
 
 	err = os.MkdirAll(path, projectDirPerm)
 	if err != nil {
-		return nil, errdefs.ErrInvalidArgument
+		return nil, errdefs.SystemError(err,
+			"failed to create project directory '%s'", path)
 	}
 
 	flags := os.O_RDONLY | os.O_CREATE | os.O_EXCL | os.O_SYNC
 	file, err := os.OpenFile(path+projectFileName, flags, projectFilePerm)
 	if err != nil {
-		return nil, err
+		return nil, errdefs.SystemError(err,
+			"failed to create project file '%s'", path)
 	}
 
 	euid := os.Geteuid()
@@ -82,7 +84,8 @@ func Create(name string, path string) (*Project, error) {
 	gid := os.Getgid()
 	if euid != uid {
 		if err = file.Chown(uid, gid); err != nil {
-			return nil, err
+			return nil, errdefs.SystemError(err,
+				"failed to change file permissions '%s'", path)
 		}
 	}
 	file.Close()
@@ -109,7 +112,7 @@ func Create(name string, path string) (*Project, error) {
 func LoadFrom(path string) (*Project, error) {
 
 	if len(path) == 0 {
-		return nil, errdefs.ErrInvalidArgument
+		return nil, errdefs.InvalidArgument("invalid path: '%s'", path)
 	}
 	if path[len(path)-1] != '/' {
 		path = path + "/"
@@ -119,10 +122,10 @@ func LoadFrom(path string) (*Project, error) {
 
 	str, err := ioutil.ReadFile(path + projectFileName)
 	if os.IsNotExist(err) {
-		return nil, errdefs.ErrNoSuchResource
+		return nil, errdefs.NotFound("project", path)
 	}
 	if err != nil {
-		return nil, errdefs.ErrInvalidArgument
+		return nil, errdefs.SystemError(err, "failed to read project file '%s'", path)
 	}
 
 	var header Header
@@ -147,7 +150,7 @@ func Load() (*Project, error) {
 
 	path, err := os.Getwd()
 	if err != nil {
-		return nil, err
+		return nil, errdefs.SystemError(err, "failed to load project file in '%s'", path)
 	}
 
 	return LoadFrom(path)
@@ -161,15 +164,19 @@ func (prj *Project) Write() error {
 	}
 	hStr, err := yaml.Marshal(header)
 	if err != nil {
-		return err
+		return errdefs.InvalidArgument("project file corrupt")
 	}
 
 	pStr, err := yaml.Marshal(prj)
 	if err != nil {
-		return err
+		return errdefs.InvalidArgument("project file corrupt")
 	}
 
-	return ioutil.WriteFile(prj.path+projectFileName, append(hStr, pStr...), projectFilePerm)
+	err = ioutil.WriteFile(prj.path+projectFileName, append(hStr, pStr...), projectFilePerm)
+	if err != nil {
+		return errdefs.SystemError(err, "failed to write project")
+	}
+	return nil
 }
 
 // NewWorkspace creates a new workspace
@@ -202,7 +209,7 @@ func (prj *Project) SetCurrentWorkspace(name string) error {
 		}
 	}
 
-	return errdefs.ErrNoSuchResource
+	return errdefs.NotFound("workspace", name)
 }
 
 // CreateWorkspace creates a new workspace in the project before the provided workspace
@@ -232,11 +239,11 @@ func (prj *Project) CreateWorkspace(name string, origin string, before string) (
 			idx = i
 		}
 		if ws.Name == workspace.Name {
-			return nil, errdefs.ErrResourceExists
+			return nil, errdefs.AlreadyExists("workspace", workspace.Name)
 		}
 	}
 	if before != "" && idx == len(prj.Workspaces) {
-		return nil, errdefs.ErrNoSuchResource
+		return nil, errdefs.NotFound("workspace", workspace.Name)
 	}
 
 	if len(prj.Workspaces) > 0 && idx <= prj.currentWorkspaceIndex {
@@ -266,5 +273,5 @@ func (prj *Project) DeleteWorkspace(name string) error {
 		}
 	}
 
-	return errdefs.ErrNoSuchResource
+	return errdefs.NotFound("workspace", name)
 }

@@ -16,7 +16,6 @@ import (
 	"github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/czankel/cne/config"
-	"github.com/czankel/cne/errdefs"
 )
 
 // containerdRuntime provides the runtime implementation for the containerd daemon
@@ -104,9 +103,9 @@ func (run *containerdRuntime) PullImage(name string) (Image, error) {
 
 	img, err := run.client.Pull(run.context, name, containerd.WithPullUnpack)
 	if err == reference.ErrObjectRequired {
-		return nil, errdefs.ErrNoSuchResource
+		return nil, Errorf("invalid image name '%s': %v", name, err)
 	} else if err != nil {
-		return nil, err
+		return nil, Errorf("pull image '%s' failed: %v", name, err)
 	}
 
 	return &image{
