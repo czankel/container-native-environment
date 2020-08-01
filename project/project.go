@@ -2,8 +2,13 @@
 package project
 
 import (
+	"crypto/md5"
+	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
+	"reflect"
+	"sort"
 	"strconv"
 	"syscall"
 	"time"
@@ -24,13 +29,13 @@ type Header struct {
 	Version string
 }
 
-// Project
+// Project is the current persistent project definition.
 type Project struct {
 	Name                  string
-	UUID                  string // Unique id for the project
+	UUID                  string // Universal Unique id for the project
 	Workspaces            []Workspace
 	path                  string
-	currentWorkspaceIndex int // the main workspace must be at index 0!
+	currentWorkspaceIndex int // The main workspace must be at index 0!
 	instanceID            uint64
 	modifiedAt            time.Time
 }
@@ -39,13 +44,27 @@ type Project struct {
 // pipeline by propagating results to the following workspace.
 // Note that Image cannot be changed and requires to create a new workspace
 type Workspace struct {
-	Name   string // Name of the workspace (must be unique)
-	Origin string // Name or link of the base image
+	Name        string // Name of the workspace (must be unique)
+	Environment Environment
+	ProjectUUID string `yaml:"-" output:"-"`
 }
 
-// New defines a new project with the provided name and path.
-// The path can be empty, in which case the current working directory will be used.
+// Environment describes the container-native environment
+type Environment struct {
+	Origin       string // Name or link of the base image - cannot be changed
+	Capabilities []string
+	Layers       []Layer
+}
+
+// Layer describes an 'overlay' layer. This can be virtual or explicit using an overlay FS
+type Layer struct {
+	Name     string   // Unique name for the layer in the workspace; must not contain '/'
+	Commands []string // Commands to build the layer (except for hidden layers)
+	Digest   string   `hash:"-"` // Images/Snaps for faster rebuilds. Intermediates opt.
+}
+
 // Create creates the project in the provide path
+// The path can be empty to use the current working directory.
 func Create(name string, path string) (*Project, error) {
 
 	if path == "" {
@@ -142,6 +161,11 @@ func LoadFrom(path string) (*Project, error) {
 		prj.instanceID = stat.Ino
 	}
 
+	// Fixup workspaces
+	for i := 0; i < len(prj.Workspaces); i++ {
+		prj.Workspaces[i].ProjectUUID = prj.UUID
+	}
+
 	return &prj, nil
 }
 
@@ -179,24 +203,26 @@ func (prj *Project) Write() error {
 	return nil
 }
 
-// NewWorkspace creates a new workspace
-func (prj *Project) NewWorkspace(name string) Workspace {
-
-	ws := Workspace{
-		Name: name,
-	}
-
-	return ws
-}
-
-// CurrentWorkspace retuns the current workspace. Returns NIL if current index it out of scope.
-func (prj *Project) CurrentWorkspace() *Workspace {
+// CurrentWorkspace retuns a pointer to the current workspace in the project.
+func (prj *Project) CurrentWorkspace() (*Workspace, error) {
 
 	if prj.currentWorkspaceIndex >= len(prj.Workspaces) {
-		return nil
+		return nil, errdefs.InternalError("invalid current workspace")
 	}
 
-	return &prj.Workspaces[prj.currentWorkspaceIndex]
+	return &prj.Workspaces[prj.currentWorkspaceIndex], nil
+}
+
+// Workspace returns a pointer to the workspace in the project specified by the provided name
+// or error if it doesn't exist in the project
+func (prj *Project) Workspace(name string) (*Workspace, error) {
+
+	for i, w := range prj.Workspaces {
+		if name == w.Name {
+			return &prj.Workspaces[i], nil
+		}
+	}
+	return nil, errdefs.NotFound("workspace", name)
 }
 
 // SetCurrentWorkspace sets the current workspace;
@@ -213,8 +239,8 @@ func (prj *Project) SetCurrentWorkspace(name string) error {
 }
 
 // CreateWorkspace creates a new workspace in the project before the provided workspace
-// or at the end if 'before' is an empty string
-// FIXME: returns pointer to workspace...
+// or at the end if 'before' is an empty string.
+// It returns the pointer to the workspace in the current project.
 func (prj *Project) CreateWorkspace(name string, origin string, before string) (*Workspace, error) {
 
 	if name == "" {
@@ -230,8 +256,9 @@ func (prj *Project) CreateWorkspace(name string, origin string, before string) (
 	}
 
 	workspace := Workspace{
-		Name:   name,
-		Origin: origin,
+		Name:        name,
+		ProjectUUID: prj.UUID,
+		Environment: Environment{Origin: origin},
 	}
 	idx := len(prj.Workspaces)
 	for i, ws := range prj.Workspaces {
@@ -274,4 +301,124 @@ func (prj *Project) DeleteWorkspace(name string) error {
 	}
 
 	return errdefs.NotFound("workspace", name)
+}
+
+//
+// Workspace
+//
+
+// hashValueElem is a helper function to recursively hash a Value
+func hashValueElem(w io.Writer, prefix string, elem reflect.Value) {
+
+	kind := elem.Kind()
+
+	if prefix != "" && (kind == reflect.Struct || kind == reflect.Map || kind == reflect.Slice) {
+		prefix = prefix + "/"
+	}
+
+	if kind == reflect.Struct {
+		elemType := elem.Type()
+		for i := 0; i < elem.NumField(); i++ {
+			field := elemType.Field(i)
+			if field.Tag.Get("hash") != "-" {
+				hashValueElem(w, prefix+field.Name, elem.Field(i))
+			}
+		}
+	} else if kind == reflect.Map {
+		m := elem.MapKeys()
+		keys := make([]string, len(m))
+		for i := 0; i < len(m); i++ {
+			keys[i] = m[i].String()
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			hashValueElem(w, prefix+k, elem.MapIndex(reflect.ValueOf(k)))
+		}
+	} else if kind == reflect.Slice {
+		for i := 0; i < elem.Len(); i++ {
+			hashValueElem(w, prefix+strconv.Itoa(i), elem.Index(i))
+		}
+	} else if kind == reflect.Ptr {
+		hashValueElem(w, prefix, elem.Elem())
+	} else if elem.CanInterface() {
+		w.Write([]byte(prefix))
+		str := fmt.Sprintf("%v", elem.Interface())
+		w.Write([]byte(str))
+	}
+}
+
+// ID returns an identification for the workspace
+func (ws *Workspace) ID() [16]byte {
+	var id [16]byte
+
+	hash := md5.New()
+	hashValueElem(hash, "", reflect.ValueOf(ws.Name))
+	copy(id[:], hash.Sum(nil)[:])
+
+	return id
+}
+
+// ConfigHash returns a unique hash over the enitre Workspace structure.
+func (ws *Workspace) ConfigHash() [16]byte {
+
+	var gen [16]byte
+
+	hash := md5.New()
+	hashValueElem(hash, "", reflect.ValueOf(ws))
+	copy(gen[:], hash.Sum(nil)[:])
+
+	return gen
+}
+
+// CreateLayer inserts a new layer (or layers) at the provided index, or at the end if index == -1
+func (ws *Workspace) CreateLayer(name string, atIndex int) (*Layer, error) {
+
+	if atIndex < -1 || atIndex > len(ws.Environment.Layers) {
+		return nil, errdefs.InvalidArgument("invalid index: %d", atIndex)
+	}
+	if atIndex == -1 {
+		atIndex = len(ws.Environment.Layers)
+	}
+
+	for _, l := range ws.Environment.Layers {
+		if name == l.Name {
+			return nil, errdefs.AlreadyExists("layer", name)
+		}
+	}
+
+	ws.Environment.Layers = append(ws.Environment.Layers[:atIndex],
+		append([]Layer{Layer{Name: name}}, ws.Environment.Layers[atIndex:]...)...)
+
+	return &ws.Environment.Layers[atIndex], nil
+}
+
+func (ws *Workspace) FindLayer(name string) *Layer {
+	for i, l := range ws.Environment.Layers {
+		if name == l.Name {
+			return &ws.Environment.Layers[i]
+		}
+	}
+	return nil
+}
+
+// DeleteLayer removes the specified layer.
+func (ws *Workspace) DeleteLayer(name string) error {
+	for i, l := range ws.Environment.Layers {
+		if name == l.Name {
+			ws.Environment.Layers = append(ws.Environment.Layers[:i],
+				ws.Environment.Layers[i+1:]...)
+			return nil
+		}
+	}
+	return errdefs.NotFound("layer", name)
+}
+
+// TopLayer returns the pointer to the top layer.
+func (ws *Workspace) TopLayer() *Layer {
+	cnt := len(ws.Environment.Layers)
+	if cnt == 0 {
+		return nil
+	}
+
+	return &ws.Environment.Layers[cnt-1]
 }
