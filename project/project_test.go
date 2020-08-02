@@ -2,12 +2,11 @@ package project
 
 import (
 	"errors"
-	"testing"
-	"time"
-
 	"io"
 	"io/ioutil"
 	"os"
+	"testing"
+	"time"
 
 	"github.com/czankel/cne/errdefs"
 )
@@ -80,7 +79,7 @@ func TestProjectCreateExistingProject(t *testing.T) {
 // create project in dir test1
 // copy project to test2
 // update project
-func TestCopy(t *testing.T) {
+func TestProjectCopyProjects(t *testing.T) {
 
 	dir, err := ioutil.TempDir("", testDir)
 	if err != nil {
@@ -90,7 +89,7 @@ func TestCopy(t *testing.T) {
 
 	prj, err := Create("test", dir+"/test1")
 	if err != nil {
-		t.Errorf("Failed to create new project: %v", err)
+		t.Fatalf("Failed to create new project: %v", err)
 	}
 	if prj.instanceID == 0 {
 		t.Errorf("Project ID still 0")
@@ -137,7 +136,8 @@ func TestCopy(t *testing.T) {
 
 }
 
-func TestTwoProjects(t *testing.T) {
+//
+func TestProjectCreateTwoProjects(t *testing.T) {
 	dir1, err := ioutil.TempDir("", testDir)
 	if err != nil {
 		t.Fatalf("Failed to create a temporary directory")
@@ -267,7 +267,7 @@ func TestProjectWorkspace(t *testing.T) {
 	}
 
 	// remove ws0 inside: [ws3], [ws0], [ws2], [ws1]
-	if prj.DeleteWorkspace(ws0Name) != nil {
+	if prj.DeleteWorkspace("Workspace 0") != nil {
 		t.Errorf("Failed to remove Workspace 0")
 	}
 	if len(prj.Workspaces) != 3 {
@@ -275,25 +275,205 @@ func TestProjectWorkspace(t *testing.T) {
 	}
 
 	// remove ws1 at the end: [ws3], [ws2], [ws1]
-	if prj.DeleteWorkspace(ws1Name) != nil {
+	if prj.DeleteWorkspace("Workspace 1") != nil {
 		t.Errorf("Failed to remove Workspace 1")
 	}
 	if len(prj.Workspaces) != 2 {
 		t.Errorf("Invalid number of workspaces after removing Workspace 1")
 	}
 	// remove ws3 at the beginning: [ws3], [ws2]
-	if prj.DeleteWorkspace(ws3Name) != nil {
+	if prj.DeleteWorkspace("Workspace 3") != nil {
 		t.Errorf("Failed to remove Workspace 3")
 	}
 	if len(prj.Workspaces) != 1 {
 		t.Errorf("Invalid number of workspaces after removing Workspace 3")
 	}
 	// remove last ws2: [ws2]
-	if prj.DeleteWorkspace(ws2Name) != nil {
+	if prj.DeleteWorkspace("Workspace 2") != nil {
 		t.Errorf("Failed to remove Workspace 2")
 	}
 	if len(prj.Workspaces) != 0 {
 		t.Errorf("Invalid number of workspaces after removing Workspace 2")
 	}
+}
 
+func TestProjectWorkspaceNaming(t *testing.T) {
+}
+
+func TestProjectCurrentWorkspace(t *testing.T) {
+
+	dir, err := ioutil.TempDir("", testDir)
+	if err != nil {
+		t.Fatalf("Failed to create a temporary directory")
+	}
+	defer os.RemoveAll(dir)
+
+	prj, err := Create("test", dir)
+	if err != nil {
+		t.Fatalf("Failed to create new project: %v", err)
+	}
+
+	cws, err := prj.CurrentWorkspace()
+	if err == nil {
+		t.Fatalf("CurrentWorkspace should return an error for new project")
+	}
+	err = prj.SetCurrentWorkspace("")
+	if err == nil {
+		t.Fatalf("SetCurrentWorkspace should fail on new project")
+	}
+
+	ws1, err := prj.CreateWorkspace("Workspace1", "Image1", "")
+	if err != nil {
+		t.Fatalf("Inserting Workspace1 should have succeeded")
+	}
+
+	cws, err = prj.CurrentWorkspace()
+	if err != nil {
+		t.Fatalf("CurrentWorkspace should have passed")
+	}
+	if cws.Name != ws1.Name {
+		t.Fatalf("CurrentWorkspace should return new workspace")
+	}
+
+	_, err = prj.CreateWorkspace("Workspace2", "Image2", "Workspace1")
+	if err != nil {
+		t.Fatalf("Inserting Workspace2 should have succeeded")
+	}
+	cws, err = prj.CurrentWorkspace()
+	if err != nil {
+		t.Fatalf("CurrentWorkspace should have passed")
+	}
+	if cws.Name != ws1.Name {
+		t.Fatalf("CurrentWorkspace should stay with the current workspace")
+	}
+}
+
+func TestProjectLayers(t *testing.T) {
+
+	dir, err := ioutil.TempDir("", testDir)
+	if err != nil {
+		t.Fatalf("Failed to create a temporary directory")
+	}
+	defer os.RemoveAll(dir)
+
+	prj, err := Create("test", dir)
+	if err != nil {
+		t.Fatalf("Failed to create new project: %v", err)
+	}
+
+	ws, err := prj.CreateWorkspace("ws0", "image", "")
+	if err != nil {
+		t.Errorf("Failed to add Workspace 0")
+	}
+
+	err = ws.DeleteLayer("")
+	if err == nil {
+		t.Fatalf("DeleteLayer in empty workspace should fail")
+	}
+
+	layer := ws.TopLayer()
+	if layer != nil {
+		t.Fatalf("TopLayer should return nil for empty workspace")
+	}
+
+	layer1Name := "Layer1" // -> layer[1]
+	layer2Name := "Layer2" // -> layer[2]
+	layer3Name := "Layer3" // -> layer[0]
+
+	_, err = ws.CreateLayer(layer1Name, -2)
+	if err == nil {
+		t.Fatalf("Inserting Layer1 at negative index should fail")
+	}
+	_, err = ws.CreateLayer(layer1Name, 1)
+	if err == nil {
+		t.Fatalf("Inserting Layer1 at invalid index should fail")
+	}
+
+	_, err = ws.CreateLayer(layer1Name, 0)
+	if err != nil {
+		t.Fatalf("Inserting Layer1 at 0 should succeed %v", err)
+	}
+
+	layer = ws.TopLayer()
+	if layer.Name != layer1Name {
+		t.Fatalf("TopLayer should be layer1")
+	}
+
+	_, err = ws.CreateLayer(layer2Name, 1)
+	if err != nil {
+		t.Fatalf("Appending layer at the end should succeed")
+	}
+
+	if len(ws.Environment.Layers) != 2 {
+		t.Fatalf("Number of layers should be 2")
+	}
+	if ws.Environment.Layers[0].Name != layer1Name {
+		t.Fatalf("Layer1 should be the first layer")
+	}
+	if ws.Environment.Layers[1].Name != layer2Name {
+		t.Fatalf("Layer2 should be the second layer")
+	}
+	layer = ws.TopLayer()
+	if layer.Name != layer2Name {
+		t.Fatalf("TopLayer should be layer1")
+	}
+
+	_, err = ws.CreateLayer(layer3Name, 0)
+	if err != nil {
+		t.Fatalf("Inserting Layer3 at 0 should succeed")
+	}
+	if len(ws.Environment.Layers) != 3 {
+		t.Fatalf("Number of layers should be 3")
+	}
+	if ws.Environment.Layers[0].Name != layer3Name {
+		t.Fatalf("Layer3 should be the first layer")
+	}
+	if ws.Environment.Layers[1].Name != layer1Name {
+		t.Fatalf("Layer1 should be the third layer")
+	}
+	if ws.Environment.Layers[2].Name != layer2Name {
+		t.Fatalf("Layer2 should be the second layer")
+	}
+	layer = ws.TopLayer()
+	if layer.Name != layer2Name {
+		t.Fatalf("TopLayer should be layer1")
+	}
+
+	err = ws.DeleteLayer("invalid")
+	if err == nil {
+		t.Fatalf("DeleteLayer 'invalid' should have failed")
+	}
+
+	err = ws.DeleteLayer(layer1Name)
+	if err != nil {
+		t.Fatalf("DeleteLayer Layer1 should have succeeded")
+	}
+	if len(ws.Environment.Layers) != 2 {
+		t.Fatalf("Number of layers should be 2")
+	}
+	if ws.Environment.Layers[0].Name != layer3Name {
+		t.Fatalf("Layer3 should be the first layer")
+	}
+	if ws.Environment.Layers[1].Name != layer2Name {
+		t.Fatalf("Layer2 should be the second layer")
+	}
+
+	err = ws.DeleteLayer(layer2Name)
+	if err != nil {
+		t.Fatalf("DeleteLayer Layer2 should have succeeded")
+	}
+	if len(ws.Environment.Layers) != 1 {
+		t.Fatalf("Number of layers should be 1")
+	}
+	if ws.Environment.Layers[0].Name != layer3Name {
+		t.Fatalf("Layer3 should be the only layer")
+	}
+
+	err = ws.DeleteLayer(layer3Name)
+	if err != nil {
+		t.Fatalf("DeleteLayer Layer3 should have succeeded")
+	}
+	if len(ws.Environment.Layers) != 0 {
+		t.Fatalf("Number of layers should be 0")
+	}
 }
