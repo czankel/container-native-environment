@@ -25,15 +25,16 @@ var listRuntimeCmd = &cobra.Command{
 }
 
 func listRuntimeRunE(cmd *cobra.Command, args []string) error {
+	printValue("Index", "Runtime", "", runtime.Runtimes())
 	return nil
 }
 
-var listImageCmd = &cobra.Command{
+var listImagesCmd = &cobra.Command{
 	Use:     "images",
 	Aliases: []string{"image", "i"},
 	Short:   "list images",
 	Args:    cobra.NoArgs,
-	RunE:    listImageRunE,
+	RunE:    listImagesRunE,
 }
 
 const displayHashLength = 8
@@ -61,7 +62,7 @@ func splitRepoNameTag(name string) (string, string) {
 	return dispName, name[tPos+1:]
 }
 
-func listImageRunE(cmd *cobra.Command, args []string) error {
+func listImagesRunE(cmd *cobra.Command, args []string) error {
 
 	conf := config.Load()
 
@@ -102,5 +103,5 @@ func listImageRunE(cmd *cobra.Command, args []string) error {
 func init() {
 	rootCmd.AddCommand(listCmd)
 	listCmd.AddCommand(listRuntimeCmd)
-	listCmd.AddCommand(listImageCmd)
+	listCmd.AddCommand(listImagesCmd)
 }
