@@ -238,3 +238,49 @@ func TestPrintValueSlice(t *testing.T) {
 		t.Errorf("\n" + out)
 	}
 }
+
+func compareCommands(t *testing.T, desc string, line string, exp []string) bool {
+
+	res := scanLine(line)
+
+	if len(res) != len(exp) {
+		t.Errorf("Test '%s' failed: different length %d, should be %d",
+			desc, len(res), len(exp))
+		return false
+	}
+	for i := range res {
+		if res[i] != exp[i] {
+			t.Errorf("Test '%s' failed in line %d: '%s' (exp: '%s')",
+				desc, i, res[i], exp[i])
+			return false
+		}
+	}
+	return true
+}
+
+func TestCliScanArgs(t *testing.T) {
+
+	testLine := ""
+	testCmds := []string{}
+	compareCommands(t, "empty line", testLine, testCmds)
+
+	testLine = "cmd1 arg11 arg12"
+	testCmds = []string{"cmd1 arg11 arg12"}
+	compareCommands(t, "single line", testLine, testCmds)
+
+	testLine = " cmd1   arg11   arg12  "
+	testCmds = []string{"cmd1   arg11   arg12"}
+	compareCommands(t, "single line, extra spaces", testLine, testCmds)
+
+	testLine = "cmd1 arg11, cmd2 arg21"
+	testCmds = []string{"cmd1 arg11", "cmd2 arg21"}
+	compareCommands(t, "multi line attached semi", testLine, testCmds)
+
+	testLine = "cmd1 arg11 , cmd2 arg21"
+	testCmds = []string{"cmd1 arg11", "cmd2 arg21"}
+	compareCommands(t, "multi line disting semi", testLine, testCmds)
+
+	testLine = "cmd1 arg11 ,  ,,, cmd2 arg21"
+	testCmds = []string{"cmd1 arg11", "cmd2 arg21"}
+	compareCommands(t, "multi line, multi semi", testLine, testCmds)
+}

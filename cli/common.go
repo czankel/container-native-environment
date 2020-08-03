@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"reflect"
 	"sort"
@@ -9,7 +11,49 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+
+	"github.com/czankel/cne/errdefs"
 )
+
+// scanLine splits up commands separated by a ',' into multiple command lines
+func scanLine(line string) []string {
+
+	line = strings.TrimSpace(line)
+	if len(line) == 0 {
+		return []string{}
+	}
+
+	var cmdLines []string
+	for {
+		pos := strings.IndexAny(line, ",")
+		if pos != -1 {
+			if pos > 0 {
+				cmdLines = append(cmdLines, strings.TrimSpace(line[:pos]))
+			}
+			line = strings.TrimSpace(line[pos+1:])
+		} else {
+			cmdLines = append(cmdLines, line)
+			break
+		}
+	}
+
+	return cmdLines
+}
+
+// readCommands reads commands from the io.Reader into a slice of strings
+func readCommands(reader io.Reader) ([]string, error) {
+
+	var cmdLines []string
+	scanner := bufio.NewScanner(reader)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		cmdLines = append(cmdLines, line)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, errdefs.InvalidArgument("unable to read line: %v", err)
+	}
+	return cmdLines, nil
+}
 
 // sizeToSIString converts the provide integer value to a SI size string from the 10^3x exponent
 func sizeToSIString(sz int64) string {
