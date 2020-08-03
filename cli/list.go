@@ -1,10 +1,7 @@
 package cli
 
 import (
-	"fmt"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -40,68 +37,6 @@ var listImageCmd = &cobra.Command{
 }
 
 const displayHashLength = 8
-
-// sizeToSIString converts the provide integer value to a SI size string from the 10^3x exponent
-func sizeToSIString(sz int64) string {
-	const unit = 1000
-	b := sz
-	if b < 0 {
-		b = -b
-	}
-	if b < unit {
-		return fmt.Sprintf("%dB", b)
-	}
-
-	div, exp := int64(unit), 0
-	for n := b / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-
-	return fmt.Sprintf("%.1f%cB", float64(sz)/float64(div), "kMGTPE"[exp])
-}
-
-// timeToAgoString converts the timespan from the provided time to the current time to a string
-// in the formwat "T {year|month|hour}[s] ago". Future dates will return 'future'
-func timeToAgoString(t time.Time) string {
-
-	now := time.Now()
-	if now.Before(t) {
-		return "future"
-	}
-
-	diff := now.Sub(t)
-	hours := diff.Hours()
-	years := int(hours / 365 / 24)
-
-	if years == 1 {
-		return "one year ago"
-	} else if years > 1 {
-		return strconv.Itoa(years) + " years ago"
-	}
-
-	months := int(hours / 30.5)
-	if months == 1 {
-		return "one month ago"
-	} else if months >= 1 {
-		return strconv.Itoa(months) + " months ago"
-	}
-
-	if int(hours) == 1 {
-		return "one hour ago"
-	} else if hours > 1 {
-		return strconv.Itoa(int(hours)) + " hours ago"
-	}
-
-	mins := diff.Minutes()
-	if int(mins) == 1 {
-		return "one minute ago"
-	} else if mins > 1 {
-		return strconv.Itoa(int(mins)) + " minutes ago"
-	}
-
-	return "seconds ago"
-}
 
 // splitRepoNameTag splits the provided full name to the image name and tag
 // and resolves any respository aliases from the registered repositories.

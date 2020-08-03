@@ -1,9 +1,13 @@
 package cli
 
 import (
+	"os"
+
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/czankel/cne/config"
+	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/project"
 	"github.com/czankel/cne/runtime"
 )
@@ -64,13 +68,76 @@ func createWorkspaceRunE(cmd *cobra.Command, args []string) error {
 	return prj.Write()
 }
 
+var createLayerCmd = &cobra.Command{
+	Use:     "layer NAME [CMDLINE]",
+	Short:   "Create a new layer",
+	Aliases: []string{"l"},
+	Args:    cobra.MinimumNArgs(1),
+	RunE:    createLayerRunE,
+}
+
+func createLayerRunE(cmd *cobra.Command, args []string) error {
+
+	conf := config.Load()
+
+	prj, err := project.Load()
+	if err != nil {
+		return err
+	}
+
+	run, err := runtime.Open(conf.Runtime)
+	if err != nil {
+		return err
+	}
+	defer run.Close()
+
+	ws, err := prj.CurrentWorkspace()
+	if err != nil {
+		return err
+	}
+
+	isTerminal := term.IsTerminal(int(os.Stdin.Fd()))
+	if (len(args) > 1) != isTerminal {
+		return errdefs.InvalidArgument("too many arguments")
+	}
+
+	var cmdLines []string
+	atIndex := -1
+	if createWorkspaceInsert != "" {
+		for i, l := range ws.Environment.Layers {
+			if l.Name == createWorkspaceInsert {
+				atIndex = i
+				break
+			}
+		}
+		if atIndex == -1 {
+			return errdefs.InvalidArgument("invalid index")
+		}
+	}
+
+	layer, err := ws.CreateLayer(args[0], atIndex)
+	if err != nil {
+		return err
+	}
+	layer.Commands = cmdLines
+
+	err = prj.Write()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func init() {
 
 	rootCmd.AddCommand(createCmd)
+
 	createCmd.AddCommand(createWorkspaceCmd)
 	createWorkspaceCmd.Flags().StringVar(
 		&createWorkspaceFrom, "from", "", "Base image for the workspace")
-	createWorkspaceCmd.MarkFlagRequired("from")
 	createWorkspaceCmd.Flags().StringVar(
 		&createWorkspaceInsert, "insert", "", "Insert before this workspace")
+
+	createCmd.AddCommand(createLayerCmd)
 }
