@@ -102,6 +102,16 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	var cmdLines []string
+	if len(args) > 1 {
+		cmdLines = scanLine(args[1])
+	} else if !isTerminal {
+
+		cmdLines, err = readCommands(os.Stdin)
+		if err != nil {
+			return err
+		}
+	}
+
 	atIndex := -1
 	if createWorkspaceInsert != "" {
 		for i, l := range ws.Environment.Layers {
