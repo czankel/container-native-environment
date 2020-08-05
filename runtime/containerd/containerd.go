@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/reference"
 
@@ -83,4 +84,15 @@ func (ctrdRun *containerdRuntime) PullImage(name string) (runtime.Image, error) 
 		ctrdRuntime: ctrdRun,
 		ctrdImage:   ctrdImg,
 	}, nil
+}
+
+func (ctrdRun *containerdRuntime) DeleteImage(name string) error {
+	imgSvc := ctrdRun.client.ImageService()
+
+	err := imgSvc.Delete(ctrdRun.context, name, images.SynchronousDelete())
+	if err != nil {
+		return runtime.Errorf("delete image '%s' failed: %v", name, err)
+	}
+
+	return nil
 }

@@ -27,6 +27,9 @@ type Runtime interface {
 
 	// PullImage returns a locally cached image or pulls the image from the registry
 	PullImage(name string) (Image, error)
+
+	// DeleteImage deletes the specified image from the registry.
+	DeleteImage(name string) error
 }
 
 // Image describes an image
