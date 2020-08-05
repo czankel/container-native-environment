@@ -48,16 +48,22 @@ type Image interface {
 	Size() int64
 }
 
-type runtimeType interface {
+//
+// Registry
+//
+
+// RuntimeType is a construct that allows to self-register runtime implementations
+type RuntimeType interface {
 	Open(config.Runtime) (Runtime, error)
 }
 
-var runtimes map[string]runtimeType
+var runtimes map[string]RuntimeType
 
 // Register registers a new Runtime Registrar
-func Register(name string, runType runtimeType) error {
+// ErrResourceExists: already registered
+func Register(name string, runType RuntimeType) error {
 	if runtimes == nil {
-		runtimes = make(map[string]runtimeType)
+		runtimes = make(map[string]RuntimeType)
 	}
 
 	_, ok := runtimes[name]
@@ -68,6 +74,7 @@ func Register(name string, runType runtimeType) error {
 	return nil
 }
 
+// Runtimes returns a list of all registered runtimes.
 func Runtimes() []string {
 	names := make([]string, 0, len(runtimes))
 	for n, _ := range runtimes {
