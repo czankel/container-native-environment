@@ -38,6 +38,9 @@ type Runtime interface {
 
 	// DeleteImage deletes the specified image from the registry.
 	DeleteImage(name string) error
+
+	// Snapshots returns all snapshots in the specified domain.
+	Snapshots(domain [16]byte) ([]Snapshot, error)
 }
 
 // Image describes an image that consists of a file system and configuration options.
@@ -57,6 +60,20 @@ type Image interface {
 
 	// Size returns the size of the image
 	Size() int64
+}
+
+// Snapshot describes a snapshot of the current container filesystem.
+// Supporting snapshots is optional, and not all runtimes support it.
+type Snapshot interface {
+
+	// Name returns the snapshot name
+	Name() string
+
+	// Parent returns the name of the parent snapshot
+	Parent() string
+
+	// CreatedAt returns the time the snapshot was created
+	CreatedAt() time.Time
 }
 
 // Current status of the progress

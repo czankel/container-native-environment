@@ -11,6 +11,7 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/reference"
+	"github.com/containerd/containerd/snapshots"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
@@ -162,4 +163,37 @@ func (ctrdRun *containerdRuntime) DeleteImage(name string) error {
 	}
 
 	return nil
+
+}
+
+func (ctrdRun *containerdRuntime) Snapshots(domain [16]byte) ([]runtime.Snapshot, error) {
+
+	snapMap := make(map[string]runtime.Snapshot)
+	isParent := make(map[string]bool)
+	snapSVC := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
+	err := snapSVC.Walk(ctrdRun.context, func(ctx context.Context, info snapshots.Info) error {
+		if !isParent[info.Name] {
+			snapMap[info.Name] = &snapshot{info: info}
+		}
+		if info.Parent != "" {
+			isParent[info.Parent] = true
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, runtime.Errorf("failed to get snapshots: %v", err)
+	}
+
+	for p := range isParent {
+		if _, ok := snapMap[p]; ok {
+			delete(snapMap, p)
+		}
+	}
+
+	var snaps []runtime.Snapshot
+	for _, s := range snapMap {
+		snaps = append(snaps, s)
+	}
+
+	return snaps, nil
 }
