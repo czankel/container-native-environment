@@ -31,12 +31,19 @@ func init() {
 
 // Runtime Interface
 
-// Open opens the containerd runtime under the default context name
 func (r *containerdRuntimeType) Open(confRun config.Runtime) (runtime.Runtime, error) {
+
+	// Validate the provided port
+	_, err := os.Stat(confRun.SocketName)
+	if err != nil {
+		return nil, runtime.Errorf("failed to open runtime socket '%s': %v",
+			confRun.SocketName, err)
+	}
 
 	client, err := containerd.New(confRun.SocketName)
 	if err != nil {
-		return nil, err
+		return nil, runtime.Errorf("failed to open runtime socket '%s': %v",
+			confRun.SocketName, err)
 	}
 
 	ctrdCtx := namespaces.WithNamespace(context.Background(), confRun.Namespace)
