@@ -1,7 +1,7 @@
 // Package runtime provides an abstraction layer for managing containers, images, and snapshots.
-// The included interfaces don't  beyond the the OCI runtime, which is limited to running containers and
-// does not, for example, include volume management, which is part of a different specification.
-
+//
+// The interfaces defined in this package provide a mix of functionality defined by the OCI runtime
+// and for managing images and snapshots.
 package runtime
 
 import (
@@ -15,9 +15,11 @@ import (
 	"github.com/czankel/cne/errdefs"
 )
 
-// Runtime is the main interface for managing containers and images, which provide additional
-// interfaces to interact with them.
+// Runtime is the main interface for managing containers, images, and snapshots.
 type Runtime interface {
+
+	// Namespace returns the namespace that was used for opening the runtime
+	Namespace() string
 
 	// Close closes the runtime and any open descriptors
 	Close()
@@ -32,7 +34,7 @@ type Runtime interface {
 	DeleteImage(name string) error
 }
 
-// Image describes an image
+// Image describes an image that consists of a file system and configuration options.
 type Image interface {
 
 	// Name returns the image name

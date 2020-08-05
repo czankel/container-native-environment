@@ -15,8 +15,9 @@ import (
 // containerdRuntime provides the runtime implementation for the containerd daemon
 // For more information about containerd, see: https://github.com/containerd/containerd
 type containerdRuntime struct {
-	client  *containerd.Client
-	context context.Context
+	client    *containerd.Client
+	context   context.Context
+	namespace string
 }
 
 type containerdRuntimeType struct {
@@ -41,9 +42,14 @@ func (r *containerdRuntimeType) Open(confRun config.Runtime) (runtime.Runtime, e
 	ctrdCtx := namespaces.WithNamespace(context.Background(), confRun.Namespace)
 
 	return &containerdRuntime{
-		client:  client,
-		context: ctrdCtx,
+		client:    client,
+		context:   ctrdCtx,
+		namespace: confRun.Namespace,
 	}, nil
+}
+
+func (ctrdRun *containerdRuntime) Namespace() string {
+	return ctrdRun.namespace
 }
 
 // Close closes the client to containerd
@@ -56,7 +62,7 @@ func (ctrdRun *containerdRuntime) Images() ([]runtime.Image, error) {
 
 	ctrdImgs, err := ctrdRun.client.ListImages(ctrdRun.context)
 	if err != nil {
-		return nil, err
+		return nil, runtime.Errorf("ListImages failed: %v", err)
 	}
 
 	runImgs := make([]runtime.Image, len(ctrdImgs))
