@@ -11,6 +11,10 @@ GOGET=$(GOCMD) get
 cne:
 	${GOBUILD} -o $@ -v
 
+suid:	cne
+	sudo chown root $<
+	sudo chmod +s $<
+
+
 test:
 	$(GOTEST) -v ./... -exec sudo
-
