@@ -8,7 +8,7 @@ import (
 )
 
 func pullImage(run runtime.Runtime, imageName string) (runtime.Image, error) {
-	return run.PullImage(imageName)
+	return run.PullImage(imageName, nil)
 }
 
 var pullCmd = &cobra.Command{

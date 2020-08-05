@@ -27,8 +27,14 @@ type Runtime interface {
 	// Images returns a list of images that are registered in the runtime
 	Images() ([]Image, error)
 
-	// PullImage returns a locally cached image or pulls the image from the registry
-	PullImage(name string) (Image, error)
+	// PullImage pulls an image into a local registry and returns an image instance.
+	//
+	// PullImage is a blocking call and reports the progress through the optionally provided
+	// channel. The channel can be nil to skip sending updates.
+	//
+	// Note that the status sent may exclude status information for entries that haven't
+	// changed.
+	PullImage(name string, progress chan<- []ProgressStatus) (Image, error)
 
 	// DeleteImage deletes the specified image from the registry.
 	DeleteImage(name string) error
@@ -51,6 +57,28 @@ type Image interface {
 
 	// Size returns the size of the image
 	Size() int64
+}
+
+// Current status of the progress
+const (
+	StatusUnknown  = "unknown"
+	StatusExists   = "exists"
+	StatusPending  = "pending"
+	StatusRunning  = "running"
+	StatusComplete = "complete"
+	StatusAborted  = "aborted"
+	StatusError    = "error"
+)
+
+// ProgressStatus provides information about a running or completed image download or processes.
+type ProgressStatus struct {
+	Reference string    // Resource reference, such as image or process id.
+	Status    string    // Progress status (StatusPending, ...)
+	Offset    int64     // Nominator: Current offset in a file or progress
+	Total     int64     // Denominator: Size or total time.
+	Details   string    // Additional optional information
+	StartedAt time.Time // Time the job was started.
+	UpdatedAt time.Time // Time the job was last updated (or when it was completed)
 }
 
 //

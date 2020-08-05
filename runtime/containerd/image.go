@@ -2,18 +2,129 @@
 package containerd
 
 import (
+	"context"
 	"encoding/json"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/content"
+	ctrderr "github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/remotes"
 
 	digest "github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/czankel/cne/runtime"
 )
+
+const updateIntervalMsecs = 100
+
+// updateImageProgress sends the current image download status in a regular 100ms interval
+// to the provided progress channel.
+func updateImageProgress(ctrdRun *containerdRuntime, ctx context.Context,
+	mutex *sync.Mutex, descs *[]ocispec.Descriptor,
+	progress chan<- []runtime.ProgressStatus) {
+
+	var (
+		ticker = time.NewTicker(time.Duration(updateIntervalMsecs) * time.Millisecond)
+		start  = time.Now()
+	)
+
+	defer ticker.Stop()
+	cs := ctrdRun.client.ContentStore()
+
+	for loop := true; loop; {
+		var statuses []runtime.ProgressStatus
+		var err error
+
+		select {
+		case <-ticker.C:
+			statuses, err = updateImageStatus(ctrdRun.context, start, cs, mutex, descs)
+
+		case <-ctx.Done():
+			statuses, err = updateImageStatus(ctrdRun.context, start, cs, mutex, descs)
+			loop = false
+		}
+
+		if err != nil {
+			break
+		}
+
+		progress <- statuses
+	}
+}
+
+// updateImageStatus sends the status of the current image download to the progress channel.
+func updateImageStatus(ctx context.Context, start time.Time, cs content.Store,
+	mutex *sync.Mutex, descs *[]ocispec.Descriptor) ([]runtime.ProgressStatus, error) {
+
+	statuses := []runtime.ProgressStatus{}
+	actStats := map[string]*runtime.ProgressStatus{}
+
+	active, err := cs.ListStatuses(ctx, "")
+	if err == nil {
+		for _, active := range active {
+			if !strings.HasPrefix(active.Ref, "layer-") {
+				continue
+			}
+			statuses = append(statuses, runtime.ProgressStatus{
+				Reference: active.Ref,
+				Status:    runtime.StatusRunning,
+				Offset:    active.Offset,
+				Total:     active.Total,
+				StartedAt: active.StartedAt,
+				UpdatedAt: active.UpdatedAt,
+			})
+			actStats[active.Ref] = &statuses[len(statuses)-1]
+		}
+	}
+
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	for _, desc := range *descs {
+
+		ref := remotes.MakeRefKey(ctx, desc)
+		if !strings.HasPrefix(ref, "layer-") {
+			continue
+		}
+		if _, isActive := actStats[ref]; isActive {
+			continue
+		}
+
+		info, err := cs.Info(ctx, desc.Digest)
+		if err != nil && !ctrderr.IsNotFound(err) {
+			continue
+		}
+
+		stat := runtime.ProgressStatus{
+			Reference: ref,
+			Status:    runtime.StatusUnknown,
+		}
+		if err != nil && ctrderr.IsNotFound(err) {
+			stat.Status = runtime.StatusPending
+		} else if err == nil {
+			if info.CreatedAt.After(start) {
+				if _, done := info.Labels["containerd.io/uncompressed"]; done {
+					stat.Status = runtime.StatusComplete
+				} else {
+					stat.Status = runtime.StatusRunning
+				}
+			} else {
+				stat.Status = runtime.StatusExists
+			}
+			stat.Offset = info.Size
+			stat.Total = info.Size
+			stat.UpdatedAt = info.CreatedAt
+		}
+		statuses = append(statuses, stat)
+	}
+
+	return statuses, nil
+}
 
 type image struct {
 	ctrdRuntime *containerdRuntime
