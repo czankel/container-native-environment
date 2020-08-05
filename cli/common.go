@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/czankel/cne/errdefs"
+	"github.com/czankel/cne/runtime"
 )
 
 // scanLine splits up commands separated by a ',' into multiple command lines
@@ -220,5 +221,58 @@ func printList(list interface{}) {
 			format = "\t%s"
 		}
 		fmt.Fprintf(w, "\n")
+	}
+}
+
+// showImageProgress displays the progress of sequential or parallel jobs
+// Use this as a callback function in calls that provide a progress feedback
+func showImageProgress(progress <-chan []runtime.ProgressStatus) {
+
+	lines := 0
+	ticks := 0
+
+	statCached := make(map[string]runtime.ProgressStatus)
+	statRefs := []string{}
+
+	w := new(tabwriter.Writer)
+	w.Init(os.Stdout, 8, 0, 1, ' ', 0)
+	defer w.Flush()
+
+	for statUpdate := range progress {
+		for _, status := range statUpdate {
+			if _, ok := statCached[status.Reference]; !ok {
+				statRefs = append(statRefs, status.Reference)
+			}
+			statCached[status.Reference] = status
+		}
+		for ; lines > 0; lines = lines - 1 {
+			fmt.Fprintf(w, "\033[1A\033[2K")
+		}
+		lines = len(statRefs)
+		for _, ref := range statRefs {
+
+			status := statCached[ref]
+
+			decoded := strings.Index(ref, ":")
+			if decoded > 0 {
+				ref = ref[decoded+1:]
+			}
+			if status.Status == runtime.StatusRunning {
+				if status.Offset == status.Total {
+					fmt.Fprintf(w, "%s: Extracting %c\n",
+						ref[:12],
+						"-\\|/"[ticks&3])
+				} else {
+					fmt.Fprintf(w, "%s: Downloading (%s / %s)\n",
+						ref[:12],
+						sizeToSIString(status.Offset),
+						sizeToSIString(status.Total))
+				}
+			} else {
+				fmt.Fprintf(w, "%s: %s\n", ref[:12], strings.Title(status.Status))
+			}
+		}
+		w.Flush()
+		ticks = ticks + 1
 	}
 }

@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"sync"
+
 	"github.com/spf13/cobra"
 
 	"github.com/czankel/cne/config"
@@ -8,7 +10,22 @@ import (
 )
 
 func pullImage(run runtime.Runtime, imageName string) (runtime.Image, error) {
-	return run.PullImage(imageName, nil)
+
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+
+	progress := make(chan []runtime.ProgressStatus)
+
+	go func() {
+		defer wg.Done()
+		showImageProgress(progress)
+	}()
+
+	img, err := run.PullImage(imageName, progress)
+	wg.Wait()
+
+	return img, err
 }
 
 var pullCmd = &cobra.Command{
