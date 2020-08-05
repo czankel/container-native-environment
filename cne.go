@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/czankel/cne/cli"
+	_ "github.com/czankel/cne/runtime/containerd"
 )
 
 func main() {

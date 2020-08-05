@@ -1,4 +1,4 @@
-package runtime
+package containerd
 
 import (
 	"context"
@@ -16,6 +16,7 @@ import (
 	"github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/czankel/cne/config"
+	"github.com/czankel/cne/runtime"
 )
 
 // containerdRuntime provides the runtime implementation for the containerd daemon
@@ -36,13 +37,13 @@ type containerdRuntimeType struct {
 const contextName = "cne"
 
 func init() {
-	Register("containerd", &containerdRuntimeType{})
+	runtime.Register("containerd", &containerdRuntimeType{})
 }
 
 // Runtime Interface
 
 // Open opens the containerd runtime under the default context name
-func (r *containerdRuntimeType) Open(confRun config.Runtime) (Runtime, error) {
+func (r *containerdRuntimeType) Open(confRun config.Runtime) (runtime.Runtime, error) {
 
 	c, err := containerd.New(confRun.SocketName)
 	if err != nil {
@@ -63,14 +64,14 @@ func (run *containerdRuntime) Close() {
 }
 
 // Images returns a list of all images available on the system
-func (run *containerdRuntime) Images() ([]Image, error) {
+func (run *containerdRuntime) Images() ([]runtime.Image, error) {
 
 	contdImgs, err := run.client.ListImages(run.context)
 	if err != nil {
 		return nil, err
 	}
 
-	imgs := make([]Image, len(contdImgs))
+	imgs := make([]runtime.Image, len(contdImgs))
 	for i, img := range contdImgs {
 		imgs[i] = &image{
 			contdRuntime: run,
@@ -99,13 +100,13 @@ func (img image) Size() int64 {
 }
 
 // PullImage pulls the specified image by name from the default registry
-func (run *containerdRuntime) PullImage(name string) (Image, error) {
+func (run *containerdRuntime) PullImage(name string) (runtime.Image, error) {
 
 	img, err := run.client.Pull(run.context, name, containerd.WithPullUnpack)
 	if err == reference.ErrObjectRequired {
-		return nil, Errorf("invalid image name '%s': %v", name, err)
+		return nil, runtime.Errorf("invalid image name '%s': %v", name, err)
 	} else if err != nil {
-		return nil, Errorf("pull image '%s' failed: %v", name, err)
+		return nil, runtime.Errorf("pull image '%s' failed: %v", name, err)
 	}
 
 	return &image{
