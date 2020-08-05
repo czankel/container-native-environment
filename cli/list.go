@@ -3,9 +3,12 @@ package cli
 import (
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 
 	"github.com/czankel/cne/config"
+	"github.com/czankel/cne/errdefs"
+	"github.com/czankel/cne/project"
 	"github.com/czankel/cne/runtime"
 )
 
@@ -100,8 +103,57 @@ func listImagesRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+var listSnapshotsCmd = &cobra.Command{
+	Use:     "snapshots",
+	Aliases: []string{"snapshot", "i"},
+	Short:   "list snapshots",
+	Args:    cobra.NoArgs,
+	RunE:    listSnapshotsRunE,
+}
+
+func listSnapshotsRunE(cmd *cobra.Command, args []string) error {
+
+	conf := config.Load()
+
+	run, err := runtime.Open(conf.Runtime)
+	if err != nil {
+		return err
+	}
+	defer run.Close()
+
+	prj, err := project.Load()
+	if err != nil {
+		return err
+	}
+
+	dom, err := uuid.Parse(prj.UUID)
+	if err != nil {
+		return errdefs.InvalidArgument("invalid project UUID in workspace: '%v'", prj.UUID)
+	}
+
+	snapshots, err := run.Snapshots(dom)
+	if err != nil {
+		return err
+	}
+
+	snapList := make([]struct {
+		Name      string
+		Parent    string
+		CreatedAt string
+	}, len(snapshots), len(snapshots))
+
+	for i, snap := range snapshots {
+		snapList[i].Name = snap.Name()
+		snapList[i].Parent = snap.Parent()
+		snapList[i].CreatedAt = timeToAgoString(snap.CreatedAt())
+	}
+	printList(snapList)
+
+	return nil
+}
 func init() {
 	rootCmd.AddCommand(listCmd)
 	listCmd.AddCommand(listRuntimeCmd)
 	listCmd.AddCommand(listImagesCmd)
+	listCmd.AddCommand(listSnapshotsCmd)
 }
