@@ -41,6 +41,9 @@ type Runtime interface {
 
 	// Snapshots returns all snapshots in the specified domain.
 	Snapshots(domain [16]byte) ([]Snapshot, error)
+
+	// Containers returns all containers in the specified domain.
+	Containers(domain [16]byte) ([]Container, error)
 }
 
 // Image describes an image that consists of a file system and configuration options.
@@ -60,6 +63,29 @@ type Image interface {
 
 	// Size returns the size of the image
 	Size() int64
+}
+
+// Container provides an abstraction for running processes in an isolated environment in user space.
+type Container interface {
+
+	// CreatedAt returns the date the container was created.
+	CreatedAt() time.Time
+
+	// UpdatedAt returns the date the container was last updated.
+	UpdatedAt() time.Time
+
+	// Domain returns the immutable domain id of the container.
+	// The domain allows for grouping containers.
+	Domain() [16]byte
+
+	// ID returns the immutable container id that has to be unique in a domain.
+	ID() [16]byte
+
+	// Generation returns a value representing the filesystem.
+	Generation() [16]byte
+
+	// Delete deletes the container.
+	Delete() error
 }
 
 // Snapshot describes a snapshot of the current container filesystem.

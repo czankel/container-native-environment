@@ -197,3 +197,43 @@ func (ctrdRun *containerdRuntime) Snapshots(domain [16]byte) ([]runtime.Snapshot
 
 	return snaps, nil
 }
+
+func (ctrdRun *containerdRuntime) Containers(domain [16]byte) ([]runtime.Container, error) {
+
+	var runCtrs []runtime.Container
+
+	ctrdCtrs, err := ctrdRun.client.Containers(ctrdRun.context)
+	if err != nil {
+		return nil, runtime.Errorf("failed to get containers: %v", err)
+	}
+
+	for _, c := range ctrdCtrs {
+
+		dom, id, err := splitCtrdID(c.ID())
+		if err != nil {
+			return nil, err
+		}
+		if dom != domain {
+			continue
+		}
+
+		img, err := c.Image(ctrdRun.context)
+		if err != nil {
+			return nil, runtime.Errorf("failed to get image: %v", err)
+		}
+		spec, err := c.Spec(ctrdRun.context)
+		if err != nil {
+			return nil, runtime.Errorf("failed to get image spec: %v", err)
+		}
+
+		runCtrs = append(runCtrs, &container{
+			domain:        dom,
+			id:            id,
+			image:         &image{ctrdRun, img},
+			spec:          spec,
+			ctrdRuntime:   ctrdRun,
+			ctrdContainer: c,
+		})
+	}
+	return runCtrs, nil
+}
