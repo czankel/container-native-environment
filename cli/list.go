@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/czankel/cne/config"
+	"github.com/czankel/cne/container"
 	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/project"
 	"github.com/czankel/cne/runtime"
@@ -151,9 +152,54 @@ func listSnapshotsRunE(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
+
+var listContainersCmd = &cobra.Command{
+	Use:     "containers",
+	Aliases: []string{"containers", "c"},
+	Short:   "list containers",
+	Args:    cobra.NoArgs,
+	RunE:    listContainersRunE,
+}
+
+func listContainersRunE(cmd *cobra.Command, args []string) error {
+
+	conf := config.Load()
+
+	prj, err := project.Load()
+	if err != nil {
+		return err
+	}
+
+	run, err := runtime.Open(conf.Runtime)
+	if err != nil {
+		return err
+	}
+	defer run.Close()
+
+	ctrs, err := container.Containers(run, prj)
+	if err != nil {
+		return err
+	}
+
+	ctrList := make([]struct {
+		Name      string
+		CreatedAt string
+	}, len(ctrs), len(ctrs))
+
+	for i, c := range ctrs {
+		ctrList[i].Name = c.Name
+		ctrList[i].CreatedAt = timeToAgoString(c.CreatedAt)
+	}
+
+	printList(ctrList)
+
+	return nil
+}
+
 func init() {
 	rootCmd.AddCommand(listCmd)
 	listCmd.AddCommand(listRuntimeCmd)
 	listCmd.AddCommand(listImagesCmd)
+	listCmd.AddCommand(listContainersCmd)
 	listCmd.AddCommand(listSnapshotsCmd)
 }
