@@ -93,6 +93,25 @@ func Find(run runtime.Runtime, ws *project.Workspace) (*Container, error) {
 	}, nil
 }
 
+// Create creates and builds a new container.
+func Create(run runtime.Runtime, ws *project.Workspace, img runtime.Image) (*Container, error) {
+
+	dom, err := uuid.Parse(ws.ProjectUUID)
+	if err != nil {
+		return nil, errdefs.InvalidArgument("invalid project UUID: '%v'", ws.ProjectUUID)
+	}
+
+	cid := ws.ID()
+	gen := ws.ConfigHash()
+
+	runCtr, err := run.NewContainer(dom, cid, gen, img, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Container{runContainer: runCtr, Name: containerName(runCtr)}, nil
+}
+
 // Delete deletes the container if it exists
 // Note that this function does not return an error if the container doesn't exist
 func Delete(run runtime.Runtime, ws *project.Workspace) error {

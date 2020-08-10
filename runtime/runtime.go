@@ -10,6 +10,7 @@ import (
 
 	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go/v1"
+	runspecs "github.com/opencontainers/runtime-spec/specs-go"
 
 	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/errdefs"
@@ -44,6 +45,13 @@ type Runtime interface {
 
 	// Containers returns all containers in the specified domain.
 	Containers(domain [16]byte) ([]Container, error)
+
+	// NewContainer defines a new Container but doesn't start it.
+	//
+	// The container can be started using the <Container>.Start() method.
+	// This allows for additional changes or mounting additional paths, etc.
+	NewContainer(domain [16]byte, id [16]byte, generation [16]byte,
+		image Image, spec *runspecs.Spec) (Container, error)
 }
 
 // Image describes an image that consists of a file system and configuration options.

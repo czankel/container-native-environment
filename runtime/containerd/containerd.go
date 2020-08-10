@@ -14,6 +14,7 @@ import (
 	"github.com/containerd/containerd/snapshots"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	runspecs "github.com/opencontainers/runtime-spec/specs-go"
 
 	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/runtime"
@@ -236,4 +237,18 @@ func (ctrdRun *containerdRuntime) Containers(domain [16]byte) ([]runtime.Contain
 		})
 	}
 	return runCtrs, nil
+}
+
+func (ctrdRun *containerdRuntime) NewContainer(domain [16]byte, id [16]byte, generation [16]byte,
+	img runtime.Image, spec *runspecs.Spec) (runtime.Container, error) {
+
+	return &container{
+		domain:        domain,
+		id:            id,
+		generation:    generation,
+		image:         img.(*image),
+		spec:          spec,
+		ctrdRuntime:   ctrdRun,
+		ctrdContainer: nil,
+	}, nil
 }
