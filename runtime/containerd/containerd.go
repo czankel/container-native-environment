@@ -3,6 +3,7 @@ package containerd
 
 import (
 	"context"
+	"encoding/hex"
 	"os"
 	"os/signal"
 	"sync"
@@ -20,6 +21,8 @@ import (
 	"github.com/czankel/cne/runtime"
 )
 
+const containerdGenerationLabel = "CNE-GEN"
+
 // containerdRuntime provides the runtime implementation for the containerd daemon
 // For more information about containerd, see: https://github.com/containerd/containerd
 type containerdRuntime struct {
@@ -35,6 +38,25 @@ const contextName = "cne"
 
 func init() {
 	runtime.Register("containerd", &containerdRuntimeType{})
+}
+
+// getGeneration returns the generation stored in a label
+func getGeneration(ctrdRun *containerdRuntime, ctrdCtr containerd.Container) ([16]byte, error) {
+
+	var gen [16]byte
+
+	labels, err := ctrdCtr.Labels(ctrdRun.context)
+	if err != nil {
+		return [16]byte{}, runtime.Errorf("failed to get generation: %v", err)
+	}
+
+	g, err := hex.DecodeString(labels[containerdGenerationLabel])
+	if err != nil {
+		return [16]byte{}, err
+	}
+	copy(gen[:], g)
+
+	return gen, nil
 }
 
 // Runtime Interface
@@ -218,6 +240,11 @@ func (ctrdRun *containerdRuntime) Containers(domain [16]byte) ([]runtime.Contain
 			continue
 		}
 
+		gen, err := getGeneration(ctrdRun, c)
+		if err != nil {
+			return nil, err
+		}
+
 		img, err := c.Image(ctrdRun.context)
 		if err != nil {
 			return nil, runtime.Errorf("failed to get image: %v", err)
@@ -230,6 +257,7 @@ func (ctrdRun *containerdRuntime) Containers(domain [16]byte) ([]runtime.Contain
 		runCtrs = append(runCtrs, &container{
 			domain:        dom,
 			id:            id,
+			generation:    gen,
 			image:         &image{ctrdRun, img},
 			spec:          spec,
 			ctrdRuntime:   ctrdRun,

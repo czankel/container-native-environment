@@ -73,14 +73,75 @@ func (ctr *container) UpdatedAt() time.Time {
 	return time.Now()
 }
 
-func (ctr *container) Delete() error {
+func (ctr *container) Create() error {
 
 	ctrdRun := ctr.ctrdRuntime
-	ctrdCtr := ctr.ctrdContainer
+
+	ctrdCtrs, err := ctrdRun.client.Containers(ctrdRun.context)
+	if err != nil {
+		return runtime.Errorf("failed to create container: %v", err)
+	}
+
+	// if a container with a different generation exists, delete that container
+	for _, c := range ctrdCtrs {
+
+		dom, id, err := splitCtrdID(c.ID())
+		if err != nil {
+			return err
+		}
+		if dom == ctr.domain && id == ctr.id {
+			deleteContainer(ctrdRun, c)
+			break
+		}
+	}
+
+	// update imcomplete spec
+	spec := ctr.spec
+	if spec.Process == nil {
+		spec.Process = &runspecs.Process{}
+	}
+
+	config, err := ctr.image.Config()
+	if err != nil {
+		return runtime.Errorf("failed to get image OCI spec: %v", err)
+	}
+	if spec.Linux != nil {
+		spec.Process.Args = append(config.Entrypoint, config.Cmd...)
+		cwd := config.WorkingDir
+		if cwd == "" {
+			cwd = "/"
+		}
+		spec.Process.Cwd = cwd
+	}
+
+	// create container
+	uuidName := composeID(ctr.domain, ctr.id)
+	labels := map[string]string{}
+	gen := hex.EncodeToString(ctr.generation[:])
+	labels[containerdGenerationLabel] = gen
+
+	ctrdCtr, err := ctrdRun.client.NewContainer(ctrdRun.context, uuidName,
+		containerd.WithImage(ctr.image.ctrdImage),
+		containerd.WithSpec(spec),
+		containerd.WithRuntime("io.containerd.runtime.v1.linux", nil),
+		containerd.WithContainerLabels(labels))
+	if err != nil {
+		return runtime.Errorf("failed to create container: %v", err)
+	}
+
+	ctr.ctrdContainer = ctrdCtr
+	return nil
+}
+
+func deleteContainer(ctrdRun *containerdRuntime, ctrdCtr containerd.Container) error {
 
 	err := ctrdCtr.Delete(ctrdRun.context)
 	if err != nil {
 		return runtime.Errorf("failed to delete container: %v", err)
 	}
 	return nil
+}
+
+func (ctr *container) Delete() error {
+	return deleteContainer(ctr.ctrdRuntime, ctr.ctrdContainer)
 }

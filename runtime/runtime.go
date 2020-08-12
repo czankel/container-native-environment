@@ -92,6 +92,10 @@ type Container interface {
 	// Generation returns a value representing the filesystem.
 	Generation() [16]byte
 
+	// Create creates the container.
+	// Note that some runtimes delete a prior generation.
+	Create() error
+
 	// Delete deletes the container.
 	Delete() error
 }

@@ -118,6 +118,12 @@ func Create(run runtime.Runtime, ws *project.Workspace, img runtime.Image) (*Con
 		return nil, err
 	}
 
+	// create the container
+	err = runCtr.Create()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Container{runContainer: runCtr, Name: containerName(runCtr)}, nil
 }
 

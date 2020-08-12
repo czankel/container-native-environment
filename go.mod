@@ -25,6 +25,7 @@ require (
 	github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 // indirect
 	golang.org/x/net v0.0.0-20191116160921-f9c825593386 // indirect
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
+	golang.org/x/sys v0.0.0-20191026070338-33540a1f6037
 	golang.org/x/term v0.0.0-20191110171634-ad39bd3f0407
 	google.golang.org/grpc v1.25.1 // indirect
 	gopkg.in/yaml.v2 v2.2.4
