@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/czankel/cne/config"
+	"github.com/czankel/cne/container"
 	"github.com/czankel/cne/project"
 	"github.com/czankel/cne/runtime"
 )
@@ -108,9 +109,47 @@ func deleteLayerRunE(cmd *cobra.Command, args []string) error {
 	return prj.Write()
 }
 
+var deleteContainerCmd = &cobra.Command{
+	Use:   "container NAME",
+	Short: "delete container",
+	Args:  cobra.ExactArgs(1),
+	RunE:  deleteContainerRunE,
+}
+
+func deleteContainerRunE(cmd *cobra.Command, args []string) error {
+
+	conf := config.Load()
+
+	run, err := runtime.Open(conf.Runtime)
+	if err != nil {
+		return err
+	}
+	defer run.Close()
+
+	prj, err := project.Load()
+	if err != nil {
+		return err
+	}
+
+	ctrs, err := container.Containers(run, prj)
+	if err != nil {
+		return err
+	}
+
+	for _, c := range ctrs {
+		if c.Name == args[0] {
+			c.Delete()
+			break
+		}
+	}
+
+	return nil
+}
+
 func init() {
 	rootCmd.AddCommand(deleteCmd)
 	deleteCmd.AddCommand(deleteImageCmd)
 	deleteCmd.AddCommand(deleteWorkspaceCmd)
 	deleteCmd.AddCommand(deleteLayerCmd)
+	deleteCmd.AddCommand(deleteContainerCmd)
 }
