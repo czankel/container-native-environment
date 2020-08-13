@@ -6,6 +6,7 @@ package runtime
 
 import (
 	"fmt"
+	"io"
 	"time"
 
 	digest "github.com/opencontainers/go-digest"
@@ -74,6 +75,21 @@ type Image interface {
 }
 
 // Container provides an abstraction for running processes in an isolated environment in user space.
+//
+// Containers are uniquely identified by these fields:
+//  - domain:     identifies the project on a system
+//  - id:         identification of the container in the domain
+//  - generation: describing the underlying filesystem (snapshot)
+// Domain and ID are immutable. Generation is mutable and updated for each filesystem modificiation.
+//
+// Runtimes might only support a single container for a domain and ID and have other restriction.
+// See additional information in the interface functions.
+// Depending on the implementation, containers might also be destroyed and re-created internally
+// for functions, such as Commit or Abort. In those cases, all processes must be deleted before
+// calling these functions.
+//
+// Note that the current implementation does not require to run any process, so the first
+// process created will become the init task (PID 1).
 type Container interface {
 
 	// CreatedAt returns the date the container was created.
@@ -96,8 +112,32 @@ type Container interface {
 	// Note that some runtimes delete a prior generation.
 	Create() error
 
+	// Start starts the container.
+	// Snapshot is an optional argument for defining the base filesystem other than the image.
+	// Mutable defines if a process running inside the container can write to the filesystem.
+	Start(snapshot Snapshot, mutable bool) error
+
+	// Stop stops the container gracefully and exists all processes asynchronously.
+	// Force forces to kill all running processes.
+	// This function is idempotent.
+	Stop(force bool) error
+
 	// Delete deletes the container.
 	Delete() error
+
+	// Commit commits the container with a new generation value. It is idempotent.
+	Commit(generation [16]byte) error
+
+	// Exec starts the provided command and returns immediately.
+	Exec(stream Stream, cmd []string) (Process, error)
+}
+
+// Stream describes the IO channels to a process that is running in a container.
+type Stream struct {
+	Stdin    io.Reader
+	Stdout   io.Writer
+	Stderr   io.Writer
+	Terminal bool
 }
 
 // Snapshot describes a snapshot of the current container filesystem.
@@ -112,6 +152,14 @@ type Snapshot interface {
 
 	// CreatedAt returns the time the snapshot was created
 	CreatedAt() time.Time
+}
+
+// Process describes a process running inside a container
+type Process interface {
+
+	// Wait asynchronously waits for the process to exit, and sends the exit code to the
+	// channel.
+	Wait() (<-chan ExitStatus, error)
 }
 
 // Current status of the progress
@@ -134,6 +182,13 @@ type ProgressStatus struct {
 	Details   string    // Additional optional information
 	StartedAt time.Time // Time the job was started.
 	UpdatedAt time.Time // Time the job was last updated (or when it was completed)
+}
+
+// ExitStatus describes the exit status of a background operation
+type ExitStatus struct {
+	ExitTime time.Time
+	Error    error
+	Code     uint32 // Exit value from the process
 }
 
 //

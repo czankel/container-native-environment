@@ -124,6 +124,19 @@ func Create(run runtime.Runtime, ws *project.Workspace, img runtime.Image) (*Con
 		return nil, err
 	}
 
+	// start the actual container (snap may be nil)
+	err = runCtr.Start(nil, true)
+	if err != nil {
+		return nil, err
+	}
+
+	// commit the container
+	err = runCtr.Commit(ws.ConfigHash())
+	if err != nil {
+		runCtr.Delete()
+		return nil, err
+	}
+
 	return &Container{runContainer: runCtr, Name: containerName(runCtr)}, nil
 }
 
@@ -143,6 +156,22 @@ func Delete(run runtime.Runtime, ws *project.Workspace) error {
 	}
 
 	return ctr.Delete()
+}
+
+func (ctr *Container) Exec(stream runtime.Stream, cmd []string) (uint32, error) {
+
+	proc, err := ctr.runContainer.Exec(stream, cmd)
+	if err != nil {
+		return 0, err
+	}
+
+	ch, err := proc.Wait()
+	if err != nil {
+		return 0, err
+	}
+
+	exitStat := <-ch
+	return exitStat.Code, exitStat.Error
 }
 
 func (ctr *Container) Delete() error {

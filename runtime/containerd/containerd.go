@@ -50,11 +50,12 @@ func getGeneration(ctrdRun *containerdRuntime, ctrdCtr containerd.Container) ([1
 		return [16]byte{}, runtime.Errorf("failed to get generation: %v", err)
 	}
 
-	g, err := hex.DecodeString(labels[containerdGenerationLabel])
+	val := labels[containerdGenerationLabel]
+	str, err := hex.DecodeString(val)
 	if err != nil {
-		return [16]byte{}, err
+		return [16]byte{}, runtime.Errorf("failed to decode generation '%s': $v", val, err)
 	}
-	copy(gen[:], g)
+	copy(gen[:], str)
 
 	return gen, nil
 }
