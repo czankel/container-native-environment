@@ -31,13 +31,13 @@ type Header struct {
 
 // Project is the current persistent project definition.
 type Project struct {
-	Name                  string
-	UUID                  string // Universal Unique id for the project
-	Workspaces            []Workspace
-	path                  string
-	currentWorkspaceIndex int // The main workspace must be at index 0!
-	instanceID            uint64
-	modifiedAt            time.Time
+	Name                 string
+	UUID                 string // Universal Unique id for the project
+	Workspaces           []Workspace
+	CurrentWorkspaceName string
+	path                 string
+	instanceID           uint64
+	modifiedAt           time.Time
 }
 
 // Workspace is a specific environment of the project. They allow for building a development
@@ -203,19 +203,19 @@ func (prj *Project) Write() error {
 	return nil
 }
 
-// CurrentWorkspace retuns a pointer to the current workspace in the project.
+// CurrentWorkspace retuns a pointer to the current workspace or nil if unset or no workspaces.
+// Returns an error if the workspace wasn't found.
 func (prj *Project) CurrentWorkspace() (*Workspace, error) {
-
-	if prj.currentWorkspaceIndex >= len(prj.Workspaces) {
-		return nil, errdefs.InternalError("invalid current workspace")
-	}
-
-	return &prj.Workspaces[prj.currentWorkspaceIndex], nil
+	return prj.Workspace(prj.CurrentWorkspaceName)
 }
 
 // Workspace returns a pointer to the workspace in the project specified by the provided name
 // or error if it doesn't exist in the project
 func (prj *Project) Workspace(name string) (*Workspace, error) {
+
+	if name == "" && len(prj.Workspaces) > 0 {
+		return &prj.Workspaces[0], nil
+	}
 
 	for i, w := range prj.Workspaces {
 		if name == w.Name {
@@ -228,9 +228,14 @@ func (prj *Project) Workspace(name string) (*Workspace, error) {
 // SetCurrentWorkspace sets the current workspace;
 func (prj *Project) SetCurrentWorkspace(name string) error {
 
-	for i, ws := range prj.Workspaces {
+	if name == "" {
+		prj.CurrentWorkspaceName = ""
+		return nil
+	}
+
+	for _, ws := range prj.Workspaces {
 		if name == ws.Name {
-			prj.currentWorkspaceIndex = i
+			prj.CurrentWorkspaceName = name
 			return nil
 		}
 	}
@@ -273,10 +278,6 @@ func (prj *Project) CreateWorkspace(name string, origin string, before string) (
 		return nil, errdefs.NotFound("workspace", workspace.Name)
 	}
 
-	if len(prj.Workspaces) > 0 && idx <= prj.currentWorkspaceIndex {
-		prj.currentWorkspaceIndex = prj.currentWorkspaceIndex + 1
-	}
-
 	prj.Workspaces = append(prj.Workspaces[:idx],
 		append([]Workspace{workspace}, prj.Workspaces[idx:]...)...)
 
@@ -284,17 +285,14 @@ func (prj *Project) CreateWorkspace(name string, origin string, before string) (
 }
 
 // DeleteWorkspace removes the specified workspace.
-// If it was the current workspace, the current workspace will be
-// set to the main workspace. Note that the main workspace cannot be removed
+// If it was the current workspace, the current workspace will become unset
 func (prj *Project) DeleteWorkspace(name string) error {
 
 	for i, ws := range prj.Workspaces {
 		if name == ws.Name {
 			prj.Workspaces = append(prj.Workspaces[:i], prj.Workspaces[i+1:]...)
-			if prj.currentWorkspaceIndex == i &&
-				prj.currentWorkspaceIndex < len(prj.Workspaces) &&
-				prj.currentWorkspaceIndex > 0 {
-				prj.currentWorkspaceIndex--
+			if prj.CurrentWorkspaceName == ws.Name {
+				prj.CurrentWorkspaceName = ""
 			}
 			return nil
 		}

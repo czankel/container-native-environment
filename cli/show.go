@@ -74,6 +74,37 @@ func showProjectRunE(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
+
+var showWorkspaceCmd = &cobra.Command{
+	Use:   "workspace",
+	Short: "Show the current workspace",
+	RunE:  showWorkspaceRunE,
+	Args:  cobra.RangeArgs(0, 1),
+}
+
+func showWorkspaceRunE(cmd *cobra.Command, args []string) error {
+
+	prj, err := project.Load()
+	if err != nil {
+		return err
+	}
+
+	var ws *project.Workspace
+
+	if len(args) > 0 {
+		ws, err = prj.Workspace(args[0])
+	} else {
+		ws, err = prj.CurrentWorkspace()
+	}
+	if err != nil {
+		return err
+	}
+
+	printValue("Field", "Value", "", ws)
+
+	return nil
+}
+
 func init() {
 	rootCmd.AddCommand(showCmd)
 	showCmd.AddCommand(showConfigCmd)
@@ -82,4 +113,5 @@ func init() {
 	showConfigCmd.Flags().BoolVarP(
 		&showUserConfig, "user", "", false, "Show only user configurations")
 	showCmd.AddCommand(showProjectCmd)
+	showCmd.AddCommand(showWorkspaceCmd)
 }

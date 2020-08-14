@@ -65,6 +65,8 @@ func createWorkspaceRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	prj.CurrentWorkspaceName = wsName
+
 	return prj.Write()
 }
 

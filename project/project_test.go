@@ -317,7 +317,7 @@ func TestProjectCurrentWorkspace(t *testing.T) {
 	if err == nil {
 		t.Fatalf("CurrentWorkspace should return an error for new project")
 	}
-	err = prj.SetCurrentWorkspace("")
+	err = prj.SetCurrentWorkspace("main")
 	if err == nil {
 		t.Fatalf("SetCurrentWorkspace should fail on new project")
 	}
@@ -335,7 +335,31 @@ func TestProjectCurrentWorkspace(t *testing.T) {
 		t.Fatalf("CurrentWorkspace should return new workspace")
 	}
 
-	_, err = prj.CreateWorkspace("Workspace2", "Image2", "Workspace1")
+	ws2, err := prj.CreateWorkspace("Workspace2", "Image2", "Workspace1")
+	if err != nil {
+		t.Fatalf("Inserting Workspace2 should have succeeded")
+	}
+	cws, err = prj.CurrentWorkspace()
+	if err != nil {
+		t.Fatalf("CurrentWorkspace should have passed")
+	}
+	if cws.Name != ws2.Name {
+		t.Fatalf("CurrentWorkspace should have changed")
+	}
+
+	err = prj.SetCurrentWorkspace(ws1.Name)
+	if err != nil {
+		t.Fatalf("SetCurrentWorkspace failed")
+	}
+	cws, err = prj.CurrentWorkspace()
+	if err != nil {
+		t.Fatalf("CurrentWorkspace should have passed")
+	}
+	if cws.Name != ws1.Name {
+		t.Fatalf("CurrentWorkspace should return the ")
+	}
+
+	_, err = prj.CreateWorkspace("Workspace3", "Image3", "Workspace2")
 	if err != nil {
 		t.Fatalf("Inserting Workspace2 should have succeeded")
 	}
@@ -344,8 +368,9 @@ func TestProjectCurrentWorkspace(t *testing.T) {
 		t.Fatalf("CurrentWorkspace should have passed")
 	}
 	if cws.Name != ws1.Name {
-		t.Fatalf("CurrentWorkspace should stay with the current workspace")
+		t.Fatalf("CurrentWorkspace should not have changed")
 	}
+
 }
 
 func TestProjectLayers(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/czankel/cne/config"
+	"github.com/czankel/cne/project"
 )
 
 var setCmd = &cobra.Command{
@@ -59,9 +60,32 @@ func setConfigRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+var setWorkspaceCmd = &cobra.Command{
+	Use:   "workspace",
+	Short: "Set the current workspace",
+	RunE:  setWorkspaceRunE,
+	Args:  cobra.ExactArgs(1),
+}
+
+func setWorkspaceRunE(cmd *cobra.Command, args []string) error {
+
+	prj, err := project.Load()
+	if err != nil {
+		return err
+	}
+
+	err = prj.SetCurrentWorkspace(args[0])
+	if err != nil {
+		return err
+	}
+
+	return prj.Write()
+}
+
 func init() {
 	rootCmd.AddCommand(setCmd)
 	setCmd.AddCommand(setConfigCmd)
 	setConfigCmd.Flags().BoolVarP(
 		&setSystemConfig, "system", "", false, "Set system configuration")
+	setCmd.AddCommand(setWorkspaceCmd)
 }
