@@ -4,6 +4,7 @@ package container
 
 import (
 	"encoding/hex"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -128,6 +129,33 @@ func Create(run runtime.Runtime, ws *project.Workspace, img runtime.Image) (*Con
 	err = runCtr.Start(nil, true)
 	if err != nil {
 		return nil, err
+	}
+
+	// build new image: execute in the current layer
+	for layIdx := 0; layIdx < len(ws.Environment.Layers); layIdx++ {
+
+		layer := &ws.Environment.Layers[layIdx]
+		for _, line := range layer.Commands {
+
+			stream := runtime.Stream{}
+			cmdArgs := strings.Split(line, " ")
+
+			process, err := runCtr.Exec(stream, cmdArgs)
+			if err != nil {
+				runCtr.Delete()
+				return nil, err
+			}
+
+			c, err := process.Wait()
+			if err == nil {
+				exitStatus := <-c
+				err = exitStatus.Error
+			}
+			if err != nil {
+				runCtr.Delete()
+				return nil, err
+			}
+		}
 	}
 
 	// commit the container

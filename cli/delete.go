@@ -60,7 +60,12 @@ func deleteWorkspaceRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	name := args[0]
-	_, err = prj.Workspace(name)
+	ws, err := prj.Workspace(name)
+	if err != nil {
+		return err
+	}
+
+	err = container.Delete(run, ws)
 	if err != nil {
 		return err
 	}
@@ -101,12 +106,32 @@ func deleteLayerRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	oldCtr, err := container.Find(run, ws)
+	if err != nil {
+		return err
+	}
+
 	err = ws.DeleteLayer(args[0])
 	if err != nil {
 		return err
 	}
 
-	return prj.Write()
+	ctr, err := buildContainer(conf, run, prj, ws)
+	if err != nil {
+		return err
+	}
+
+	err = prj.Write()
+	if err != nil {
+		ctr.Delete()
+		return err
+	}
+
+	if oldCtr != nil {
+		oldCtr.Delete()
+	}
+
+	return nil
 }
 
 var deleteContainerCmd = &cobra.Command{

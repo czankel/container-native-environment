@@ -7,6 +7,7 @@ import (
 	"golang.org/x/term"
 
 	"github.com/czankel/cne/config"
+	"github.com/czankel/cne/container"
 	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/project"
 	"github.com/czankel/cne/runtime"
@@ -98,6 +99,11 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	oldCtr, err := container.Find(run, ws)
+	if err != nil {
+		return err
+	}
+
 	isTerminal := term.IsTerminal(int(os.Stdin.Fd()))
 	if (len(args) > 1) != isTerminal {
 		return errdefs.InvalidArgument("too many arguments")
@@ -133,9 +139,20 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 	}
 	layer.Commands = cmdLines
 
+	if len(cmdLines) > 0 {
+		_, err := buildContainer(conf, run, prj, ws)
+		if err != nil {
+			return err
+		}
+	}
+
 	err = prj.Write()
 	if err != nil {
 		return err
+	}
+	if oldCtr != nil {
+		// Ignore any errors, TOOD: add warning
+		oldCtr.Delete()
 	}
 
 	return nil
