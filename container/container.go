@@ -95,7 +95,15 @@ func Find(run runtime.Runtime, ws *project.Workspace) (*Container, error) {
 }
 
 // Create creates and builds a new container.
-func Create(run runtime.Runtime, ws *project.Workspace, img runtime.Image) (*Container, error) {
+// The progress is optional for outputting status updates
+func Create(run runtime.Runtime, ws *project.Workspace, img runtime.Image,
+	progress chan []runtime.ProgressStatus) (*Container, error) {
+
+	defer func() {
+		if progress != nil {
+			close(progress)
+		}
+	}()
 
 	dom, err := uuid.Parse(ws.ProjectUUID)
 	if err != nil {
@@ -125,6 +133,21 @@ func Create(run runtime.Runtime, ws *project.Workspace, img runtime.Image) (*Con
 		return nil, err
 	}
 
+	// Prep the progress status updates
+	layerStatus := make([]runtime.ProgressStatus, len(ws.Environment.Layers))
+	if progress != nil {
+		for i, l := range ws.Environment.Layers {
+			layerStatus[i].Reference = l.Name
+			layerStatus[i].Status = runtime.StatusPending
+			layerStatus[i].Total = int64(len(l.Commands))
+			layerStatus[i].StartedAt = time.Now()
+			layerStatus[i].UpdatedAt = time.Now()
+		}
+		var stat []runtime.ProgressStatus
+		copy(stat, layerStatus)
+		progress <- stat
+	}
+
 	// start the actual container (snap may be nil)
 	err = runCtr.Start(nil, true)
 	if err != nil {
@@ -137,9 +160,15 @@ func Create(run runtime.Runtime, ws *project.Workspace, img runtime.Image) (*Con
 		layer := &ws.Environment.Layers[layIdx]
 		for _, line := range layer.Commands {
 
+			if progress != nil {
+				layerStatus[layIdx].Status = runtime.StatusRunning
+				layerStatus[layIdx].Details = line
+				stat := []runtime.ProgressStatus{layerStatus[layIdx]}
+				progress <- stat
+			}
+
 			stream := runtime.Stream{}
 			cmdArgs := strings.Split(line, " ")
-
 			process, err := runCtr.Exec(stream, cmdArgs)
 			if err != nil {
 				runCtr.Delete()
@@ -155,6 +184,12 @@ func Create(run runtime.Runtime, ws *project.Workspace, img runtime.Image) (*Con
 				runCtr.Delete()
 				return nil, err
 			}
+		}
+
+		if progress != nil {
+			layerStatus[layIdx].Status = runtime.StatusComplete
+			stat := []runtime.ProgressStatus{layerStatus[layIdx]}
+			progress <- stat
 		}
 	}
 

@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"sync"
+
 	"github.com/spf13/cobra"
 
 	"github.com/czankel/cne/config"
@@ -24,10 +26,21 @@ func buildContainer(conf *config.Config, run runtime.Runtime,
 		return nil, err
 	}
 
-	ctr, err := container.Create(run, ws, img)
+	// build the container and provide progress output
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+
+	progress := make(chan []runtime.ProgressStatus)
+	go func() {
+		defer wg.Done()
+		showBuildProgress(progress)
+	}()
+	ctr, err := container.Create(run, ws, img, progress)
 	if err != nil {
 		return nil, err
 	}
+	wg.Wait()
 
 	return ctr, nil
 }
