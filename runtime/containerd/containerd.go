@@ -212,8 +212,8 @@ func (ctrdRun *containerdRuntime) Snapshots(domain [16]byte) ([]runtime.Snapshot
 
 	snapMap := make(map[string]runtime.Snapshot)
 	isParent := make(map[string]bool)
-	snapSVC := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
-	err := snapSVC.Walk(ctrdRun.context, func(ctx context.Context, info snapshots.Info) error {
+	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
+	err := snapSvc.Walk(ctrdRun.context, func(ctx context.Context, info snapshots.Info) error {
 		if !isParent[info.Name] {
 			snapMap[info.Name] = &snapshot{info: info}
 		}
@@ -238,6 +238,17 @@ func (ctrdRun *containerdRuntime) Snapshots(domain [16]byte) ([]runtime.Snapshot
 	}
 
 	return snaps, nil
+}
+
+func deleteSnapshot(ctrdRun *containerdRuntime, name string) error {
+
+	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
+	err := snapSvc.Remove(ctrdRun.context, name)
+	if err != nil {
+		return runtime.Errorf("delete snapshot '%s' failed: %v", name, err)
+	}
+
+	return nil
 }
 
 func (ctrdRun *containerdRuntime) Containers(domain [16]byte) ([]runtime.Container, error) {

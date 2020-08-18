@@ -68,10 +68,11 @@ func createTask(ctr *container, mounts []mount.Mount) (containerd.Task, error) {
 	ctrdCtx := ctrdRun.context
 
 	ctrdTask, err := ctr.ctrdContainer.NewTask(ctrdCtx,
-		cio.NewCreator(cio.WithStdio),
+		cio.NewCreator(),
 		containerd.WithRootFS(mounts))
 	if err != nil {
-		ctr.ctrdContainer.Delete(ctrdCtx)
+		ctrID := composeID(ctr.domain, ctr.id)
+		deleteContainer(ctrdRun, ctr.ctrdContainer, ctrID)
 		ctr.ctrdContainer = nil
 		return nil, runtime.Errorf("failed to create container task: %v", err)
 	}
@@ -144,12 +145,13 @@ func (ctr *container) Create() error {
 	// if a container with a different generation exists, delete that container
 	for _, c := range ctrdCtrs {
 
+		ctrID := c.ID()
 		dom, id, err := splitCtrdID(c.ID())
 		if err != nil {
 			return err
 		}
 		if dom == ctr.domain && id == ctr.id {
-			deleteContainer(ctrdRun, c)
+			deleteContainer(ctrdRun, c, ctrID)
 			break
 		}
 	}
@@ -338,7 +340,8 @@ func (ctr *container) Processes() ([]runtime.Process, error) {
 	return nil, errdefs.NotImplemented()
 }
 
-func deleteContainer(ctrdRun *containerdRuntime, ctrdCtr containerd.Container) error {
+func deleteContainer(ctrdRun *containerdRuntime,
+	ctrdCtr containerd.Container, ctrID string) error {
 
 	err := deleteTask(ctrdRun, ctrdCtr)
 	if err != nil {
@@ -349,9 +352,16 @@ func deleteContainer(ctrdRun *containerdRuntime, ctrdCtr containerd.Container) e
 	if err != nil {
 		return runtime.Errorf("failed to delete container: %v", err)
 	}
+
+	err = deleteSnapshot(ctrdRun, ctrID)
+	if err != nil {
+		return runtime.Errorf("failed to delete snapshot: %v", err)
+	}
+
 	return nil
 }
 
 func (ctr *container) Delete() error {
-	return deleteContainer(ctr.ctrdRuntime, ctr.ctrdContainer)
+	ctrID := composeID(ctr.domain, ctr.id)
+	return deleteContainer(ctr.ctrdRuntime, ctr.ctrdContainer, ctrID)
 }
