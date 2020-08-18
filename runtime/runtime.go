@@ -29,6 +29,9 @@ type Runtime interface {
 	// Images returns a list of images that are registered in the runtime
 	Images() ([]Image, error)
 
+	// GetImage returns an already pulled image or ErrNotFound if the image wasn't found.
+	GetImage(name string) (Image, error)
+
 	// PullImage pulls an image into a local registry and returns an image instance.
 	//
 	// PullImage is a blocking call and reports the progress through the optionally provided

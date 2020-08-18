@@ -4,11 +4,13 @@ package containerd
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"os"
 	"os/signal"
 	"sync"
 
 	"github.com/containerd/containerd"
+	ctrderr "github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/reference"
@@ -18,6 +20,7 @@ import (
 	runspecs "github.com/opencontainers/runtime-spec/specs-go"
 
 	"github.com/czankel/cne/config"
+	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/runtime"
 )
 
@@ -110,6 +113,21 @@ func (ctrdRun *containerdRuntime) Images() ([]runtime.Image, error) {
 	}
 
 	return runImgs, nil
+}
+
+func (ctrdRun *containerdRuntime) GetImage(name string) (runtime.Image, error) {
+
+	ctrdImg, err := ctrdRun.client.GetImage(ctrdRun.context, name)
+	if errors.Is(err, ctrderr.ErrNotFound) {
+		return nil, errdefs.NotFound("image", name)
+	} else if err != nil {
+		return nil, err
+	}
+
+	return &image{
+		ctrdRuntime: ctrdRun,
+		ctrdImage:   ctrdImg,
+	}, nil
 }
 
 // TODO: ContainerD is not really stable when interrupting an image pull (e.g. using CTRL-C)

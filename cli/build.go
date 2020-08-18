@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/spf13/cobra"
@@ -20,8 +21,11 @@ func buildContainer(conf *config.Config, run runtime.Runtime,
 		return nil, errdefs.InvalidArgument("Workspace has not image defined")
 	}
 
-	// Need to pull the image required for building the container
-	img, err := pullImage(run, ws.Environment.Origin)
+	// check and pull the image, if required, for building the container
+	img, err := run.GetImage(ws.Environment.Origin)
+	if err != nil && errors.Is(err, errdefs.ErrNotFound) {
+		img, err = pullImage(run, ws.Environment.Origin)
+	}
 	if err != nil {
 		return nil, err
 	}
