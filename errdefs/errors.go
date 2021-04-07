@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"strings"
 )
 
 var (
@@ -26,6 +27,7 @@ var (
 	// error: function '<name>' is not implemented
 	ErrInternalError = errors.New("internal error")
 	// error: internal error: <description>
+	ErrCommandFailed = errors.New("failed")
 )
 
 type cneError struct {
@@ -48,6 +50,15 @@ func (err *cneError) Error() string {
 // Is must be used with the Err* variables
 func (cerr *cneError) Is(other error) bool {
 	return cerr.cause == other
+}
+
+func IsCneError(err interface{}) bool {
+	switch err.(type) {
+	case cneError:
+		return true
+	default:
+		return false
+	}
 }
 
 func InvalidArgument(format string, args ...interface{}) error {
@@ -100,5 +111,12 @@ func InternalError(format string, args ...interface{}) error {
 	return &cneError{
 		cause: ErrInternalError,
 		msg:   fmt.Sprintf(format, args...),
+	}
+}
+
+func CommandFailed(cmd []string) error {
+	return &cneError{
+		cause: ErrCommandFailed,
+		msg:   fmt.Sprintf("Command failed: %s", strings.Join(cmd, " ")),
 	}
 }

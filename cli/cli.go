@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/czankel/cne/config"
+	"github.com/czankel/cne/errdefs"
 )
 
 var conf *config.Config
@@ -64,7 +65,12 @@ func init() {
 // Execute is the main entry point to the CLI. It executes the commands and arguments provided
 // in os.Args[1:]
 func Execute() error {
-	return rootCmd.Execute()
+
+	err := rootCmd.Execute()
+	if err != nil && errdefs.IsCneError(err) {
+		err = fmt.Errorf("%s: %v", basenamee, err)
+	}
+	return err
 }
 
 func initConfig() {
