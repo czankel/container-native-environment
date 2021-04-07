@@ -6,10 +6,12 @@ GOCLEAN=$(GOCMD) clean
 GOTEST=$(GOCMD) test
 GOGET=$(GOCMD) get
 
+VERSION = $(shell git describe --always --dirty)
+
 .PHONY: cne test clean
 
 cne:
-	${GOBUILD} -o $@ -v
+	${GOBUILD} -o $@ -v -ldflags="-X github.com/czankel/cne/config.CneVersion=${VERSION}"
 
 suid:	cne
 	sudo chown root $<

@@ -15,6 +15,9 @@ import (
 	"github.com/czankel/cne/errdefs"
 )
 
+// CneVersion is set in Makefile by a linker option to the git hash/version
+var CneVersion string
+
 type Runtime struct {
 	Name       string `toml:"Name,omitempty"`
 	SocketName string `toml:"SocketName,omitempty"`

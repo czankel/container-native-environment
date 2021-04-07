@@ -2,7 +2,9 @@
 package cli
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -10,6 +12,9 @@ import (
 )
 
 var conf *config.Config
+
+var basenamee string
+var rootCneVersion bool
 
 var rootCmd = &cobra.Command{
 	SilenceErrors: true,
@@ -21,10 +26,37 @@ virtual environment based on containers to provide a reliable and
 reproducible environment for development and other use cases, such as
 machine learning or analytics.
 `,
+	Run: rootRun,
+}
+
+var rootVersionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Display the version",
+	Args:  cobra.NoArgs,
+	Run:   rootVersionRun,
+}
+
+func rootRun(cmd *cobra.Command, args []string) {
+	if rootCneVersion {
+		rootVersionRun(cmd, args)
+	}
+
+	if len(args) == 0 {
+		cmd.Help()
+		os.Exit(0)
+	}
+}
+
+func rootVersionRun(cmd *cobra.Command, args []string) {
+	fmt.Printf("%s version %s\n", basenamee, config.CneVersion)
+	os.Exit(0)
 }
 
 func init() {
-	rootCmd.Use = os.Args[0]
+	rootCmd.Use = filepath.Base(os.Args[0])
+	rootCmd.Flags().BoolVar(
+		&rootCneVersion, "version", false, "Get version information")
+	rootCmd.AddCommand(rootVersionCmd)
 	cobra.OnInitialize(initConfig)
 }
 
@@ -36,5 +68,6 @@ func Execute() error {
 
 func initConfig() {
 
+	basenamee = filepath.Base(os.Args[0])
 	conf = config.Load()
 }
