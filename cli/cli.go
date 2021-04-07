@@ -68,6 +68,12 @@ func Execute() error {
 
 func initConfig() {
 
+	var err error
 	basenamee = filepath.Base(os.Args[0])
-	conf = config.Load()
+
+	conf, err = config.Load()
+	if err != nil {
+		fmt.Printf("%s: %v\n", basenamee, err)
+		os.Exit(1)
+	}
 }

@@ -31,12 +31,17 @@ var showUserConfig bool
 
 func showConfigRunE(cmd *cobra.Command, args []string) error {
 
+	var err error
+
 	if showUserConfig == showSystemConfig {
-		conf = config.Load()
+		conf, err = config.Load()
 	} else if showSystemConfig {
-		conf = config.LoadSystemConfig()
+		conf, err = config.LoadSystemConfig()
 	} else {
-		conf = config.LoadUserConfig()
+		conf, err = config.LoadUserConfig()
+	}
+	if err != nil {
+		return err
 	}
 
 	if len(args) == 0 {

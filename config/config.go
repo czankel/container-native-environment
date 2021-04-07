@@ -37,7 +37,7 @@ type Config struct {
 // update updates the configuration with the values from the specified configuration file
 func (conf *Config) update(path string) error {
 	_, err := toml.DecodeFile(path, conf)
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		return errdefs.InvalidArgument("config file '%s' corrupt", path)
 	}
 	return nil
@@ -45,7 +45,7 @@ func (conf *Config) update(path string) error {
 
 // Load returns the default configuration amended by the configuration stored in the
 // system and user configuration file.
-func Load() *Config {
+func Load() (*Config, error) {
 
 	conf := &Config{
 		Runtime: Runtime{
@@ -65,23 +65,23 @@ func Load() *Config {
 
 	usr, err := user.Current()
 	if err == nil {
-		conf.update(usr.HomeDir + "/" + UserConfigFile)
+		err = conf.update(usr.HomeDir + "/" + UserConfigFile)
 	}
 
-	return conf
+	return conf, err
 }
 
 // LoadSystemConfig loads only the system configuration
-func LoadSystemConfig() *Config {
+func LoadSystemConfig() (*Config, error) {
 
 	conf := &Config{}
-	conf.update(SystemConfigFile)
+	err := conf.update(SystemConfigFile)
 
-	return conf
+	return conf, err
 }
 
 // LoadUserConfig loads only the system configuration
-func LoadUserConfig() *Config {
+func LoadUserConfig() (*Config, error) {
 
 	conf := &Config{}
 
@@ -90,7 +90,7 @@ func LoadUserConfig() *Config {
 		conf.update(usr.HomeDir + "/" + UserConfigFile)
 	}
 
-	return conf
+	return conf, err
 }
 
 // getValue returns the reflect.Value for the element in the nested structure by the

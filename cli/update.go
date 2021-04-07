@@ -64,11 +64,15 @@ The system option modifies the system-wide configuration file stored in
 
 func updateConfigRunE(cmd *cobra.Command, args []string) error {
 
-	var conf *config.Config
+	var err error
+
 	if updateSystemConfig {
-		conf = config.LoadSystemConfig()
+		conf, err = config.LoadSystemConfig()
 	} else {
-		conf = config.LoadUserConfig()
+		conf, err = config.LoadUserConfig()
+	}
+	if err != nil {
+		return err
 	}
 
 	name := args[0]
