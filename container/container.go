@@ -117,7 +117,7 @@ func Create(run runtime.Runtime, ws *project.Workspace, img runtime.Image,
 		hex.EncodeToString(gen[:])
 
 	// start with the base container
-	spec, err := DefaultSpec(run.Namespace(), ctrID, ws.Environment.Capabilities)
+	spec, err := DefaultSpec(run.Namespace(), ctrID)
 	if err != nil {
 		return nil, err
 	}

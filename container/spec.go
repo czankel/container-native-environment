@@ -62,7 +62,9 @@ func expandCaps(userCaps []string) []string {
 	return caps
 }
 
-func DefaultProcessSpec(caps []string) specs.Process {
+func DefaultProcessSpec() specs.Process {
+
+	caps := []string{}
 
 	return specs.Process{
 		Env:             defaultEnv,
@@ -88,7 +90,9 @@ func DefaultProcessSpec(caps []string) specs.Process {
 	}
 }
 
-func DefaultSpec(namespace string, ctrID string, caps []string) (specs.Spec, error) {
+func DefaultSpec(namespace string, ctrID string) (specs.Spec, error) {
+
+	caps := []string{}
 
 	s := specs.Spec{
 		Version: specs.Version,
