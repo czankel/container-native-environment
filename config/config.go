@@ -271,3 +271,8 @@ func (conf *Config) FullImageName(name string) string {
 
 	return name
 }
+
+// GetUser returns the details and credentials of the current user
+func (conf *Config) User() (User, error) {
+	return getProcessUser()
+}
