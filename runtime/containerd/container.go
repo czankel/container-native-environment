@@ -27,7 +27,7 @@ type container struct {
 	domain        [16]byte
 	id            [16]byte
 	generation    [16]byte
-	spec          *runspecs.Spec
+	spec          runspecs.Spec
 	image         *image
 	ctrdRuntime   *containerdRuntime
 	ctrdContainer containerd.Container
@@ -183,7 +183,7 @@ func (ctr *container) Create() error {
 
 	ctrdCtr, err := ctrdRun.client.NewContainer(ctrdRun.context, uuidName,
 		containerd.WithImage(ctr.image.ctrdImage),
-		containerd.WithSpec(spec),
+		containerd.WithSpec(&spec),
 		containerd.WithRuntime("io.containerd.runtime.v1.linux", nil),
 		containerd.WithContainerLabels(labels))
 	if err != nil {

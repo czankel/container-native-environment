@@ -327,7 +327,7 @@ func (ctrdRun *containerdRuntime) Containers(domain [16]byte) ([]runtime.Contain
 			id:            id,
 			generation:    gen,
 			image:         &image{ctrdRun, img},
-			spec:          spec,
+			spec:          *spec,
 			ctrdRuntime:   ctrdRun,
 			ctrdContainer: c,
 		})
@@ -343,7 +343,7 @@ func (ctrdRun *containerdRuntime) NewContainer(domain [16]byte, id [16]byte, gen
 		id:            id,
 		generation:    generation,
 		image:         img.(*image),
-		spec:          spec,
+		spec:          *spec,
 		ctrdRuntime:   ctrdRun,
 		ctrdContainer: nil,
 	}, nil

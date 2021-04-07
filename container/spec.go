@@ -62,9 +62,35 @@ func expandCaps(userCaps []string) []string {
 	return caps
 }
 
-func DefaultSpec(namespace string, ctrID string, caps []string) (*specs.Spec, error) {
+func DefaultProcessSpec(caps []string) specs.Process {
 
-	s := &specs.Spec{
+	return specs.Process{
+		Env:             defaultEnv,
+		Cwd:             "/",
+		NoNewPrivileges: true,
+		User: specs.User{
+			UID: 0,
+			GID: 0,
+		},
+		Capabilities: &specs.LinuxCapabilities{
+			Bounding:    expandCaps(caps),
+			Permitted:   expandCaps(caps),
+			Inheritable: expandCaps(caps),
+			Effective:   expandCaps(caps),
+		},
+		Rlimits: []specs.POSIXRlimit{
+			{
+				Type: "RLIMIT_NOFILE",
+				Hard: uint64(1024),
+				Soft: uint64(1024),
+			},
+		},
+	}
+}
+
+func DefaultSpec(namespace string, ctrID string, caps []string) (specs.Spec, error) {
+
+	s := specs.Spec{
 		Version: specs.Version,
 		Root: &specs.Root{
 			Path: defaultRootfsPath,

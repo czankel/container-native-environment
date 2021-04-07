@@ -122,7 +122,7 @@ func Create(run runtime.Runtime, ws *project.Workspace, img runtime.Image,
 		return nil, err
 	}
 
-	runCtr, err := run.NewContainer(dom, cid, gen, img, spec)
+	runCtr, err := run.NewContainer(dom, cid, gen, img, &spec)
 	if err != nil {
 		return nil, err
 	}
