@@ -7,6 +7,7 @@ package runtime
 import (
 	"fmt"
 	"io"
+	"os"
 	"time"
 
 	digest "github.com/opencontainers/go-digest"
@@ -159,6 +160,9 @@ type Snapshot interface {
 
 // Process describes a process running inside a container
 type Process interface {
+
+	// Signal sends a signal to the process
+	Signal(sig os.Signal) error
 
 	// Wait asynchronously waits for the process to exit, and sends the exit code to the
 	// channel.

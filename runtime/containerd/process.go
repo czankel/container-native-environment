@@ -2,6 +2,9 @@
 package containerd
 
 import (
+	"os"
+	"syscall"
+
 	"github.com/containerd/containerd"
 	ctrderr "github.com/containerd/containerd/errdefs"
 
@@ -40,4 +43,14 @@ func (proc *process) Wait() (<-chan runtime.ExitStatus, error) {
 	}()
 
 	return runExitStatus, nil
+}
+
+func (proc *process) Signal(sig os.Signal) error {
+
+	s := sig.(syscall.Signal)
+	err := proc.ctrdProc.Kill(proc.container.ctrdRuntime.context, s)
+	if err != nil {
+		return runtime.Errorf("kill failed: %v", err)
+	}
+	return nil
 }
