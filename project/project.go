@@ -14,16 +14,19 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 
 	"github.com/czankel/cne/errdefs"
 )
 
-const projectDirName = ".cne/"
-const projectFileName = "project"
-const projectFileVersion = "1.0"
-const projectFilePerm = 0600
-const projectDirPerm = 0770
+const (
+	projectFileName    = "cneproject"
+	projectFileVersion = "1.0"
+	projectFilePerm    = 0600
+
+	LayerNameImage = "image"
+	LayerNameTop   = ""
+)
 
 type Header struct {
 	Version string
@@ -33,8 +36,8 @@ type Header struct {
 type Project struct {
 	Name                 string
 	UUID                 string // Universal Unique id for the project
-	Workspaces           []Workspace
 	CurrentWorkspaceName string
+	Workspaces           []Workspace
 	path                 string
 	instanceID           uint64
 	modifiedAt           time.Time
@@ -45,22 +48,24 @@ type Project struct {
 // Note that Image cannot be changed and requires to create a new workspace
 type Workspace struct {
 	Name        string // Name of the workspace (must be unique)
-	Environment Environment
 	ProjectUUID string `yaml:"-" output:"-"`
+	Path        string `yaml:"-"`
+	Environment Environment
 }
 
 // Environment describes the container-native environment
+// Note that the image needs to be pulled manually to cause an update (using 'pull')
 type Environment struct {
-	Origin       string // Name or link of the base image - cannot be changed
-	Capabilities []string
-	Layers       []Layer
+	Origin string // Name or link of the base image
+	Layers []Layer
 }
 
 // Layer describes an 'overlay' layer. This can be virtual or explicit using an overlay FS
+// Note that ideally we could use compositions for apt and other handlers
 type Layer struct {
-	Name     string   // Unique name for the layer in the workspace; must not contain '/'
-	Commands []string // Commands to build the layer (except for hidden layers)
-	Digest   string   `hash:"-"` // Images/Snaps for faster rebuilds. Intermediates opt.
+	Name     string // Unique name for the layer in the workspace; must not contain '/'
+	Digest   string `output:"-"` // Images/Snaps for faster rebuilds
+	Commands []string
 }
 
 // Create creates the project in the provide path
@@ -77,18 +82,10 @@ func Create(name string, path string) (*Project, error) {
 		path = path + "/"
 	}
 
-	path = path + projectDirName
-	_, err := os.Stat(path)
-	if err == nil {
-		return nil, errdefs.AlreadyExists("project", path)
-	} else if !os.IsNotExist(err) {
-		return nil, errdefs.SystemError(err, "cannot read project in '%s'", path)
-	}
-
-	err = os.MkdirAll(path, projectDirPerm)
-	if err != nil {
-		return nil, errdefs.SystemError(err,
-			"failed to create project directory '%s'", path)
+	prj := &Project{
+		Name: name,
+		UUID: uuid.New().String(),
+		path: path,
 	}
 
 	flags := os.O_RDONLY | os.O_CREATE | os.O_EXCL | os.O_SYNC
@@ -110,13 +107,7 @@ func Create(name string, path string) (*Project, error) {
 	file.Close()
 
 	fileInfo, err := os.Stat(path)
-
-	prj := &Project{
-		Name:       name,
-		UUID:       uuid.New().String(),
-		modifiedAt: fileInfo.ModTime(),
-		path:       path,
-	}
+	prj.modifiedAt = fileInfo.ModTime()
 
 	stat, ok := fileInfo.Sys().(*syscall.Stat_t)
 	if ok {
@@ -136,8 +127,6 @@ func LoadFrom(path string) (*Project, error) {
 	if path[len(path)-1] != '/' {
 		path = path + "/"
 	}
-
-	path = path + projectDirName
 
 	str, err := ioutil.ReadFile(path + projectFileName)
 	if os.IsNotExist(err) {
@@ -160,10 +149,10 @@ func LoadFrom(path string) (*Project, error) {
 	if ok {
 		prj.instanceID = stat.Ino
 	}
-
 	// Fixup workspaces
 	for i := 0; i < len(prj.Workspaces); i++ {
 		prj.Workspaces[i].ProjectUUID = prj.UUID
+		prj.Workspaces[i].Path = prj.path
 	}
 
 	return &prj, nil
@@ -181,6 +170,7 @@ func Load() (*Project, error) {
 }
 
 // Write writes the project to the project path
+
 func (prj *Project) Write() error {
 
 	header := &Header{
@@ -263,8 +253,10 @@ func (prj *Project) CreateWorkspace(name string, origin string, before string) (
 	workspace := Workspace{
 		Name:        name,
 		ProjectUUID: prj.UUID,
-		Environment: Environment{Origin: origin},
+		Environment: Environment{Origin: origin, Layers: []Layer{}},
+		Path:        "",
 	}
+
 	idx := len(prj.Workspaces)
 	for i, ws := range prj.Workspaces {
 		if before == ws.Name {
@@ -318,7 +310,8 @@ func hashValueElem(w io.Writer, prefix string, elem reflect.Value) {
 		elemType := elem.Type()
 		for i := 0; i < elem.NumField(); i++ {
 			field := elemType.Field(i)
-			if field.Tag.Get("hash") != "-" {
+			tag := field.Tag.Get("hash")
+			if tag != "-" {
 				hashValueElem(w, prefix+field.Name, elem.Field(i))
 			}
 		}
@@ -356,13 +349,13 @@ func (ws *Workspace) ID() [16]byte {
 	return id
 }
 
-// ConfigHash returns a unique hash over the enitre Workspace structure.
+// ConfigHash returns a unique hash over the Workspace Environment.
 func (ws *Workspace) ConfigHash() [16]byte {
 
 	var gen [16]byte
 
 	hash := md5.New()
-	hashValueElem(hash, "", reflect.ValueOf(ws))
+	hashValueElem(hash, "", reflect.ValueOf(ws.Environment))
 	copy(gen[:], hash.Sum(nil)[:])
 
 	return gen
@@ -385,7 +378,8 @@ func (ws *Workspace) CreateLayer(name string, atIndex int) (*Layer, error) {
 	}
 
 	ws.Environment.Layers = append(ws.Environment.Layers[:atIndex],
-		append([]Layer{Layer{Name: name}}, ws.Environment.Layers[atIndex:]...)...)
+		append([]Layer{Layer{Name: name}},
+			ws.Environment.Layers[atIndex:]...)...)
 
 	return &ws.Environment.Layers[atIndex], nil
 }
