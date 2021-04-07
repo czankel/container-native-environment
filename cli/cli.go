@@ -12,6 +12,7 @@ import (
 )
 
 var conf *config.Config
+var user config.User
 
 var basenamee string
 var rootCneVersion bool
@@ -72,6 +73,12 @@ func initConfig() {
 	basenamee = filepath.Base(os.Args[0])
 
 	conf, err = config.Load()
+	if err != nil {
+		fmt.Printf("%s: %v\n", basenamee, err)
+		os.Exit(1)
+	}
+
+	user, err = conf.User()
 	if err != nil {
 		fmt.Printf("%s: %v\n", basenamee, err)
 		os.Exit(1)
