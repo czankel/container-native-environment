@@ -5,7 +5,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/runtime"
 )
 
@@ -41,8 +40,6 @@ registry is used.`,
 }
 
 func pullImageRunE(cmd *cobra.Command, args []string) error {
-
-	conf := config.Load()
 
 	run, err := runtime.Open(conf.Runtime)
 	if err != nil {

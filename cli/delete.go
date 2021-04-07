@@ -3,7 +3,6 @@ package cli
 import (
 	"github.com/spf13/cobra"
 
-	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/container"
 	"github.com/czankel/cne/project"
 	"github.com/czankel/cne/runtime"
@@ -25,7 +24,6 @@ var deleteImageCmd = &cobra.Command{
 }
 
 func deleteImageRunE(cmd *cobra.Command, args []string) error {
-	conf := config.Load()
 
 	run, err := runtime.Open(conf.Runtime)
 	if err != nil {
@@ -45,8 +43,6 @@ var deleteWorkspaceCmd = &cobra.Command{
 }
 
 func deleteWorkspaceRunE(cmd *cobra.Command, args []string) error {
-
-	conf := config.Load()
 
 	run, err := runtime.Open(conf.Runtime)
 	if err != nil {
@@ -88,8 +84,6 @@ var deleteLayerCmd = &cobra.Command{
 
 func deleteLayerRunE(cmd *cobra.Command, args []string) error {
 
-	conf := config.Load()
-
 	run, err := runtime.Open(conf.Runtime)
 	if err != nil {
 		return err
@@ -116,7 +110,7 @@ func deleteLayerRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	ctr, err := buildContainer(conf, run, prj, ws)
+	ctr, err := buildContainer(run, prj, ws)
 	if err != nil {
 		return err
 	}
@@ -142,8 +136,6 @@ var deleteContainerCmd = &cobra.Command{
 }
 
 func deleteContainerRunE(cmd *cobra.Command, args []string) error {
-
-	conf := config.Load()
 
 	run, err := runtime.Open(conf.Runtime)
 	if err != nil {

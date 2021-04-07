@@ -28,7 +28,6 @@ The system option modifies the system-wide configuration file stored in
 
 func setConfigRunE(cmd *cobra.Command, args []string) error {
 
-	var conf *config.Config
 	if setSystemConfig {
 		conf = config.LoadSystemConfig()
 	} else {

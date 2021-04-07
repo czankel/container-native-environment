@@ -6,7 +6,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/container"
 	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/project"
@@ -14,7 +13,7 @@ import (
 )
 
 // buildContainer builds the container for the provided workspace and outputs progress status
-func buildContainer(conf *config.Config, run runtime.Runtime,
+func buildContainer(run runtime.Runtime,
 	prj *project.Project, ws *project.Workspace) (*container.Container, error) {
 
 	if ws.Environment.Origin == "" {
@@ -68,8 +67,6 @@ var buildWorkspaceForce bool
 
 func buildWorkspaceRunE(cmd *cobra.Command, args []string) error {
 
-	conf := config.Load()
-
 	prj, err := project.Load()
 	if err != nil {
 		return err
@@ -100,7 +97,7 @@ func buildWorkspaceRunE(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	_, err = buildContainer(conf, run, prj, ws)
+	_, err = buildContainer(run, prj, ws)
 	return err
 }
 

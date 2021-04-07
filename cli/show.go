@@ -31,8 +31,6 @@ var showUserConfig bool
 
 func showConfigRunE(cmd *cobra.Command, args []string) error {
 
-	var conf *config.Config
-
 	if showUserConfig == showSystemConfig {
 		conf = config.Load()
 	} else if showSystemConfig {

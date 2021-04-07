@@ -5,7 +5,11 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
+
+	"github.com/czankel/cne/config"
 )
+
+var conf *config.Config
 
 var rootCmd = &cobra.Command{
 	SilenceErrors: true,
@@ -21,11 +25,16 @@ machine learning or analytics.
 
 func init() {
 	rootCmd.Use = os.Args[0]
-	cobra.OnInitialize()
+	cobra.OnInitialize(initConfig)
 }
 
 // Execute is the main entry point to the CLI. It executes the commands and arguments provided
 // in os.Args[1:]
 func Execute() error {
 	return rootCmd.Execute()
+}
+
+func initConfig() {
+
+	conf = config.Load()
 }

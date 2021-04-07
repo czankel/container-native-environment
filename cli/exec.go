@@ -5,7 +5,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/container"
 	"github.com/czankel/cne/project"
 	"github.com/czankel/cne/runtime"
@@ -22,7 +21,6 @@ var execShell bool
 
 func execRunE(cmd *cobra.Command, args []string) error {
 
-	conf := config.Load()
 	prj, err := project.Load()
 	if err != nil {
 		return err
@@ -45,7 +43,7 @@ func execRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	if ctr == nil {
-		ctr, err = buildContainer(conf, run, prj, ws)
+		ctr, err = buildContainer(run, prj, ws)
 		if err != nil {
 			return err
 		}

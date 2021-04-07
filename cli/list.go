@@ -48,8 +48,6 @@ const displayHashLength = 8
 // The default repository is omitted in the name.
 func splitRepoNameTag(name string) (string, string) {
 
-	conf := config.Load()
-
 	tPos := strings.Index(name, ":")
 	dispName := name[:tPos]
 
@@ -67,8 +65,6 @@ func splitRepoNameTag(name string) (string, string) {
 }
 
 func listImagesRunE(cmd *cobra.Command, args []string) error {
-
-	conf := config.Load()
 
 	run, err := runtime.Open(conf.Runtime)
 	if err != nil {
@@ -113,8 +109,6 @@ var listSnapshotsCmd = &cobra.Command{
 }
 
 func listSnapshotsRunE(cmd *cobra.Command, args []string) error {
-
-	conf := config.Load()
 
 	run, err := runtime.Open(conf.Runtime)
 	if err != nil {
@@ -162,8 +156,6 @@ var listContainersCmd = &cobra.Command{
 }
 
 func listContainersRunE(cmd *cobra.Command, args []string) error {
-
-	conf := config.Load()
 
 	prj, err := project.Load()
 	if err != nil {

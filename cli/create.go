@@ -6,7 +6,6 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/container"
 	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/project"
@@ -32,8 +31,6 @@ var createWorkspaceFrom string
 var createWorkspaceInsert string
 
 func createWorkspaceRunE(cmd *cobra.Command, args []string) error {
-
-	conf := config.Load()
 
 	prj, err := project.Load()
 	if err != nil {
@@ -80,8 +77,6 @@ var createLayerCmd = &cobra.Command{
 }
 
 func createLayerRunE(cmd *cobra.Command, args []string) error {
-
-	conf := config.Load()
 
 	prj, err := project.Load()
 	if err != nil {
@@ -140,7 +135,7 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 	layer.Commands = cmdLines
 
 	if len(cmdLines) > 0 {
-		_, err := buildContainer(conf, run, prj, ws)
+		_, err := buildContainer(run, prj, ws)
 		if err != nil {
 			return err
 		}
