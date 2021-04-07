@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 
 	"github.com/containerd/containerd"
@@ -91,6 +92,63 @@ func (r *containerdRuntimeType) Open(confRun config.Runtime) (runtime.Runtime, e
 
 func (ctrdRun *containerdRuntime) Namespace() string {
 	return ctrdRun.namespace
+}
+
+func (ctrdRun *containerdRuntime) Domains() ([][16]byte, error) {
+
+	var domains [][16]byte
+
+	ctrdCtrs, err := ctrdRun.client.Containers(ctrdRun.context)
+	if err != nil {
+		return domains, err
+	}
+
+	for _, c := range ctrdCtrs {
+		dom, _, err := splitCtrdID(c.ID())
+		if err != nil {
+			return domains, err
+		}
+		found := false
+		for _, d := range domains {
+			if d == dom {
+				found = true
+				break
+			}
+		}
+		if !found {
+			domains = append(domains, dom)
+		}
+	}
+
+	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
+	err = snapSvc.Walk(ctrdRun.context, func(ctx context.Context, info snapshots.Info) error {
+
+		name := string(info.Name)
+		idx := strings.Index(name, "-")
+		if idx == 32 {
+			str, err := hex.DecodeString(name[:32])
+			if err != nil {
+				return runtime.Errorf("failed to decode domain '%s': $v", name, err)
+			}
+
+			var dom [16]byte
+			copy(dom[:], str)
+
+			found := false
+			for _, d := range domains {
+				if d == dom {
+					found = true
+					break
+				}
+			}
+			if !found {
+				domains = append(domains, dom)
+			}
+		}
+		return nil
+	})
+
+	return domains, nil
 }
 
 func (ctrdRun *containerdRuntime) Close() {
@@ -208,36 +266,16 @@ func (ctrdRun *containerdRuntime) DeleteImage(name string) error {
 
 }
 
-func (ctrdRun *containerdRuntime) Snapshots(domain [16]byte) ([]runtime.Snapshot, error) {
-
-	snapMap := make(map[string]runtime.Snapshot)
-	isParent := make(map[string]bool)
-	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
-	err := snapSvc.Walk(ctrdRun.context, func(ctx context.Context, info snapshots.Info) error {
-		if !isParent[info.Name] {
-			snapMap[info.Name] = &snapshot{info: info}
-		}
-		if info.Parent != "" {
-			isParent[info.Parent] = true
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, runtime.Errorf("failed to get snapshots: %v", err)
-	}
-
-	for p := range isParent {
-		if _, ok := snapMap[p]; ok {
-			delete(snapMap, p)
-		}
-	}
+func (ctrdRun *containerdRuntime) Snapshots() ([]runtime.Snapshot, error) {
 
 	var snaps []runtime.Snapshot
-	for _, s := range snapMap {
-		snaps = append(snaps, s)
-	}
 
-	return snaps, nil
+	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
+	err := snapSvc.Walk(ctrdRun.context, func(ctx context.Context, info snapshots.Info) error {
+		snaps = append(snaps, &snapshot{info: info})
+		return nil
+	})
+	return snaps, err
 }
 
 func deleteSnapshot(ctrdRun *containerdRuntime, name string) error {

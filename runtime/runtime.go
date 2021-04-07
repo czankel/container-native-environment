@@ -24,6 +24,9 @@ type Runtime interface {
 	// Namespace returns the namespace that was used for opening the runtime
 	Namespace() string
 
+	// Domains returns all domains in the namespace
+	Domains() ([][16]byte, error)
+
 	// Close closes the runtime and any open descriptors
 	Close()
 
@@ -45,17 +48,17 @@ type Runtime interface {
 	// DeleteImage deletes the specified image from the registry.
 	DeleteImage(name string) error
 
-	// Snapshots returns all snapshots in the specified domain.
-	Snapshots(domain [16]byte) ([]Snapshot, error)
+	// Snapshots returns all snapshots
+	Snapshots() ([]Snapshot, error)
 
 	// Containers returns all containers in the specified domain.
 	Containers(domain [16]byte) ([]Container, error)
 
-	// NewContainer defines a new Container but doesn't start it.
+	// NewContainer defines a new Container but doesn't create or start it.
 	//
 	// The container can be started using the <Container>.Start() method.
 	// This allows for additional changes or mounting additional paths, etc.
-	NewContainer(domain [16]byte, id [16]byte, generation [16]byte,
+	NewContainer(domain, id, generation [16]byte,
 		image Image, spec *runspecs.Spec) (Container, error)
 }
 

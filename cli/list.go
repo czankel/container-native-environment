@@ -3,12 +3,10 @@ package cli
 import (
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 
 	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/container"
-	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/project"
 	"github.com/czankel/cne/runtime"
 )
@@ -116,22 +114,14 @@ func listSnapshotsRunE(cmd *cobra.Command, args []string) error {
 	}
 	defer run.Close()
 
-	prj, err := project.Load()
-	if err != nil {
-		return err
-	}
-
-	dom, err := uuid.Parse(prj.UUID)
-	if err != nil {
-		return errdefs.InvalidArgument("invalid project UUID in workspace: '%v'", prj.UUID)
-	}
-
-	snapshots, err := run.Snapshots(dom)
+	snapshots, err := run.Snapshots()
 	if err != nil {
 		return err
 	}
 
 	snapList := make([]struct {
+		Domain    string
+		Container string
 		Name      string
 		Parent    string
 		CreatedAt string
