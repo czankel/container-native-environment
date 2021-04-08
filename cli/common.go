@@ -118,16 +118,18 @@ func timeToAgoString(t time.Time) string {
 	return "seconds ago"
 }
 
-// printValue prints the provided value as two columns for name and value content.
+// printValueElem prints the provided value as two columns for name and value content.
 // Struct  Each element is printed as a single row with the provided prefix for the name field
 //         For nested structures, the field names of each substructure are concatenated by '.'
 //         Use the output:"-" tag to omit a field.
 // Map     Similar to Struct, but using the keys as the prefix instead of the structure elements.
 // <other> Printed as two columns using the prefix as the name for the value content.
-func printValueElem(w *tabwriter.Writer, prefix string, elem reflect.Value) {
+// flat outputs a slice in the [ ... ] format. It will only flatten the final slice ([][])
+func printValueElem(w *tabwriter.Writer, prefix string, elem reflect.Value, flat bool) {
 
 	kind := elem.Kind()
 
+	cPrefix := prefix
 	if prefix != "" && (kind == reflect.Struct || kind == reflect.Map || kind == reflect.Slice) {
 		prefix = prefix + "/"
 	}
@@ -142,11 +144,13 @@ func printValueElem(w *tabwriter.Writer, prefix string, elem reflect.Value) {
 		}
 
 		for i := 0; i < elem.NumField(); i++ {
-			if !elem.Field(i).CanInterface() {
+			elemField := elem.Field(i)
+			if !elemField.CanInterface() {
 				break
 			}
 			if elemType.Field(i).Tag.Get("output") != "-" {
-				printValueElem(w, prefix+elemType.Field(i).Name, elem.Field(i))
+				flat := elemType.Field(i).Tag.Get("output") == "flat"
+				printValueElem(w, prefix+elemType.Field(i).Name, elemField, flat)
 			}
 		}
 	} else if kind == reflect.Map {
@@ -157,14 +161,21 @@ func printValueElem(w *tabwriter.Writer, prefix string, elem reflect.Value) {
 		}
 		sort.Strings(keys)
 		for _, k := range keys {
-			printValueElem(w, prefix+k, elem.MapIndex(reflect.ValueOf(k)))
+			printValueElem(w, prefix+k, elem.MapIndex(reflect.ValueOf(k)), false)
 		}
 	} else if kind == reflect.Slice {
-		for i := 0; i < elem.Len(); i++ {
-			printValueElem(w, prefix+strconv.Itoa(i), elem.Index(i))
+		if elem.Len() == 0 {
+			return
+		}
+		if flat && elem.Index(0).Kind() != reflect.Slice && elem.Index(0).CanInterface() {
+			fmt.Fprintf(w, "%s\t%v\n", cPrefix, elem.Interface())
+		} else {
+			for i := 0; i < elem.Len(); i++ {
+				printValueElem(w, prefix+strconv.Itoa(i), elem.Index(i), flat)
+			}
 		}
 	} else if kind == reflect.Ptr {
-		printValueElem(w, prefix, elem.Elem())
+		printValueElem(w, prefix, elem.Elem(), false)
 	} else if elem.CanInterface() {
 		fmt.Fprintf(w, "%s\t%v\n", prefix, elem.Interface())
 	}
@@ -182,7 +193,7 @@ func printValue(fieldHdr string, valueHdr string, prefix string, value interface
 	defer w.Flush()
 
 	fmt.Fprintf(w, "%s\t%s\n", strings.ToUpper(fieldHdr), strings.ToUpper(valueHdr))
-	printValueElem(w, prefix, reflect.ValueOf(value))
+	printValueElem(w, prefix, reflect.ValueOf(value), false)
 }
 
 // printList prints a slice of structures using the field names as the header
@@ -199,26 +210,26 @@ func printList(list interface{}) {
 	w.Init(os.Stdout, 8, 0, 1, ' ', 0)
 	defer w.Flush()
 
-	format := "%s"
+	format := "%"
 	hdr := reflect.TypeOf(list).Elem()
 	for i := 0; i < hdr.NumField(); i++ {
 		if hdr.Field(i).Tag.Get("output") != "-" {
 			fmt.Fprintf(w, format, strings.ToUpper(hdr.Field(i).Name))
-			format = "\t%s"
+			format = "\t%"
 		}
 	}
 	fmt.Fprintf(w, "\n")
 
 	items := reflect.ValueOf(list)
 	for i := 0; i < items.Len(); i++ {
-		format = "%s"
+		format = "%"
 		item := items.Index(i)
 		for j := 0; j < item.NumField(); j++ {
 			if hdr.Field(j).Tag.Get("output") == "-" {
 				continue
 			}
 			fmt.Fprintf(w, format, item.Field(j).Interface())
-			format = "\t%s"
+			format = "\t%"
 		}
 		fmt.Fprintf(w, "\n")
 	}
@@ -298,7 +309,6 @@ func showBuildProgress(progress <-chan []runtime.ProgressStatus) {
 			}
 			statCached[status.Reference] = status
 		}
-
 		for ; lines > 0; lines = lines - 1 {
 			fmt.Fprintf(w, "\033[1A\033[2K")
 		}
@@ -316,11 +326,11 @@ func showBuildProgress(progress <-chan []runtime.ProgressStatus) {
 				reflen = 12
 			}
 			if status.Status == runtime.StatusRunning {
-				fmt.Fprintf(w, "Building layer '%s': %s\n",
+				fmt.Fprintf(w, "[%s] %s\n",
 					ref[:reflen],
 					status.Details)
 			} else {
-				fmt.Fprintf(w, "%s: %s\n", ref[:reflen], strings.Title(status.Status))
+				fmt.Fprintf(w, "[%s] %s\n", ref[:reflen], strings.Title(status.Status))
 			}
 		}
 		w.Flush()
