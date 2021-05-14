@@ -298,9 +298,13 @@ func (prj *Project) DeleteWorkspace(name string) error {
 //
 
 // hashValueElem is a helper function to recursively hash a Value
-func hashValueElem(w io.Writer, prefix string, elem reflect.Value) {
+func hashValueElem(w io.Writer, prefix string, elem reflect.Value, deep bool) {
 
 	kind := elem.Kind()
+
+	if deep && (kind == reflect.Struct || kind == reflect.Map || kind == reflect.Slice) {
+		return
+	}
 
 	if prefix != "" && (kind == reflect.Struct || kind == reflect.Map || kind == reflect.Slice) {
 		prefix = prefix + "/"
@@ -312,7 +316,7 @@ func hashValueElem(w io.Writer, prefix string, elem reflect.Value) {
 			field := elemType.Field(i)
 			tag := field.Tag.Get("hash")
 			if tag != "-" {
-				hashValueElem(w, prefix+field.Name, elem.Field(i))
+				hashValueElem(w, prefix+field.Name, elem.Field(i), true)
 			}
 		}
 	} else if kind == reflect.Map {
@@ -323,14 +327,14 @@ func hashValueElem(w io.Writer, prefix string, elem reflect.Value) {
 		}
 		sort.Strings(keys)
 		for _, k := range keys {
-			hashValueElem(w, prefix+k, elem.MapIndex(reflect.ValueOf(k)))
+			hashValueElem(w, prefix+k, elem.MapIndex(reflect.ValueOf(k)), true)
 		}
 	} else if kind == reflect.Slice {
 		for i := 0; i < elem.Len(); i++ {
-			hashValueElem(w, prefix+strconv.Itoa(i), elem.Index(i))
+			hashValueElem(w, prefix+strconv.Itoa(i), elem.Index(i), true)
 		}
 	} else if kind == reflect.Ptr {
-		hashValueElem(w, prefix, elem.Elem())
+		hashValueElem(w, prefix, elem.Elem(), deep)
 	} else if elem.CanInterface() {
 		w.Write([]byte(prefix))
 		str := fmt.Sprintf("%v", elem.Interface())
@@ -340,13 +344,19 @@ func hashValueElem(w io.Writer, prefix string, elem reflect.Value) {
 
 // ID returns an identification for the workspace
 func (ws *Workspace) ID() [16]byte {
-	var id [16]byte
+	return md5.Sum([]byte(ws.Name))
+}
 
-	hash := md5.New()
-	hashValueElem(hash, "", reflect.ValueOf(ws.Name))
-	copy(id[:], hash.Sum(nil)[:])
+// BaseHash returns a unique hash value for a build container
+func (ws *Workspace) BaseHash() [16]byte {
 
-	return id
+	var gen [16]byte
+
+	val := md5.New()
+	hashValueElem(val, "", reflect.ValueOf(ws.Environment), false /* deep */)
+	copy(gen[:], val.Sum(nil)[:])
+
+	return gen
 }
 
 // ConfigHash returns a unique hash over the Workspace Environment.
@@ -355,7 +365,7 @@ func (ws *Workspace) ConfigHash() [16]byte {
 	var gen [16]byte
 
 	hash := md5.New()
-	hashValueElem(hash, "", reflect.ValueOf(ws.Environment))
+	hashValueElem(hash, "", reflect.ValueOf(ws.Environment), true /* deep */)
 	copy(gen[:], hash.Sum(nil)[:])
 
 	return gen
