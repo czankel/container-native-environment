@@ -87,6 +87,11 @@ func TestProjectCopyProjects(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
+	err = os.MkdirAll(dir+"/test1/", 0755)
+	if err != nil {
+		t.Fatalf("Failed to create test directory: %v", err)
+	}
+
 	prj, err := Create("test", dir+"/test1")
 	if err != nil {
 		t.Fatalf("Failed to create new project: %v", err)
@@ -95,18 +100,18 @@ func TestProjectCopyProjects(t *testing.T) {
 		t.Errorf("Project ID still 0")
 	}
 
-	src, err := os.Open(dir + "/test1/" + projectDirName + projectFileName)
+	src, err := os.Open(dir + "/test1/" + projectFileName)
 	if err != nil {
 		t.Fatalf("Failed to open project file: %v", err)
 	}
 	defer src.Close()
 
-	err = os.MkdirAll(dir+"/test2/"+projectDirName, 0755)
+	err = os.MkdirAll(dir+"/test2/", 0755)
 	if err != nil {
 		t.Fatalf("Failed to create destination directory")
 	}
 
-	dst, err := os.Create(dir + "/test2/" + projectDirName + projectFileName)
+	dst, err := os.Create(dir + "/test2/" + projectFileName)
 	if err != nil {
 		t.Fatalf("Failed to create destination file")
 	}
