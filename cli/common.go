@@ -210,26 +210,26 @@ func printList(list interface{}) {
 	w.Init(os.Stdout, 8, 0, 1, ' ', 0)
 	defer w.Flush()
 
-	format := "%"
+	format := "%s"
 	hdr := reflect.TypeOf(list).Elem()
 	for i := 0; i < hdr.NumField(); i++ {
 		if hdr.Field(i).Tag.Get("output") != "-" {
 			fmt.Fprintf(w, format, strings.ToUpper(hdr.Field(i).Name))
-			format = "\t%"
+			format = "\t%s"
 		}
 	}
 	fmt.Fprintf(w, "\n")
 
 	items := reflect.ValueOf(list)
 	for i := 0; i < items.Len(); i++ {
-		format = "%"
+		format = "%s"
 		item := items.Index(i)
 		for j := 0; j < item.NumField(); j++ {
 			if hdr.Field(j).Tag.Get("output") == "-" {
 				continue
 			}
 			fmt.Fprintf(w, format, item.Field(j).Interface())
-			format = "\t%"
+			format = "\t%s"
 		}
 		fmt.Fprintf(w, "\n")
 	}
