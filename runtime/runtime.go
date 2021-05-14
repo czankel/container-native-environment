@@ -48,16 +48,13 @@ type Runtime interface {
 	// DeleteImage deletes the specified image from the registry.
 	DeleteImage(name string) error
 
-	// Snapshots returns all snapshots
+	// Snapshots returns all snapshots.
 	Snapshots() ([]Snapshot, error)
 
 	// Containers returns all containers in the specified domain.
 	Containers(domain [16]byte) ([]Container, error)
 
-	// NewContainer defines a new Container but doesn't create or start it.
-	//
-	// The container can be started using the <Container>.Start() method.
-	// This allows for additional changes or mounting additional paths, etc.
+	// NewContainer defines a new Container without creating it.
 	NewContainer(domain, id, generation [16]byte,
 		image Image, spec *runspecs.Spec) (Container, error)
 }
@@ -65,19 +62,19 @@ type Runtime interface {
 // Image describes an image that consists of a file system and configuration options.
 type Image interface {
 
-	// Name returns the image name
+	// Name returns the image name.
 	Name() string
 
-	// Digest returns the digest of the image
+	// Digest returns the digest of the image.
 	Digest() digest.Digest
 
-	// CreatedAt returns the data the image was created
+	// CreatedAt returns the data the image was created.
 	CreatedAt() time.Time
 
-	// Config returns the configuration of the image
+	// Config returns the configuration of the image.
 	Config() (*v1.ImageConfig, error)
 
-	// Size returns the size of the image
+	// Size returns the size of the image.
 	Size() int64
 }
 
@@ -87,16 +84,17 @@ type Image interface {
 //  - domain:     identifies the project on a system
 //  - id:         identification of the container in the domain
 //  - generation: describing the underlying filesystem (snapshot)
-// Domain and ID are immutable. Generation is mutable and updated for each filesystem modificiation.
+// Domain and ID are immutable. Generation is mutable and updated for any modifications to the
+// configuration and filesystem.
 //
 // Runtimes might only support a single container for a domain and ID and have other restriction.
 // See additional information in the interface functions.
-// Depending on the implementation, containers might also be destroyed and re-created internally
-// for functions, such as Commit or Abort. In those cases, all processes must be deleted before
-// calling these functions.
+//
+// Depending on the implementation, containers might also be destroyed and re-created internally.
 //
 // Note that the current implementation does not require to run any process, so the first
 // process created will become the init task (PID 1).
+//
 type Container interface {
 
 	// CreatedAt returns the date the container was created.
@@ -116,7 +114,6 @@ type Container interface {
 	Generation() [16]byte
 
 	// Create creates the container.
-	// Note that some runtimes delete a prior generation.
 	Create() error
 
 	// Start starts the container.
@@ -132,10 +129,10 @@ type Container interface {
 	// Delete deletes the container.
 	Delete() error
 
-	// Commit commits the container with a new generation value. It is idempotent.
+	// Commit commits the container after it has been built with a new generation value.
 	Commit(generation [16]byte) error
 
-	// Exec starts the provided command and returns immediately.
+	// Exec(stream Stream, cmd []string) (Process, error)
 	Exec(stream Stream, cmd []string) (Process, error)
 }
 
@@ -148,31 +145,29 @@ type Stream struct {
 }
 
 // Snapshot describes a snapshot of the current container filesystem.
-// Supporting snapshots is optional, and not all runtimes support it.
 type Snapshot interface {
 
-	// Name returns the snapshot name
+	// Name returns the snapshot name.
 	Name() string
 
-	// Parent returns the name of the parent snapshot
+	// Parent returns the name of the parent snapshot.
 	Parent() string
 
-	// CreatedAt returns the time the snapshot was created
+	// CreatedAt returns the time the snapshot was created.
 	CreatedAt() time.Time
 }
 
-// Process describes a process running inside a container
+// Process describes a process running inside a container.
 type Process interface {
 
-	// Signal sends a signal to the process
+	// Signal sends a signal to the process.
 	Signal(sig os.Signal) error
 
-	// Wait asynchronously waits for the process to exit, and sends the exit code to the
-	// channel.
+	// Wait waits asynchronously for the process to exit and sends the exit code to the channel.
 	Wait() (<-chan ExitStatus, error)
 }
 
-// Current status of the progress
+// Progress status values.
 const (
 	StatusUnknown  = "unknown"
 	StatusExists   = "exists"
@@ -191,10 +186,10 @@ type ProgressStatus struct {
 	Total     int64     // Denominator: Size or total time.
 	Details   string    // Additional optional information
 	StartedAt time.Time // Time the job was started.
-	UpdatedAt time.Time // Time the job was last updated (or when it was completed)
+	UpdatedAt time.Time // Time the job was last updated (or when it was completed).
 }
 
-// ExitStatus describes the exit status of a background operation
+// ExitStatus describes the exit status of a background operation.
 type ExitStatus struct {
 	ExitTime time.Time
 	Error    error
@@ -202,18 +197,17 @@ type ExitStatus struct {
 }
 
 //
-// Registry
+// Runtime Registry
 //
 
-// RuntimeType is a construct that allows to self-register runtime implementations
+// RuntimeType is a construct that allows to self-register runtime implementations.
 type RuntimeType interface {
 	Open(config.Runtime) (Runtime, error)
 }
 
 var runtimes map[string]RuntimeType
 
-// Register registers a new Runtime Registrar
-// ErrResourceExists: already registered
+// Register registers a new Runtime Registrar.
 func Register(name string, runType RuntimeType) error {
 	if runtimes == nil {
 		runtimes = make(map[string]RuntimeType)
@@ -236,7 +230,7 @@ func Runtimes() []string {
 	return names
 }
 
-// Open opens a new runtime for the specified name
+// Open opens a new runtime for the specified name.
 func Open(confRun config.Runtime) (Runtime, error) {
 	reg, ok := runtimes[confRun.Name]
 	if !ok {
@@ -245,10 +239,10 @@ func Open(confRun config.Runtime) (Runtime, error) {
 	return reg.Open(confRun)
 }
 
-// Errorf returns a runtime error for unspecific errors that cannot be mapped to a error type.
+// Errorf is an internal function to create an error specific to the runtime.
 //
-// This function should be used mostly for internal errors. Others, for example, invalid arguments,
-// already exists, not found, etc. should use the errors defined in errdefs directly.
+// This function should be used only for internal errors that cannot be mapped to one of the
+// errors defined in errdefs.
 func Errorf(format string, args ...interface{}) error {
 	return errdefs.New(errdefs.ErrRuntimeError,
 		fmt.Sprintf("runtime: "+format, args...))
