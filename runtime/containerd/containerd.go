@@ -44,26 +44,6 @@ func init() {
 	runtime.Register("containerd", &containerdRuntimeType{})
 }
 
-// getGeneration returns the generation stored in a label
-func getGeneration(ctrdRun *containerdRuntime, ctrdCtr containerd.Container) ([16]byte, error) {
-
-	var gen [16]byte
-
-	labels, err := ctrdCtr.Labels(ctrdRun.context)
-	if err != nil {
-		return [16]byte{}, runtime.Errorf("failed to get generation: %v", err)
-	}
-
-	val := labels[containerdGenerationLabel]
-	str, err := hex.DecodeString(val)
-	if err != nil {
-		return [16]byte{}, runtime.Errorf("failed to decode generation '%s': $v", val, err)
-	}
-	copy(gen[:], str)
-
-	return gen, nil
-}
-
 // Runtime Interface
 
 func (r *containerdRuntimeType) Open(confRun config.Runtime) (runtime.Runtime, error) {
@@ -267,84 +247,13 @@ func (ctrdRun *containerdRuntime) DeleteImage(name string) error {
 }
 
 func (ctrdRun *containerdRuntime) Snapshots() ([]runtime.Snapshot, error) {
-
-	var snaps []runtime.Snapshot
-
-	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
-	err := snapSvc.Walk(ctrdRun.context, func(ctx context.Context, info snapshots.Info) error {
-		snaps = append(snaps, &snapshot{info: info})
-		return nil
-	})
-	return snaps, err
-}
-
-func deleteSnapshot(ctrdRun *containerdRuntime, name string) error {
-
-	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
-	err := snapSvc.Remove(ctrdRun.context, name)
-	if err != nil {
-		return runtime.Errorf("delete snapshot '%s' failed: %v", name, err)
-	}
-
-	return nil
+	return getSnapshots(ctrdRun)
 }
 
 func (ctrdRun *containerdRuntime) Containers(domain [16]byte) ([]runtime.Container, error) {
-
-	var runCtrs []runtime.Container
-
-	ctrdCtrs, err := ctrdRun.client.Containers(ctrdRun.context)
-	if err != nil {
-		return nil, runtime.Errorf("failed to get containers: %v", err)
-	}
-
-	for _, c := range ctrdCtrs {
-
-		dom, id, err := splitCtrdID(c.ID())
-		if err != nil {
-			return nil, err
-		}
-		if dom != domain {
-			continue
-		}
-
-		gen, err := getGeneration(ctrdRun, c)
-		if err != nil {
-			return nil, err
-		}
-
-		img, err := c.Image(ctrdRun.context)
-		if err != nil {
-			return nil, runtime.Errorf("failed to get image: %v", err)
-		}
-		spec, err := c.Spec(ctrdRun.context)
-		if err != nil {
-			return nil, runtime.Errorf("failed to get image spec: %v", err)
-		}
-
-		runCtrs = append(runCtrs, &container{
-			domain:        dom,
-			id:            id,
-			generation:    gen,
-			image:         &image{ctrdRun, img},
-			spec:          *spec,
-			ctrdRuntime:   ctrdRun,
-			ctrdContainer: c,
-		})
-	}
-	return runCtrs, nil
+	return getContainers(ctrdRun, domain)
 }
-
-func (ctrdRun *containerdRuntime) NewContainer(domain [16]byte, id [16]byte, generation [16]byte,
+func (ctrdRun *containerdRuntime) NewContainer(domain, id, generation [16]byte,
 	img runtime.Image, spec *runspecs.Spec) (runtime.Container, error) {
-
-	return &container{
-		domain:        domain,
-		id:            id,
-		generation:    generation,
-		image:         img.(*image),
-		spec:          *spec,
-		ctrdRuntime:   ctrdRun,
-		ctrdContainer: nil,
-	}, nil
+	return newContainer(ctrdRun, domain, id, generation, img, spec), nil
 }

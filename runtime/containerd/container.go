@@ -61,6 +61,99 @@ func composeID(domain [16]byte, id [16]byte) string {
 	return hex.EncodeToString(domain[:]) + "-" + hex.EncodeToString(id[:])
 }
 
+// getGeneration returns the generation from a containerD Container.
+func getGeneration(ctrdRun *containerdRuntime, ctrdCtr containerd.Container) ([16]byte, error) {
+
+	var gen [16]byte
+
+	labels, err := ctrdCtr.Labels(ctrdRun.context)
+	if err != nil {
+		return [16]byte{}, runtime.Errorf("failed to get generation: %v", err)
+	}
+
+	val := labels[containerdGenerationLabel]
+	str, err := hex.DecodeString(val)
+	if err != nil {
+		return [16]byte{}, runtime.Errorf("failed to decode generation '%s': $v", val, err)
+	}
+	copy(gen[:], str)
+
+	return gen, nil
+}
+
+func getContainers(ctrdRun *containerdRuntime, domain [16]byte) ([]runtime.Container, error) {
+
+	var runCtrs []runtime.Container
+
+	ctrdCtrs, err := ctrdRun.client.Containers(ctrdRun.context)
+	if err != nil {
+		return nil, runtime.Errorf("failed to get containers: %v", err)
+	}
+
+	for _, c := range ctrdCtrs {
+
+		dom, id, err := splitCtrdID(c.ID())
+		if err != nil {
+			return nil, err
+		}
+		if dom != domain {
+			continue
+		}
+
+		ctr, err := newContainerFromCtrdCtr(ctrdRun, c, domain, id)
+		if err != nil {
+			return nil, err
+		}
+
+		runCtrs = append(runCtrs, ctr)
+	}
+	return runCtrs, nil
+}
+
+// newContainer defines a new container without creating it.
+func newContainer(ctrdRun *containerdRuntime, domain, id, generation [16]byte,
+	img runtime.Image, spec *runspecs.Spec) runtime.Container {
+
+	return &container{
+		domain:        domain,
+		id:            id,
+		generation:    generation,
+		image:         img.(*image),
+		spec:          *spec,
+		ctrdRuntime:   ctrdRun,
+		ctrdContainer: nil,
+	}
+}
+
+// newContainerFromCtrdCtr defines a new container from and existing containerD container.
+func newContainerFromCtrdCtr(ctrdRun *containerdRuntime,
+	ctrdCtr containerd.Container, domain, id [16]byte) (*container, error) {
+
+	gen, err := getGeneration(ctrdRun, ctrdCtr)
+	if err != nil {
+		return nil, err
+	}
+
+	img, err := ctrdCtr.Image(ctrdRun.context)
+	if err != nil {
+		return nil, runtime.Errorf("failed to get image: %v", err)
+	}
+	spec, err := ctrdCtr.Spec(ctrdRun.context)
+	if err != nil {
+		return nil, runtime.Errorf("failed to get image spec: %v", err)
+	}
+
+	return &container{
+		domain:        domain,
+		id:            id,
+		generation:    gen,
+		image:         &image{ctrdRun, img},
+		spec:          *spec,
+		ctrdRuntime:   ctrdRun,
+		ctrdContainer: ctrdCtr,
+	}, nil
+}
+
 // createTask creates a new task
 func createTask(ctr *container, mounts []mount.Mount) (containerd.Task, error) {
 
