@@ -3,11 +3,9 @@ package containerd
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 
 	"github.com/containerd/containerd"
@@ -15,7 +13,6 @@ import (
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/reference"
-	"github.com/containerd/containerd/snapshots"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	runspecs "github.com/opencontainers/runtime-spec/specs-go"
@@ -100,35 +97,12 @@ func (ctrdRun *containerdRuntime) Domains() ([][16]byte, error) {
 		}
 	}
 
-	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
-	err = snapSvc.Walk(ctrdRun.context, func(ctx context.Context, info snapshots.Info) error {
+	snapDomains, err := getSnapshotDomains(ctrdRun)
+	if err != nil {
+		return nil, err
+	}
 
-		name := string(info.Name)
-		idx := strings.Index(name, "-")
-		if idx == 32 {
-			str, err := hex.DecodeString(name[:32])
-			if err != nil {
-				return runtime.Errorf("failed to decode domain '%s': $v", name, err)
-			}
-
-			var dom [16]byte
-			copy(dom[:], str)
-
-			found := false
-			for _, d := range domains {
-				if d == dom {
-					found = true
-					break
-				}
-			}
-			if !found {
-				domains = append(domains, dom)
-			}
-		}
-		return nil
-	})
-
-	return domains, nil
+	return append(domains, snapDomains...), nil
 }
 
 func (ctrdRun *containerdRuntime) Close() {
