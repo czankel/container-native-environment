@@ -119,18 +119,13 @@ type Container interface {
 	// Generation returns a value representing the filesystem.
 	Generation() [16]byte
 
+	// SetRootFSssets the rootfs to the provide snapshot.
+	//
+	// The root filesystem can only be set when the container has not been created.
+	SetRootFs(snapshot Snapshot) error
+
 	// Create creates the container.
 	Create() error
-
-	// Start starts the container.
-	// Snapshot is an optional argument for defining the base filesystem other than the image.
-	// Mutable defines if a process running inside the container can write to the filesystem.
-	Start(snapshot Snapshot, mutable bool) error
-
-	// Stop stops the container gracefully and exists all processes asynchronously.
-	// Force forces to kill all running processes.
-	// This function is idempotent.
-	Stop(force bool) error
 
 	// Delete deletes the container.
 	Delete() error

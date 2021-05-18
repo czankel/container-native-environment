@@ -3,12 +3,15 @@ package containerd
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"strings"
 	"time"
 
 	"github.com/containerd/containerd"
 	ctrderr "github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshots"
+	"github.com/opencontainers/image-spec/identity"
 
 	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/runtime"
@@ -55,6 +58,114 @@ func getSnapshots(ctrdRun *containerdRuntime) ([]runtime.Snapshot, error) {
 		return nil
 	})
 	return snaps, err
+}
+
+func createSnapshot(ctrdRun *containerdRuntime,
+	snapName, parentName string, mutable bool) ([]mount.Mount, *snapshot, error) {
+
+	ctrdCtx := ctrdRun.context
+
+	var mounts []mount.Mount
+
+	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
+
+	// check if the snapshot already exists, take mutable flag into account
+	info, err := snapSvc.Stat(ctrdCtx, snapName)
+	if err != nil && !ctrderr.IsNotFound(err) {
+		return nil, nil, err
+	}
+	if err == nil && (info.Kind == snapshots.KindActive && mutable ||
+		info.Kind == snapshots.KindView && !mutable) {
+		mounts, err = snapSvc.Mounts(ctrdCtx, snapName)
+		if err != nil {
+			return nil, nil, runtime.Errorf("failed to get snapshot mounts: %v", err)
+		}
+	}
+
+	// otherwise, create snapshot
+	if mounts == nil {
+
+		labels := map[string]string{}
+		labels["containerd.io/gc.root"] = time.Now().UTC().Format(time.RFC3339)
+
+		if mutable {
+			mounts, err = snapSvc.Prepare(ctrdCtx, snapName, parentName,
+				snapshots.WithLabels(labels))
+		} else {
+			mounts, err = snapSvc.View(ctrdCtx, snapName, parentName,
+				snapshots.WithLabels(labels))
+		}
+		if err != nil {
+			return nil, nil,
+				runtime.Errorf("failed to create snapshot '%s': %v", snapName, err)
+		}
+
+		info, err = snapSvc.Stat(ctrdCtx, snapName)
+		if err != nil {
+			return nil, nil, runtime.Errorf("failed to create snapshot")
+		}
+	}
+
+	return mounts, &snapshot{ctrdRuntime: ctrdRun, info: info}, nil
+}
+
+func createActiveSnapshot(ctrdRun *containerdRuntime,
+	img *image, domain, id [16]byte, snap runtime.Snapshot) error {
+
+	activeSnapName := activeSnapshotName(domain, id)
+	var rootFsSnapName string
+	if snap != nil {
+		rootFsSnapName = snap.Name()
+	} else {
+		diffIDs, err := img.ctrdImage.RootFS(ctrdRun.context)
+		if err != nil {
+			return runtime.Errorf("failed to get rootfs: %v", err)
+		}
+		rootFsSnapName = identity.ChainID(diffIDs).String()
+	}
+
+	// delete all 'old' snapshots down to the new rootfs or the image
+	if rootFsSnapName == activeSnapName {
+		return errdefs.InternalError("Cannot set rootfs to active layer")
+	}
+
+	snapName := activeSnapName
+	for snapName != rootFsSnapName {
+		snap, err := getSnapshot(ctrdRun, snapName)
+		if err != nil && errors.Is(err, errdefs.ErrNotFound) {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		err = deleteSnapshot(ctrdRun, snapName)
+		if err != nil && errors.Is(err, errdefs.ErrNotFound) {
+			break
+		}
+		if err != nil && errors.Is(err, errdefs.ErrInUse) {
+			break
+		}
+		if err != nil {
+			break
+		}
+		snapName = snap.Parent()
+	}
+
+	// create active snapshot based on the new rootFs
+	_, snap, err := createSnapshot(ctrdRun, activeSnapName, rootFsSnapName, true /* mutable */)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func getActiveSnapMounts(ctrdRun *containerdRuntime, dom, cid [16]byte) ([]mount.Mount, error) {
+
+	snapName := activeSnapshotName(dom, cid)
+
+	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
+	return snapSvc.Mounts(ctrdRun.context, snapName)
 }
 
 func getSnapshotDomains(ctrdRun *containerdRuntime) ([][16]byte, error) {
