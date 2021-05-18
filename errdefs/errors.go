@@ -27,7 +27,11 @@ var (
 	// error: function '<name>' is not implemented
 	ErrInternalError = errors.New("internal error")
 	// error: internal error: <description>
-	ErrCommandFailed = errors.New("failed")
+	// error: internal error: <description>
+	ErrInUse = errors.New("in use")
+
+	// pass-through errors
+	ErrCommandFailed = errors.New("cmd failed")
 )
 
 type cneError struct {
@@ -104,6 +108,13 @@ func NotImplemented() error {
 	return &cneError{
 		cause: ErrNotImplemented,
 		msg:   fmt.Sprintf("function '%s' has not been implemented", fnName),
+	}
+}
+
+func InUse(resource, name string) error {
+	return &cneError{
+		cause: ErrInUse,
+		msg:   fmt.Sprintf("%s '%s' is in use", resource, name),
 	}
 }
 
