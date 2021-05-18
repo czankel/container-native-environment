@@ -127,6 +127,11 @@ func Create(run runtime.Runtime, ws *project.Workspace, img runtime.Image,
 		return nil, err
 	}
 
+	err = runCtr.SetRootFs(nil)
+	if err != nil {
+		return nil, err
+	}
+
 	// create the container
 	err = runCtr.Create()
 	if err != nil {
@@ -146,12 +151,6 @@ func Create(run runtime.Runtime, ws *project.Workspace, img runtime.Image,
 		var stat []runtime.ProgressStatus
 		copy(stat, layerStatus)
 		progress <- stat
-	}
-
-	// start the actual container (snap may be nil)
-	err = runCtr.Start(nil, true)
-	if err != nil {
-		return nil, err
 	}
 
 	// build new image: execute in the current layer
