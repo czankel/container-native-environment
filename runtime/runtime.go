@@ -54,6 +54,12 @@ type Runtime interface {
 	// Containers returns all containers in the specified domain.
 	Containers(domain [16]byte) ([]Container, error)
 
+	// GetContainer looks up and returns the specified container by domain, id, and generation.
+	// It returns ErrNotFound if the container could not be found.
+	//
+	// The container can be used to execute commands with Exec.
+	GetContainer(domain, id, generation [16]byte) (Container, error)
+
 	// NewContainer defines a new Container without creating it.
 	NewContainer(domain, id, generation [16]byte,
 		image Image, spec *runspecs.Spec) (Container, error)

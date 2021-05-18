@@ -3,6 +3,7 @@ package containerd
 
 import (
 	"encoding/hex"
+	"errors"
 	"strings"
 	"syscall"
 	"time"
@@ -56,8 +57,8 @@ func splitCtrdID(ctrdID string) ([16]byte, [16]byte, error) {
 	return dom, id, nil
 }
 
-// composeID composes the containerd ID from the domain and container ID
-func composeID(domain [16]byte, id [16]byte) string {
+// composeCtrdID composes the containerd ID from the domain and container ID
+func composeCtrdID(domain [16]byte, id [16]byte) string {
 	return hex.EncodeToString(domain[:]) + "-" + hex.EncodeToString(id[:])
 }
 
@@ -81,6 +82,7 @@ func getGeneration(ctrdRun *containerdRuntime, ctrdCtr containerd.Container) ([1
 	return gen, nil
 }
 
+// getContainers returns all containers in the specified domain
 func getContainers(ctrdRun *containerdRuntime, domain [16]byte) ([]runtime.Container, error) {
 
 	var runCtrs []runtime.Container
@@ -100,7 +102,22 @@ func getContainers(ctrdRun *containerdRuntime, domain [16]byte) ([]runtime.Conta
 			continue
 		}
 
-		ctr, err := newContainerFromCtrdCtr(ctrdRun, c, domain, id)
+		gen, err := getGeneration(ctrdRun, c)
+		if err != nil {
+			return nil, err
+		}
+
+		img, err := c.Image(ctrdRun.context)
+		if err != nil {
+			return nil, runtime.Errorf("failed to get image: %v", err)
+		}
+
+		spec, err := c.Spec(ctrdRun.context)
+		if err != nil {
+			return nil, runtime.Errorf("failed to get image spec: %v", err)
+		}
+
+		ctr := newContainer(ctrdRun, c, domain, id, gen, &image{ctrdRun, img}, spec)
 		if err != nil {
 			return nil, err
 		}
@@ -111,25 +128,50 @@ func getContainers(ctrdRun *containerdRuntime, domain [16]byte) ([]runtime.Conta
 }
 
 // newContainer defines a new container without creating it.
-func newContainer(ctrdRun *containerdRuntime, domain, id, generation [16]byte,
-	img runtime.Image, spec *runspecs.Spec) runtime.Container {
+func newContainer(ctrdRun *containerdRuntime, ctrdCtr containerd.Container,
+	domain, id, generation [16]byte, img *image, spec *runspecs.Spec) *container {
 
 	return &container{
 		domain:        domain,
 		id:            id,
 		generation:    generation,
-		image:         img.(*image),
+		image:         img,
 		spec:          *spec,
 		ctrdRuntime:   ctrdRun,
-		ctrdContainer: nil,
+		ctrdContainer: ctrdCtr,
 	}
 }
 
-// newContainerFromCtrdCtr defines a new container from and existing containerD container.
-func newContainerFromCtrdCtr(ctrdRun *containerdRuntime,
-	ctrdCtr containerd.Container, domain, id [16]byte) (*container, error) {
+// getContainer looks up the container by domain, id, and generation. It returns not-found
+// error if the container doesn't exist.
+//
+// Note that the container must be 'Exec-able', so a not-found error will also be returned if
+// no valid active snapshot exists and the container will be deleted.
+func getContainer(ctrdRun *containerdRuntime, domain, id, generation [16]byte) (*container, error) {
 
-	gen, err := getGeneration(ctrdRun, ctrdCtr)
+	ctrdID := composeCtrdID(domain, id)
+	ctrdCtr, err := ctrdRun.client.LoadContainer(ctrdRun.context, ctrdID)
+	if err != nil && ctrderr.IsNotFound(err) {
+		return nil, errdefs.NotFound("container", ctrdID)
+	}
+	if err != nil {
+		return nil, runtime.Errorf("failed to get container: %v", err)
+	}
+
+	ctrdGen, err := getGeneration(ctrdRun, ctrdCtr)
+	if err != nil {
+		return nil, err
+	}
+
+	if ctrdGen != generation {
+		return nil, errdefs.NotFound("container", ctrdID)
+	}
+
+	_, err = getActiveSnapshot(ctrdRun, domain, id)
+	if err != nil && errors.Is(err, errdefs.ErrNotFound) {
+		deleteContainer(ctrdRun, ctrdCtr, ctrdID) // ignore error
+		return nil, errdefs.NotFound("container", ctrdID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -138,20 +180,15 @@ func newContainerFromCtrdCtr(ctrdRun *containerdRuntime,
 	if err != nil {
 		return nil, runtime.Errorf("failed to get image: %v", err)
 	}
+
 	spec, err := ctrdCtr.Spec(ctrdRun.context)
 	if err != nil {
 		return nil, runtime.Errorf("failed to get image spec: %v", err)
 	}
 
-	return &container{
-		domain:        domain,
-		id:            id,
-		generation:    gen,
-		image:         &image{ctrdRun, img},
-		spec:          *spec,
-		ctrdRuntime:   ctrdRun,
-		ctrdContainer: ctrdCtr,
-	}, nil
+	ctr := newContainer(ctrdRun, ctrdCtr, domain, id, generation, &image{ctrdRun, img}, spec)
+
+	return ctr, nil
 }
 
 // createTask creates a new task
@@ -164,7 +201,7 @@ func createTask(ctr *container, mounts []mount.Mount) (containerd.Task, error) {
 		cio.NewCreator(),
 		containerd.WithRootFS(mounts))
 	if err != nil {
-		ctrID := composeID(ctr.domain, ctr.id)
+		ctrID := composeCtrdID(ctr.domain, ctr.id)
 		deleteContainer(ctrdRun, ctr.ctrdContainer, ctrID)
 		ctr.ctrdContainer = nil
 		return nil, runtime.Errorf("failed to create container task: %v", err)
@@ -269,7 +306,7 @@ func (ctr *container) Create() error {
 	}
 
 	// create container
-	uuidName := composeID(ctr.domain, ctr.id)
+	uuidName := composeCtrdID(ctr.domain, ctr.id)
 	labels := map[string]string{}
 	gen := hex.EncodeToString(ctr.generation[:])
 	labels[containerdGenerationLabel] = gen
@@ -303,7 +340,7 @@ func (ctr *container) Start(snapshot runtime.Snapshot, mutable bool) error {
 
 	var mounts []mount.Mount
 
-	snapName := composeID(ctr.domain, ctr.id)
+	snapName := composeCtrdID(ctr.domain, ctr.id)
 	snapSVC := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
 
 	// check if the snapshot already exists
@@ -455,6 +492,6 @@ func deleteContainer(ctrdRun *containerdRuntime,
 }
 
 func (ctr *container) Delete() error {
-	ctrID := composeID(ctr.domain, ctr.id)
+	ctrID := composeCtrdID(ctr.domain, ctr.id)
 	return deleteContainer(ctr.ctrdRuntime, ctr.ctrdContainer, ctrID)
 }

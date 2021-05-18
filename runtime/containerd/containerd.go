@@ -227,7 +227,13 @@ func (ctrdRun *containerdRuntime) Snapshots() ([]runtime.Snapshot, error) {
 func (ctrdRun *containerdRuntime) Containers(domain [16]byte) ([]runtime.Container, error) {
 	return getContainers(ctrdRun, domain)
 }
+
+func (ctrdRun *containerdRuntime) GetContainer(
+	domain, id, generation [16]byte) (runtime.Container, error) {
+	return getContainer(ctrdRun, domain, id, generation)
+}
+
 func (ctrdRun *containerdRuntime) NewContainer(domain, id, generation [16]byte,
 	img runtime.Image, spec *runspecs.Spec) (runtime.Container, error) {
-	return newContainer(ctrdRun, domain, id, generation, img, spec), nil
+	return newContainer(ctrdRun, nil, domain, id, generation, img.(*image), spec), nil
 }

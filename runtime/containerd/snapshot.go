@@ -7,13 +7,43 @@ import (
 	"time"
 
 	"github.com/containerd/containerd"
+	ctrderr "github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/snapshots"
 
+	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/runtime"
 )
 
 type snapshot struct {
-	info snapshots.Info
+	ctrdRuntime *containerdRuntime
+	info        snapshots.Info
+}
+
+// The snapshot name consists of the domain and the containerID
+func activeSnapshotName(domain, ctrID [16]byte) string {
+	domStr := hex.EncodeToString(domain[:])
+	cidStr := hex.EncodeToString(ctrID[:])
+	return domStr + "-" + cidStr
+}
+
+// getSnapshot returns the requested snapshot
+// It returns an error if the snapshot doesn't exist
+func getSnapshot(ctrdRun *containerdRuntime, snapName string) (runtime.Snapshot, error) {
+
+	ctrdCtx := ctrdRun.context
+	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
+	info, err := snapSvc.Stat(ctrdCtx, snapName)
+	if err != nil && ctrderr.IsNotFound(err) {
+		return nil, errdefs.NotFound("snapshot", snapName)
+	} else if err != nil {
+		return nil, err
+	}
+
+	return &snapshot{ctrdRuntime: ctrdRun, info: info}, nil
+}
+
+func getActiveSnapshot(ctrdRun *containerdRuntime, domain, id [16]byte) (runtime.Snapshot, error) {
+	return getSnapshot(ctrdRun, activeSnapshotName(domain, id))
 }
 
 func getSnapshots(ctrdRun *containerdRuntime) ([]runtime.Snapshot, error) {
