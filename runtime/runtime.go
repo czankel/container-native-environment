@@ -133,8 +133,9 @@ type Container interface {
 	// Commit commits the container after it has been built with a new generation value.
 	Commit(generation [16]byte) error
 
-	// Exec(stream Stream, cmd []string) (Process, error)
-	Exec(stream Stream, cmd []string) (Process, error)
+	// Exec starts the provided command in the process spec and returns immediately.
+	// The container must be started before calling Exec.
+	Exec(stream Stream, procSpec *runspecs.Process) (Process, error)
 }
 
 // Stream describes the IO channels to a process that is running in a container.

@@ -14,7 +14,6 @@ import (
 
 	runspecs "github.com/opencontainers/runtime-spec/specs-go"
 
-	"github.com/containerd/console"
 	"github.com/google/uuid"
 
 	"github.com/czankel/cne/errdefs"
@@ -225,7 +224,7 @@ func createTask(ctr *container) (containerd.Task, error) {
 func deleteTask(ctrdRun *containerdRuntime, ctrdCtr containerd.Container) error {
 
 	ctrdTask, err := ctrdCtr.Task(ctrdRun.context, nil)
-	if err != nil && err == ctrderr.ErrNotFound {
+	if err != nil && ctrderr.IsNotFound(err) {
 		return nil
 	} else if err != nil {
 		return runtime.Errorf("failed to get container task: %v", err)
@@ -364,33 +363,20 @@ func (ctr *container) Commit(gen [16]byte) error {
 }
 
 // Exec executes the provided command.
-func (ctr *container) Exec(stream runtime.Stream, cmd []string) (runtime.Process, error) {
+func (ctr *container) Exec(stream runtime.Stream,
+	procSpec *runspecs.Process) (runtime.Process, error) {
 
 	ctrdRun := ctr.ctrdRuntime
 	ctrdCtr := ctr.ctrdContainer
 	ctrdCtx := ctrdRun.context
+
 	ctrdTask, err := ctrdCtr.Task(ctrdCtx, nil)
+	if err != nil && ctrderr.IsNotFound(err) {
+		ctrdTask, err = createTask(ctr)
+	}
 	if err != nil {
 		return nil, runtime.Errorf("failed to get task: %v", err)
 	}
-
-	spec, err := ctrdCtr.Spec(ctrdCtx)
-	if err != nil {
-		return nil, runtime.Errorf("failed to get container spec: %v", err)
-	}
-
-	procSpec := spec.Process
-	procSpec.Terminal = stream.Terminal
-	procSpec.Args = cmd
-
-	con := console.Current()
-	defer con.Reset()
-
-	if err := con.SetRaw(); err != nil {
-		return nil, runtime.Errorf("failed to set terminal: %v", err)
-	}
-	ws, err := con.Size()
-	con.Resize(ws)
 
 	cioOpts := []cio.Opt{cio.WithStreams(stream.Stdin, stream.Stdout, stream.Stderr)}
 	if stream.Terminal {
@@ -405,6 +391,9 @@ func (ctr *container) Exec(stream runtime.Stream, cmd []string) (runtime.Process
 	}
 
 	err = ctrdProc.Start(ctrdCtx)
+	if err != nil && !ctrderr.IsNotFound(err) {
+		return nil, errdefs.NotFound("command", procSpec.Args[0])
+	}
 	if err != nil {
 		return nil, runtime.Errorf("starting process failed: %v", err)
 	}
