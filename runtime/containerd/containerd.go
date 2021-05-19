@@ -237,3 +237,11 @@ func (ctrdRun *containerdRuntime) NewContainer(domain, id, generation [16]byte,
 	img runtime.Image, spec *runspecs.Spec) (runtime.Container, error) {
 	return newContainer(ctrdRun, nil, domain, id, generation, img.(*image), spec), nil
 }
+
+func (ctrdRun *containerdRuntime) DeleteContainer(domain, id, generation [16]byte) error {
+	return deleteContainer(ctrdRun, domain, id, false /*purge*/)
+}
+
+func (ctrdRun *containerdRuntime) PurgeContainer(domain, id, generation [16]byte) error {
+	return deleteContainer(ctrdRun, domain, id, true /*purge*/)
+}

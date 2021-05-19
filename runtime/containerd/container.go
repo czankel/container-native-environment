@@ -176,7 +176,7 @@ func getContainer(ctrdRun *containerdRuntime, domain, id, generation [16]byte) (
 
 	_, err = getActiveSnapshot(ctrdRun, domain, id)
 	if err != nil && errors.Is(err, errdefs.ErrNotFound) {
-		deleteContainer(ctrdRun, ctrdCtr, ctrdID) // ignore error
+		deleteCtrdContainer(ctrdRun, ctrdCtr, domain, id, false /*purge*/) // ignore error
 		return nil, errdefs.NotFound("container", ctrdID)
 	}
 	if err != nil {
@@ -212,8 +212,7 @@ func createTask(ctr *container) (containerd.Task, error) {
 	ctrdTask, err := ctr.ctrdContainer.NewTask(ctrdCtx, cio.NewCreator(),
 		containerd.WithRootFS(mounts))
 	if err != nil {
-		ctrID := composeCtrdID(ctr.domain, ctr.id)
-		deleteContainer(ctrdRun, ctr.ctrdContainer, ctrID)
+		deleteCtrdContainer(ctrdRun, ctr.ctrdContainer, ctr.domain, ctr.id, false /*purge*/)
 		ctr.ctrdContainer = nil
 		return nil, runtime.Errorf("failed to create container task: %v", err)
 	}
@@ -221,7 +220,7 @@ func createTask(ctr *container) (containerd.Task, error) {
 	return ctrdTask, nil
 }
 
-func deleteTask(ctrdRun *containerdRuntime, ctrdCtr containerd.Container) error {
+func deleteCtrdTask(ctrdRun *containerdRuntime, ctrdCtr containerd.Container) error {
 
 	ctrdTask, err := ctrdCtr.Task(ctrdRun.context, nil)
 	if err != nil && ctrderr.IsNotFound(err) {
@@ -301,7 +300,7 @@ func (ctr *container) Create() error {
 		if ctrdGen == gen {
 			return errdefs.AlreadyExists("container", ctrdID)
 		}
-		err = deleteContainer(ctrdRun, ctr.ctrdContainer, ctrdID)
+		err = deleteCtrdContainer(ctrdRun, ctrdCtr, ctr.domain, ctr.id, false /*purge*/)
 		if err != nil {
 			return err
 		}
@@ -344,6 +343,8 @@ func (ctr *container) Create() error {
 	return nil
 }
 
+// For containerd, we support the snapshots, so nothing to do here, other than setting the new
+// generation value.
 func (ctr *container) Commit(gen [16]byte) error {
 
 	ctx := ctr.ctrdRuntime.context
@@ -408,28 +409,49 @@ func (ctr *container) Processes() ([]runtime.Process, error) {
 	return nil, errdefs.NotImplemented()
 }
 
-func deleteContainer(ctrdRun *containerdRuntime,
-	ctrdCtr containerd.Container, ctrID string) error {
+// deleteContainer deletes the container, task, and active snapshot.
+// This function returns not-found if a container was not specified and could not be found.
+func deleteContainer(ctrdRun *containerdRuntime, domain, id [16]byte, purge bool) error {
 
-	err := deleteTask(ctrdRun, ctrdCtr)
+	ctrdID := composeCtrdID(domain, id)
+	ctrdCtr, err := ctrdRun.client.LoadContainer(ctrdRun.context, ctrdID)
+	if err != nil && ctrderr.IsNotFound(err) {
+		return errdefs.NotFound("container", ctrdID)
+	}
 	if err != nil {
-		return runtime.Errorf("failed to delete task: %v", err)
+		return runtime.Errorf("failed to get container: %v", err)
 	}
 
-	err = ctrdCtr.Delete(ctrdRun.context)
-	if err != nil {
-		return runtime.Errorf("failed to delete container: %v", err)
+	return deleteCtrdContainer(ctrdRun, ctrdCtr, domain, id, purge)
+}
+
+func deleteCtrdContainer(ctrdRun *containerdRuntime,
+	ctrdCtr containerd.Container, domain, id [16]byte, purge bool) error {
+
+	err := deleteCtrdTask(ctrdRun, ctrdCtr)
+	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
+		return err
 	}
 
-	err = deleteSnapshot(ctrdRun, ctrID)
+	err = ctrdCtr.Delete(ctrdRun.context, containerd.WithSnapshotCleanup)
 	if err != nil {
-		return runtime.Errorf("failed to delete snapshot: %v", err)
+		return err
+	}
+
+	if purge {
+		// ignore error for deleting snapshots
+		deleteContainerSnapshots(ctrdRun, domain, id)
 	}
 
 	return nil
 }
 
 func (ctr *container) Delete() error {
-	ctrID := composeCtrdID(ctr.domain, ctr.id)
-	return deleteContainer(ctr.ctrdRuntime, ctr.ctrdContainer, ctrID)
+	return deleteCtrdContainer(ctr.ctrdRuntime,
+		ctr.ctrdContainer, ctr.domain, ctr.id, false /*purge*/)
+}
+
+func (ctr *container) Purge() error {
+	return deleteCtrdContainer(ctr.ctrdRuntime,
+		ctr.ctrdContainer, ctr.domain, ctr.id, true /*purge*/)
 }

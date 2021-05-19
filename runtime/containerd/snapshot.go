@@ -214,6 +214,56 @@ func deleteSnapshot(ctrdRun *containerdRuntime, name string) error {
 	return nil
 }
 
+// delete all unrefeenced containers for the provided container starting with the active snapshot
+func deleteContainerSnapshots(ctrdRun *containerdRuntime, domain, id [16]byte) error {
+
+	snapName := activeSnapshotName(domain, id)
+
+	snapMap := make(map[string]*snapshot)
+	snapRefs := make(map[string]int)
+	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
+	err := snapSvc.Walk(ctrdRun.context, func(ctx context.Context, info snapshots.Info) error {
+
+		snapMap[info.Name] = &snapshot{ctrdRuntime: ctrdRun, info: info}
+
+		if info.Parent != "" {
+			snapRefs[info.Parent] = snapRefs[info.Parent] + 1
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	for refC := 0; refC == 0; {
+		snap, ok := snapMap[snapName]
+		if !ok {
+			break
+		}
+
+		parent := snap.info.Parent
+
+		err = snapSvc.Remove(ctrdRun.context, snapName)
+		if err != nil && !ctrderr.IsNotFound(err) {
+			return err
+		}
+
+		if parent == "" {
+			break
+		}
+
+		refC = snapRefs[parent] - 1
+		if refC == 0 {
+			snapRefs[parent] = -1 // mark already handled
+		} else {
+			snapRefs[parent] = refC
+		}
+		snapName = parent
+	}
+
+	return nil
+}
+
 func (snap *snapshot) Name() string {
 	return snap.info.Name
 }

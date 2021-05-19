@@ -63,6 +63,14 @@ type Runtime interface {
 	// NewContainer defines a new Container without creating it.
 	NewContainer(domain, id, generation [16]byte,
 		image Image, spec *runspecs.Spec) (Container, error)
+
+	// DeleteContainer deletes the specified container. It returns ErrNotFound if the container
+	// doesn't exist.
+	DeleteContainer(domain, id, generation [16]byte) error
+
+	// PurgeContainer deletes the specified container and all associated resources. It returns
+	// ErrNotFound if the container doesn't exist.
+	PurgeContainer(domain, id, generation [16]byte) error
 }
 
 // Image describes an image that consists of a file system and configuration options.
@@ -129,6 +137,9 @@ type Container interface {
 
 	// Delete deletes the container.
 	Delete() error
+
+	// Purge deletes the container and all snapshots that are not otherwise used.
+	Purge() error
 
 	// Commit commits the container after it has been built with a new generation value.
 	Commit(generation [16]byte) error
