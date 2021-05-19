@@ -4,6 +4,7 @@ package container
 
 import (
 	"encoding/hex"
+	"os"
 	"strings"
 	"time"
 
@@ -153,6 +154,8 @@ func Create(run runtime.Runtime, ws *project.Workspace, img runtime.Image,
 		progress <- stat
 	}
 
+	procSpec := DefaultProcessSpec()
+
 	// build new image: execute in the current layer
 	for layIdx := 0; layIdx < len(ws.Environment.Layers); layIdx++ {
 
@@ -167,8 +170,10 @@ func Create(run runtime.Runtime, ws *project.Workspace, img runtime.Image,
 			}
 
 			stream := runtime.Stream{}
-			cmdArgs := strings.Split(line, " ")
-			process, err := runCtr.Exec(stream, cmdArgs)
+			args := strings.Split(line, " ")
+
+			procSpec.Args = args
+			process, err := runCtr.Exec(stream, &procSpec)
 			if err != nil {
 				runCtr.Delete()
 				return nil, err
@@ -222,7 +227,11 @@ func Delete(run runtime.Runtime, ws *project.Workspace) error {
 
 func (ctr *Container) Exec(stream runtime.Stream, cmd []string) (uint32, error) {
 
-	proc, err := ctr.runContainer.Exec(stream, cmd)
+	procSpec := DefaultProcessSpec()
+	procSpec.Env = os.Environ()
+	procSpec.Terminal = stream.Terminal
+	procSpec.Args = cmd
+	proc, err := ctr.runContainer.Exec(stream, &procSpec)
 	if err != nil {
 		return 0, err
 	}
