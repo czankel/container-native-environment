@@ -363,6 +363,21 @@ func (ctr *container) Commit(gen [16]byte) error {
 	return nil
 }
 
+func (ctr *container) Snapshot() (runtime.Snapshot, error) {
+
+	// need to delete the task to pick up the new mount point
+	err := deleteCtrdTask(ctr.ctrdRuntime, ctr.ctrdContainer)
+	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
+		return nil, err
+	}
+	return updateSnapshot(ctr.ctrdRuntime, ctr.domain, ctr.id, false /* amend */)
+}
+
+func (ctr *container) Amend() (runtime.Snapshot, error) {
+
+	return updateSnapshot(ctr.ctrdRuntime, ctr.domain, ctr.id, true /* amend */)
+}
+
 // Exec executes the provided command.
 func (ctr *container) Exec(stream runtime.Stream,
 	procSpec *runspecs.Process) (runtime.Process, error) {

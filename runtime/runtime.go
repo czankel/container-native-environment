@@ -141,6 +141,14 @@ type Container interface {
 	// Purge deletes the container and all snapshots that are not otherwise used.
 	Purge() error
 
+	// Snapshot creates a snapshot of the current file system.
+	//
+	// Snapshot support is optional, and runtimes that don't support it will return nil.
+	Snapshot() (Snapshot, error)
+
+	// Amend amends the committed snapshot with the current changes to the filesystem.
+	Amend() (Snapshot, error)
+
 	// Commit commits the container after it has been built with a new generation value.
 	Commit(generation [16]byte) error
 
