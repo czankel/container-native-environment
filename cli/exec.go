@@ -1,11 +1,13 @@
 package cli
 
 import (
+	"errors"
 	"os"
 
 	"github.com/spf13/cobra"
 
 	"github.com/czankel/cne/container"
+	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/project"
 	"github.com/czankel/cne/runtime"
 )
@@ -37,8 +39,8 @@ func execRunE(cmd *cobra.Command, args []string) error {
 	}
 	defer run.Close()
 
-	ctr, err := container.Find(run, ws)
-	if err != nil {
+	ctr, err := container.Get(run, ws)
+	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 		return err
 	}
 

@@ -1,9 +1,12 @@
 package cli
 
 import (
+	"errors"
+
 	"github.com/spf13/cobra"
 
 	"github.com/czankel/cne/container"
+	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/project"
 	"github.com/czankel/cne/runtime"
 )
@@ -100,8 +103,8 @@ func deleteLayerRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	oldCtr, err := container.Find(run, ws)
-	if err != nil {
+	oldCtr, err := container.Get(run, ws)
+	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 		return err
 	}
 

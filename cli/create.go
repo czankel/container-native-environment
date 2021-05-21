@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -94,8 +95,8 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	oldCtr, err := container.Find(run, ws)
-	if err != nil {
+	oldCtr, err := container.Get(run, ws)
+	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 		return err
 	}
 

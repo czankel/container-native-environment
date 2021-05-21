@@ -86,8 +86,8 @@ func buildWorkspaceRunE(cmd *cobra.Command, args []string) error {
 	}
 	defer run.Close()
 
-	ctr, err := container.Find(run, ws)
-	if err != nil {
+	ctr, err := container.Get(run, ws)
+	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 		return err
 	}
 	if ctr != nil && buildWorkspaceForce {

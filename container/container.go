@@ -16,9 +16,33 @@ import (
 )
 
 type Container struct {
+	runRuntime   runtime.Runtime   `output:"-"`
 	runContainer runtime.Container `output:"-"`
+	Namespace    string
 	Name         string
+	Domain       [16]byte
+	ID           [16]byte
+	Generation   [16]byte
 	CreatedAt    time.Time
+}
+
+// containerName is a helper function returning the unique name of a container consisting
+// of the domain, container id, and generation.
+func containerName(dom, cid, gen [16]byte) string {
+
+	return hex.EncodeToString(dom[:]) + "-" +
+		hex.EncodeToString(cid[:]) + "-" +
+		hex.EncodeToString(gen[:])
+}
+
+// containerNameRunCtr is a helper function to extract the container name from a runtime Container.
+func containerNameRunCtr(runCtr runtime.Container) string {
+
+	dom := runCtr.Domain()
+	cid := runCtr.ID()
+	gen := runCtr.Generation()
+
+	return containerName(dom, cid, gen)
 }
 
 // findContainer is a helper function to find and return the existing container for the provided
@@ -40,43 +64,43 @@ func findContainer(run runtime.Runtime,
 	return nil, nil
 }
 
-func containerName(runCtr runtime.Container) string {
-
-	dom := runCtr.Domain()
-	cid := runCtr.ID()
-	gen := runCtr.Generation()
-
-	return hex.EncodeToString(dom[:]) + "-" +
-		hex.EncodeToString(cid[:]) + "-" +
-		hex.EncodeToString(gen[:])
-}
-
 // Containers returns all active containers in the project.
 func Containers(run runtime.Runtime, prj *project.Project) ([]Container, error) {
 
-	dom, err := uuid.Parse(prj.UUID)
-	if err != nil {
-		return nil, errdefs.InvalidArgument("invalid project UUID: '%v'", prj.UUID)
+	var domains [][16]byte
+
+	if prj != nil {
+		dom, err := uuid.Parse(prj.UUID)
+		if err != nil {
+			return nil, errdefs.InvalidArgument("invalid project UUID: '%v'", prj.UUID)
+		}
+		domains = [][16]byte{dom}
 	}
 
-	runCtrs, err := run.Containers(dom)
-	if err != nil {
-		return nil, err
-	}
-	ctrs := make([]Container, len(runCtrs))
-	for i, c := range runCtrs {
-		ctrs[i] = Container{
-			runContainer: c,
-			Name:         containerName(c),
-			CreatedAt:    c.CreatedAt(),
+	var ctrs []Container
+	for _, dom := range domains {
+		runCtrs, err := run.Containers(dom)
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range runCtrs {
+			cid := c.ID()
+			ctrs = append(ctrs, Container{
+				runContainer: c,
+				Name:         containerNameRunCtr(c),
+				Domain:       dom,
+				ID:           cid,
+				Generation:   c.Generation(),
+				CreatedAt:    c.CreatedAt(),
+			})
 		}
 	}
 
 	return ctrs, nil
 }
 
-// Find looks up the container and returns it or nil if it doesn't exist
-func Find(run runtime.Runtime, ws *project.Workspace) (*Container, error) {
+// Get looks up the current active Container for the specified Workspace.
+func Get(run runtime.Runtime, ws *project.Workspace) (*Container, error) {
 
 	dom, err := uuid.Parse(ws.ProjectUUID)
 	if err != nil {
@@ -84,13 +108,22 @@ func Find(run runtime.Runtime, ws *project.Workspace) (*Container, error) {
 			"invalid project UUID in workspace: '%v'", ws.ProjectUUID)
 	}
 
-	runCtr, err := findContainer(run, dom, ws.ID(), ws.ConfigHash())
-	if err != nil || runCtr == nil {
+	cid := ws.ID()
+	gen := ws.ConfigHash()
+	runCtr, err := run.GetContainer(dom, cid, gen)
+	if err != nil {
 		return nil, err
 	}
+
+	name := containerNameRunCtr(runCtr)
 	return &Container{
+		runRuntime:   run,
 		runContainer: runCtr,
-		Name:         containerName(runCtr),
+		Namespace:    run.Namespace(),
+		Name:         name,
+		Domain:       runCtr.Domain(),
+		ID:           cid,
+		Generation:   gen,
 		CreatedAt:    runCtr.CreatedAt(),
 	}, nil
 }
@@ -204,7 +237,7 @@ func Create(run runtime.Runtime, ws *project.Workspace, img runtime.Image,
 		return nil, err
 	}
 
-	return &Container{runContainer: runCtr, Name: containerName(runCtr)}, nil
+	return &Container{runContainer: runCtr, Name: containerName(dom, cid, gen)}, nil
 }
 
 // Delete deletes the container if it exists
