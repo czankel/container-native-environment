@@ -17,23 +17,23 @@ import (
 )
 
 // scanLine splits up commands separated by a ',' into multiple command lines
-func scanLine(line string) []string {
+func scanLine(line string) [][]string {
 
 	line = strings.TrimSpace(line)
 	if len(line) == 0 {
-		return []string{}
+		return [][]string{}
 	}
 
-	var cmdLines []string
+	var cmdLines [][]string
 	for {
 		pos := strings.IndexAny(line, ",")
 		if pos != -1 {
 			if pos > 0 {
-				cmdLines = append(cmdLines, strings.TrimSpace(line[:pos]))
+				cmdLines = append(cmdLines, []string{strings.TrimSpace(line[:pos])})
 			}
 			line = strings.TrimSpace(line[pos+1:])
 		} else {
-			cmdLines = append(cmdLines, line)
+			cmdLines = append(cmdLines, []string{line})
 			break
 		}
 	}

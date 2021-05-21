@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"strings"
 	"testing"
 
 	"bytes"
@@ -239,20 +240,27 @@ func TestPrintValueSlice(t *testing.T) {
 	}
 }
 
-func compareCommands(t *testing.T, desc string, line string, exp []string) bool {
+// TODO: implement splitting a command line into slices of arguments
+func compareCommands(t *testing.T, desc string, line string, exp [][]string) bool {
 
 	res := scanLine(line)
 
 	if len(res) != len(exp) {
-		t.Errorf("Test '%s' failed: different length %d, should be %d",
-			desc, len(res), len(exp))
+		t.Errorf("Test '%s' failed: different length %d, should be %d %s",
+			desc, len(res), len(exp), strings.Join(res[0], ":"))
 		return false
 	}
 	for i := range res {
-		if res[i] != exp[i] {
-			t.Errorf("Test '%s' failed in line %d: '%s' (exp: '%s')",
-				desc, i, res[i], exp[i])
-			return false
+		if len(res[i]) != len(exp[i]) {
+			t.Errorf("Test '%s' failed in line %d: number of arguments mismatch",
+				desc, i)
+		}
+		for j := range res[i] {
+			if res[i][j] != exp[i][j] {
+				t.Errorf("Test '%s' failed in line %d, index %d: '%s' (exp: '%s')",
+					desc, i, j, res[i][j], exp[i][j])
+				return false
+			}
 		}
 	}
 	return true
@@ -261,26 +269,26 @@ func compareCommands(t *testing.T, desc string, line string, exp []string) bool 
 func TestCliScanArgs(t *testing.T) {
 
 	testLine := ""
-	testCmds := []string{}
+	testCmds := [][]string{}
 	compareCommands(t, "empty line", testLine, testCmds)
 
 	testLine = "cmd1 arg11 arg12"
-	testCmds = []string{"cmd1 arg11 arg12"}
+	testCmds = [][]string{{"cmd1 arg11 arg12"}}
 	compareCommands(t, "single line", testLine, testCmds)
 
 	testLine = " cmd1   arg11   arg12  "
-	testCmds = []string{"cmd1   arg11   arg12"}
+	testCmds = [][]string{{"cmd1   arg11   arg12"}}
 	compareCommands(t, "single line, extra spaces", testLine, testCmds)
 
 	testLine = "cmd1 arg11, cmd2 arg21"
-	testCmds = []string{"cmd1 arg11", "cmd2 arg21"}
-	compareCommands(t, "multi line attached semi", testLine, testCmds)
+	testCmds = [][]string{{"cmd1 arg11"}, {"cmd2 arg21"}}
+	compareCommands(t, "multi line, attached delim", testLine, testCmds)
 
 	testLine = "cmd1 arg11 , cmd2 arg21"
-	testCmds = []string{"cmd1 arg11", "cmd2 arg21"}
-	compareCommands(t, "multi line disting semi", testLine, testCmds)
+	testCmds = [][]string{{"cmd1 arg11"}, {"cmd2 arg21"}}
+	compareCommands(t, "multi line", testLine, testCmds)
 
 	testLine = "cmd1 arg11 ,  ,,, cmd2 arg21"
-	testCmds = []string{"cmd1 arg11", "cmd2 arg21"}
-	compareCommands(t, "multi line, multi semi", testLine, testCmds)
+	testCmds = [][]string{{"cmd1 arg11"}, {"cmd2 arg21"}}
+	compareCommands(t, "multi line, multi delims", testLine, testCmds)
 }

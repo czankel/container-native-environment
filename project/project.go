@@ -60,12 +60,19 @@ type Environment struct {
 	Layers []Layer
 }
 
+// Command describes the command and its argument(s).
+// The Name is optional and used by support functions to manage the command list.
+type CommandGroup struct {
+	Name     string
+	Cmdlines [][]string `output:"flat" yaml:",flow"`
+}
+
 // Layer describes an 'overlay' layer. This can be virtual or explicit using an overlay FS
 // Note that ideally we could use compositions for apt and other handlers
 type Layer struct {
 	Name     string // Unique name for the layer in the workspace; must not contain '/'
 	Digest   string `output:"-"` // Images/Snaps for faster rebuilds
-	Commands []string
+	Commands []CommandGroup
 }
 
 // Create creates the project in the provide path

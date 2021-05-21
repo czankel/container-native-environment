@@ -15,6 +15,8 @@ import (
 	"github.com/czankel/cne/runtime"
 )
 
+const MaxProgressOutputLength = 80
+
 type Container struct {
 	runRuntime   runtime.Runtime   `output:"-"`
 	runContainer runtime.Container `output:"-"`
@@ -193,33 +195,41 @@ func Create(run runtime.Runtime, ws *project.Workspace, img runtime.Image,
 	for layIdx := 0; layIdx < len(ws.Environment.Layers); layIdx++ {
 
 		layer := &ws.Environment.Layers[layIdx]
-		for _, line := range layer.Commands {
+		for _, cmdgrp := range layer.Commands {
 
-			if progress != nil {
-				layerStatus[layIdx].Status = runtime.StatusRunning
-				layerStatus[layIdx].Details = line
-				stat := []runtime.ProgressStatus{layerStatus[layIdx]}
-				progress <- stat
-			}
+			for _, cmdline := range cmdgrp.Cmdlines {
 
-			stream := runtime.Stream{}
-			args := strings.Split(line, " ")
+				args := cmdline
 
-			procSpec.Args = args
-			process, err := runCtr.Exec(stream, &procSpec)
-			if err != nil {
-				runCtr.Delete()
-				return nil, err
-			}
+				if progress != nil {
+					lineOut := "Executing: " + strings.Join(args, " ")
+					if len(lineOut) > MaxProgressOutputLength {
+						lineOut = lineOut[:MaxProgressOutputLength-4] + " ..."
+					}
+					layerStatus[layIdx].Status = runtime.StatusRunning
+					layerStatus[layIdx].Details = lineOut
+					stat := []runtime.ProgressStatus{layerStatus[layIdx]}
+					progress <- stat
+				}
 
-			c, err := process.Wait()
-			if err == nil {
-				exitStatus := <-c
-				err = exitStatus.Error
-			}
-			if err != nil {
-				runCtr.Delete()
-				return nil, err
+				stream := runtime.Stream{}
+
+				procSpec.Args = args
+				process, err := runCtr.Exec(stream, &procSpec)
+				if err != nil {
+					runCtr.Delete()
+					return nil, err
+				}
+
+				c, err := process.Wait()
+				if err == nil {
+					exitStatus := <-c
+					err = exitStatus.Error
+				}
+				if err != nil {
+					runCtr.Delete()
+					return nil, err
+				}
 			}
 		}
 
