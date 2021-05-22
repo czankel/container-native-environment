@@ -2,6 +2,7 @@
 package containerd
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"strings"
@@ -10,7 +11,10 @@ import (
 
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
+	"github.com/containerd/containerd/containers"
 	ctrderr "github.com/containerd/containerd/errdefs"
+	"github.com/containerd/containerd/oci"
+	"github.com/containerd/typeurl"
 
 	runspecs "github.com/opencontainers/runtime-spec/specs-go"
 
@@ -340,6 +344,48 @@ func (ctr *container) Create() error {
 	}
 
 	ctr.ctrdContainer = ctrdCtr
+	return nil
+}
+
+func (ctr *container) UpdateSpec(newSpec *runspecs.Spec) error {
+
+	ctrdRun := ctr.ctrdRuntime
+	ctrdCtr := ctr.ctrdContainer
+
+	// update incomplete spec
+	ctr.spec = *newSpec
+	spec := &ctr.spec
+	if spec.Process == nil {
+		spec.Process = &runspecs.Process{}
+	}
+
+	config, err := ctr.image.Config()
+	if err != nil {
+		return runtime.Errorf("failed to get image OCI spec: %v", err)
+	}
+	if spec.Linux != nil {
+		spec.Process.Args = append(config.Entrypoint, config.Cmd...)
+		cwd := config.WorkingDir
+		if cwd == "" {
+			cwd = "/"
+		}
+		spec.Process.Cwd = cwd
+	}
+
+	err = ctrdCtr.Update(ctrdRun.context,
+		func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
+			if err := oci.ApplyOpts(ctx, client, c, spec); err != nil {
+				return err
+			}
+			var err error
+			c.Spec, err = typeurl.MarshalAny(spec)
+			return err
+		},
+	)
+	if err != nil {
+		return runtime.Errorf("failed to update container: %v", err)
+	}
+
 	return nil
 }
 

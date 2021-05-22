@@ -132,6 +132,9 @@ type Container interface {
 	// The root filesystem can only be set when the container has not been created.
 	SetRootFs(snapshot Snapshot) error
 
+	// UpdateSpec updates the container spec.
+	UpdateSpec(spec *runspecs.Spec) error
+
 	// Create creates the container.
 	Create() error
 
