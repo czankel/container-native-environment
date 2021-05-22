@@ -27,23 +27,25 @@ var (
 	// error: function '<name>' is not implemented
 	ErrInternalError = errors.New("internal error")
 	// error: internal error: <description>
-	// error: internal error: <description>
 	ErrInUse = errors.New("in use")
 
 	// pass-through errors
-	ErrCommandFailed = errors.New("cmd failed")
+	ErrCommandFailed   = errors.New("cmd failed")
+	ErrCommandNotFound = errors.New("cmd not found")
 )
 
 type cneError struct {
-	cause error
-	msg   string
+	cause    error
+	resource string
+	msg      string
 }
 
 // Create a new error with one of the pre-defined Err* causes in this file and message
-func New(cause error, msg string) error {
+func New(cause error, resource, msg string) error {
 	return &cneError{
-		cause: cause,
-		msg:   msg,
+		cause:    cause,
+		resource: resource,
+		msg:      msg,
 	}
 }
 
@@ -51,18 +53,24 @@ func (err *cneError) Error() string {
 	return err.msg
 }
 
-// Is must be used with the Err* variables
 func (cerr *cneError) Is(other error) bool {
 	return cerr.cause == other
 }
 
 func IsCneError(err interface{}) bool {
 	switch err.(type) {
-	case cneError:
+	case *cneError:
 		return true
 	default:
 		return false
 	}
+}
+
+func Resource(err interface{}) string {
+	if !IsCneError(err) {
+		return ""
+	}
+	return err.(*cneError).resource
 }
 
 func InvalidArgument(format string, args ...interface{}) error {
@@ -81,8 +89,9 @@ func AlreadyExists(resource, name string) error {
 
 func NotFound(resource, name string) error {
 	return &cneError{
-		cause: ErrNotFound,
-		msg:   fmt.Sprintf("%s '%s' not found", resource, name),
+		cause:    ErrNotFound,
+		resource: resource,
+		msg:      fmt.Sprintf("%s '%s' not found", resource, name),
 	}
 }
 
@@ -113,8 +122,9 @@ func NotImplemented() error {
 
 func InUse(resource, name string) error {
 	return &cneError{
-		cause: ErrInUse,
-		msg:   fmt.Sprintf("%s '%s' is in use", resource, name),
+		cause:    ErrInUse,
+		resource: resource,
+		msg:      fmt.Sprintf("%s '%s' is in use", resource, name),
 	}
 }
 
@@ -125,8 +135,29 @@ func InternalError(format string, args ...interface{}) error {
 	}
 }
 
+// 'Pass-through' errors
+
+type execError struct {
+	cause error
+	msg   string
+}
+
+func (eerr *execError) Error() string {
+	return eerr.msg
+}
+
+func (eerr *execError) Is(other error) bool {
+	return eerr.cause == other
+}
+
+func CommandNotFound(cmd string) error {
+	return &execError{
+		cause: ErrCommandNotFound,
+		msg:   fmt.Sprintf("%s: command not found", cmd),
+	}
+}
 func CommandFailed(cmd []string) error {
-	return &cneError{
+	return &execError{
 		cause: ErrCommandFailed,
 		msg:   fmt.Sprintf("Command failed: %s", strings.Join(cmd, " ")),
 	}

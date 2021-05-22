@@ -269,5 +269,6 @@ func Open(confRun config.Runtime) (Runtime, error) {
 // errors defined in errdefs.
 func Errorf(format string, args ...interface{}) error {
 	return errdefs.New(errdefs.ErrRuntimeError,
+		"",
 		fmt.Sprintf("runtime: "+format, args...))
 }
