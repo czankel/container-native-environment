@@ -39,10 +39,24 @@ func buildContainer(run runtime.Runtime,
 		defer wg.Done()
 		showBuildProgress(progress)
 	}()
-	ctr, err := container.Create(run, ws, img, progress)
+
+	ctr, err := container.NewContainer(run, ws, img)
 	if err != nil {
 		return nil, err
 	}
+
+	err = ctr.Create()
+	if err != nil && errors.Is(err, errdefs.ErrAlreadyExists) {
+		run.DeleteContainer(ctr.Domain, ctr.ID, ctr.Generation)
+		err = ctr.Create()
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	stream := runtime.Stream{}
+	err = ctr.Build(ws, -1, &user, progress, stream)
+
 	wg.Wait()
 
 	return ctr, nil

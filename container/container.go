@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/project"
 	"github.com/czankel/cne/runtime"
@@ -130,16 +131,10 @@ func Get(run runtime.Runtime, ws *project.Workspace) (*Container, error) {
 	}, nil
 }
 
-// Create creates and builds a new container.
-// The progress is optional for outputting status updates
-func Create(run runtime.Runtime, ws *project.Workspace, img runtime.Image,
-	progress chan []runtime.ProgressStatus) (*Container, error) {
-
-	defer func() {
-		if progress != nil {
-			close(progress)
-		}
-	}()
+// NewContainer defines a new Container with a default generation value for the Workspace without
+// the Layer configuration. The generation value will be updated through Commit().
+func NewContainer(run runtime.Runtime,
+	ws *project.Workspace, img runtime.Image) (*Container, error) {
 
 	dom, err := uuid.Parse(ws.ProjectUUID)
 	if err != nil {
@@ -147,13 +142,11 @@ func Create(run runtime.Runtime, ws *project.Workspace, img runtime.Image,
 	}
 
 	cid := ws.ID()
-	gen := ws.ConfigHash()
-	ctrID := hex.EncodeToString(dom[:]) + "-" +
-		hex.EncodeToString(cid[:]) + "-" +
-		hex.EncodeToString(gen[:])
+	gen := ws.BaseHash()
+	ctrName := containerName(dom, cid, gen)
 
-	// start with the base container
-	spec, err := DefaultSpec(run.Namespace(), ctrID)
+	// start with a base container
+	spec, err := DefaultSpec(run.Namespace(), ctrName)
 	if err != nil {
 		return nil, err
 	}
@@ -163,91 +156,22 @@ func Create(run runtime.Runtime, ws *project.Workspace, img runtime.Image,
 		return nil, err
 	}
 
-	err = runCtr.SetRootFs(nil)
-	if err != nil {
-		return nil, err
-	}
+	return &Container{
+		runRuntime:   run,
+		runContainer: runCtr,
+		Namespace:    run.Namespace(),
+		Name:         ctrName,
+		Domain:       dom,
+		ID:           cid,
+		Generation:   gen,
+	}, nil
+}
 
-	// create the container
-	err = runCtr.Create()
-	if err != nil {
-		return nil, err
-	}
+// Create creates the container after it has been defined and before it can be built.
+func (ctr *Container) Create() error {
 
-	// Prep the progress status updates
-	layerStatus := make([]runtime.ProgressStatus, len(ws.Environment.Layers))
-	if progress != nil {
-		for i, l := range ws.Environment.Layers {
-			layerStatus[i].Reference = l.Name
-			layerStatus[i].Status = runtime.StatusPending
-			layerStatus[i].Total = int64(len(l.Commands))
-			layerStatus[i].StartedAt = time.Now()
-			layerStatus[i].UpdatedAt = time.Now()
-		}
-		var stat []runtime.ProgressStatus
-		copy(stat, layerStatus)
-		progress <- stat
-	}
-
-	procSpec := DefaultProcessSpec()
-
-	// build new image: execute in the current layer
-	for layIdx := 0; layIdx < len(ws.Environment.Layers); layIdx++ {
-
-		layer := &ws.Environment.Layers[layIdx]
-		for _, cmdgrp := range layer.Commands {
-
-			for _, cmdline := range cmdgrp.Cmdlines {
-
-				args := cmdline
-
-				if progress != nil {
-					lineOut := "Executing: " + strings.Join(args, " ")
-					if len(lineOut) > MaxProgressOutputLength {
-						lineOut = lineOut[:MaxProgressOutputLength-4] + " ..."
-					}
-					layerStatus[layIdx].Status = runtime.StatusRunning
-					layerStatus[layIdx].Details = lineOut
-					stat := []runtime.ProgressStatus{layerStatus[layIdx]}
-					progress <- stat
-				}
-
-				stream := runtime.Stream{}
-
-				procSpec.Args = args
-				process, err := runCtr.Exec(stream, &procSpec)
-				if err != nil {
-					runCtr.Delete()
-					return nil, err
-				}
-
-				c, err := process.Wait()
-				if err == nil {
-					exitStatus := <-c
-					err = exitStatus.Error
-				}
-				if err != nil {
-					runCtr.Delete()
-					return nil, err
-				}
-			}
-		}
-
-		if progress != nil {
-			layerStatus[layIdx].Status = runtime.StatusComplete
-			stat := []runtime.ProgressStatus{layerStatus[layIdx]}
-			progress <- stat
-		}
-	}
-
-	// commit the container
-	err = runCtr.Commit(ws.ConfigHash())
-	if err != nil {
-		runCtr.Delete()
-		return nil, err
-	}
-
-	return &Container{runContainer: runCtr, Name: containerName(dom, cid, gen)}, nil
+	runCtr := ctr.runContainer
+	return runCtr.Create()
 }
 
 // Delete deletes the container if it exists
@@ -266,6 +190,124 @@ func Delete(run runtime.Runtime, ws *project.Workspace) error {
 	}
 
 	return ctr.Delete()
+}
+
+// Build builds the container.
+//
+// If a nextLayerIdx is provided, the build stops at the specified layer. Use 0 to exclude all
+// layers and -1 or len(layers) to build all layers.
+// A container may already be partially built. In that case, Build() will continue the build
+// process.
+// The progress argument is optional for outputting status updates during the build process.
+func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
+	user *config.User, progress chan []runtime.ProgressStatus, stream runtime.Stream) error {
+
+	runCtr := ctr.runContainer
+
+	if nextLayerIdx == -1 {
+		nextLayerIdx = len(ws.Environment.Layers)
+	}
+
+	bldLayerIdx := 0
+
+	// prep the progress status updates
+	defer func() {
+		if progress != nil {
+			close(progress)
+		}
+	}()
+	layerStatus := make([]runtime.ProgressStatus, len(ws.Environment.Layers))
+	if progress != nil {
+		for i, l := range ws.Environment.Layers {
+			layerStatus[i].Reference = l.Name
+			layerStatus[i].Status = runtime.StatusPending
+			layerStatus[i].Total = int64(len(l.Commands))
+			layerStatus[i].StartedAt = time.Now()
+			layerStatus[i].UpdatedAt = time.Now()
+		}
+		var stat []runtime.ProgressStatus
+		copy(stat, layerStatus)
+		progress <- stat
+	}
+
+	err := runCtr.SetRootFs(nil)
+	if err != nil {
+		return err
+	}
+
+	// build all remaining layers
+	procSpec := DefaultProcessSpec()
+	for ; bldLayerIdx < nextLayerIdx; bldLayerIdx++ {
+
+		layer := &ws.Environment.Layers[bldLayerIdx]
+		for _, cmdgrp := range layer.Commands {
+
+			for _, cmdline := range cmdgrp.Cmdlines {
+
+				args := cmdline
+				if err != nil {
+					runCtr.Delete() // ignore error
+					return err
+				}
+
+				if len(args) == 0 {
+					continue
+				}
+
+				if progress != nil {
+					lineOut := "Executing: " + strings.Join(args, " ")
+					if len(lineOut) > MaxProgressOutputLength {
+						lineOut = lineOut[:MaxProgressOutputLength-4] + " ..."
+					}
+					layerStatus[bldLayerIdx].Status = runtime.StatusRunning
+					layerStatus[bldLayerIdx].Details = lineOut
+					stat := []runtime.ProgressStatus{layerStatus[bldLayerIdx]}
+					progress <- stat
+				}
+
+				procSpec.Args = args
+				procSpec.User.UID = 0
+				procSpec.User.GID = 0
+				process, err := runCtr.Exec(stream, &procSpec)
+				if err != nil {
+					runCtr.Delete()
+					return err
+				}
+
+				c, err := process.Wait()
+				if err == nil {
+					exitStatus := <-c
+					err = exitStatus.Error
+					code := exitStatus.Code
+					if code != 0 {
+						err = errdefs.CommandFailed(args)
+					}
+				}
+				if err != nil {
+					runCtr.Purge() // ignore error
+					return err
+				}
+			}
+		}
+
+		if err != nil {
+			runCtr.Delete()
+			return err
+		}
+
+		// create a snapshot for the bldent layer, ignore any errors
+		snap, err := runCtr.Snapshot()
+		if err == nil {
+			layer.Digest = snap.Name()
+		}
+		if progress != nil {
+			layerStatus[bldLayerIdx].Status = runtime.StatusComplete
+			stat := []runtime.ProgressStatus{layerStatus[bldLayerIdx]}
+			progress <- stat
+		}
+	}
+
+	return nil
 }
 
 func (ctr *Container) Exec(stream runtime.Stream, cmd []string) (uint32, error) {
