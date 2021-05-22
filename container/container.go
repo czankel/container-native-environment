@@ -48,25 +48,6 @@ func containerNameRunCtr(runCtr runtime.Container) string {
 	return containerName(dom, cid, gen)
 }
 
-// findContainer is a helper function to find and return the existing container for the provided
-// domain, identifier, and generation. It returns nil if the container was not found.
-func findContainer(run runtime.Runtime,
-	domain [16]byte, id [16]byte, generation [16]byte) (runtime.Container, error) {
-
-	runCtrs, err := run.Containers(domain)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, c := range runCtrs {
-		if c.ID() == id && c.Generation() == generation {
-			return c, nil
-		}
-	}
-
-	return nil, nil
-}
-
 // Containers returns all active containers in the project.
 func Containers(run runtime.Runtime, prj *project.Project) ([]Container, error) {
 
@@ -174,22 +155,36 @@ func (ctr *Container) Create() error {
 	return runCtr.Create()
 }
 
-// Delete deletes the container if it exists
-// Note that this function does not return an error if the container doesn't exist
-func Delete(run runtime.Runtime, ws *project.Workspace) error {
+// find an existing top-most snapshot up to but excluding nextLayerIdx
+// and return it with the layer index.
+// Layer index 0 and snaphost nil means that there is no snapshot that matches
+func findRootFs(ctr *Container,
+	ws *project.Workspace, nextLayerIdx int) (int, runtime.Snapshot, error) {
 
-	dom, err := uuid.Parse(ws.ProjectUUID)
+	run := ctr.runRuntime
+
+	// identify the layer with the topmost existing snapshot
+	bldLayerIdx := 0
+	var snap runtime.Snapshot
+
+	snaps, err := run.Snapshots()
 	if err != nil {
-		return errdefs.InvalidArgument(
-			"invalid project UUID in workspace: '%v'", ws.ProjectUUID)
+		return -1, nil, err
 	}
 
-	ctr, err := findContainer(run, dom, ws.ID(), ws.ConfigHash())
-	if err != nil || ctr == nil {
-		return err
+	for i := 0; i < nextLayerIdx; i++ {
+		if l := ws.Environment.Layers[i]; l.Digest != "" {
+			for _, s := range snaps {
+				if l.Digest == s.Name() {
+					bldLayerIdx = i + 1
+					snap = s
+					break
+				}
+			}
+		}
 	}
 
-	return ctr.Delete()
+	return bldLayerIdx, snap, err
 }
 
 // Build builds the container.
@@ -208,7 +203,10 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 		nextLayerIdx = len(ws.Environment.Layers)
 	}
 
-	bldLayerIdx := 0
+	bldLayerIdx, rootFsSnap, err := findRootFs(ctr, ws, nextLayerIdx)
+	if err != nil {
+		return err
+	}
 
 	// prep the progress status updates
 	defer func() {
@@ -220,17 +218,23 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 	if progress != nil {
 		for i, l := range ws.Environment.Layers {
 			layerStatus[i].Reference = l.Name
-			layerStatus[i].Status = runtime.StatusPending
-			layerStatus[i].Total = int64(len(l.Commands))
 			layerStatus[i].StartedAt = time.Now()
 			layerStatus[i].UpdatedAt = time.Now()
+
+			if i < bldLayerIdx {
+				layerStatus[i].Status = runtime.StatusExists
+				layerStatus[i].Offset = layerStatus[i].Total
+			} else {
+				layerStatus[i].Status = runtime.StatusPending
+				layerStatus[i].Total = int64(len(l.Commands))
+			}
 		}
 		var stat []runtime.ProgressStatus
 		copy(stat, layerStatus)
 		progress <- stat
 	}
 
-	err := runCtr.SetRootFs(nil)
+	err = runCtr.SetRootFs(rootFsSnap)
 	if err != nil {
 		return err
 	}
@@ -332,4 +336,9 @@ func (ctr *Container) Exec(stream runtime.Stream, cmd []string) (uint32, error) 
 
 func (ctr *Container) Delete() error {
 	return ctr.runContainer.Delete()
+}
+
+// Purge deletes the container if not already deleted and also all associated Snapshots.
+func (ctr *Container) Purge() error {
+	return ctr.runContainer.Purge()
 }

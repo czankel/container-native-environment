@@ -64,9 +64,10 @@ func deleteWorkspaceRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	err = container.Delete(run, ws)
-	if err != nil {
-		return err
+	// ignore error TODO: print warning for error other than not-found
+	ctr, err := container.Get(run, ws)
+	if err == nil {
+		ctr.Purge()
 	}
 
 	err = prj.DeleteWorkspace(name)
