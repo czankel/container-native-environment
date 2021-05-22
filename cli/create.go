@@ -140,7 +140,7 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 	}}
 
 	if len(cmdLines) > 0 {
-		_, err := buildContainer(run, prj, ws)
+		_, err := buildContainer(run, ws)
 		if err != nil {
 			return err
 		}

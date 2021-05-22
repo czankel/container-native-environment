@@ -45,7 +45,7 @@ func execRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	if ctr == nil {
-		ctr, err = buildContainer(run, prj, ws)
+		ctr, err = buildContainer(run, ws)
 		if err != nil {
 			return err
 		}

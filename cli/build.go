@@ -6,18 +6,19 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/containerd/console"
+
 	"github.com/czankel/cne/container"
 	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/project"
 	"github.com/czankel/cne/runtime"
 )
 
-// buildContainer builds the container for the provided workspace and outputs progress status
-func buildContainer(run runtime.Runtime,
-	prj *project.Project, ws *project.Workspace) (*container.Container, error) {
+// createContainer defines and creates a new container
+func createContainer(run runtime.Runtime, ws *project.Workspace) (*container.Container, error) {
 
 	if ws.Environment.Origin == "" {
-		return nil, errdefs.InvalidArgument("Workspace has not image defined")
+		return nil, errdefs.InvalidArgument("Workspace has no image defined")
 	}
 
 	// check and pull the image, if required, for building the container
@@ -28,17 +29,6 @@ func buildContainer(run runtime.Runtime,
 	if err != nil {
 		return nil, err
 	}
-
-	// build the container and provide progress output
-	var wg sync.WaitGroup
-
-	wg.Add(1)
-
-	progress := make(chan []runtime.ProgressStatus)
-	go func() {
-		defer wg.Done()
-		showBuildProgress(progress)
-	}()
 
 	ctr, err := container.NewContainer(run, ws, img)
 	if err != nil {
@@ -54,6 +44,32 @@ func buildContainer(run runtime.Runtime,
 		return nil, err
 	}
 
+	return ctr, err
+}
+
+// buildLayers builds the layers of a container and outputs progress status.
+// The nextLayerIdx argument defines the layer index following the one that should be built,
+// with 0 meaning no layer should be built.  Use -1 or len(layers) to build all layers.
+// This function is idempotent and can be called again to continue the build, for example,
+// for a higher layer.
+// Note that in an error case, it will keep any residual container and snapshots.
+func buildLayers(run runtime.Runtime, ctr *container.Container,
+	ws *project.Workspace, nextLayerIdx int) error {
+
+	con := console.Current()
+	defer con.Reset()
+
+	// build the container and provide progress output
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+
+	progress := make(chan []runtime.ProgressStatus)
+	go func() {
+		defer wg.Done()
+		showBuildProgress(progress)
+	}()
+
 	// TODO: --------------------------------------------------
 	// TODO: running as root inside the container during build!
 	// TODO: --------------------------------------------------
@@ -61,9 +77,44 @@ func buildContainer(run runtime.Runtime,
 	user.BuildGID = 0
 
 	stream := runtime.Stream{}
-	err = ctr.Build(ws, -1, &user, progress, stream)
 
+	err := ctr.Build(ws, nextLayerIdx, &user, progress, stream)
+	if err != nil && errors.Is(err, errdefs.ErrCommandFailed) {
+		wg.Wait()
+		return err
+	}
+	if err != nil {
+		wg.Wait()
+		return err
+	}
 	wg.Wait()
+
+	return nil
+}
+
+// commitContainer commits the container
+func commitContainer(ctr *container.Container, ws *project.Workspace) error {
+	return ctr.Commit(ws, user, ws.Path)
+}
+
+// buildContainer builds the container for the provided workspace and outputs progress status.
+// Note that in an error case, it will keep any residual container and snapshots.
+func buildContainer(run runtime.Runtime, ws *project.Workspace) (*container.Container, error) {
+
+	ctr, err := createContainer(run, ws)
+	if err != nil {
+		return nil, err
+	}
+
+	err = buildLayers(run, ctr, ws, -1)
+	if err != nil {
+		return nil, err
+	}
+
+	err = commitContainer(ctr, ws)
+	if err != nil {
+		return nil, err
+	}
 
 	return ctr, nil
 }
@@ -111,13 +162,13 @@ func buildWorkspaceRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if ctr != nil && buildWorkspaceForce {
-		err = ctr.Delete()
+		err = ctr.Purge()
 		if err != nil {
 			return err
 		}
 	}
 
-	_, err = buildContainer(run, prj, ws)
+	_, err = buildContainer(run, ws)
 	return err
 }
 
