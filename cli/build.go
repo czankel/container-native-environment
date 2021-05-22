@@ -54,6 +54,12 @@ func buildContainer(run runtime.Runtime,
 		return nil, err
 	}
 
+	// TODO: --------------------------------------------------
+	// TODO: running as root inside the container during build!
+	// TODO: --------------------------------------------------
+	user.BuildUID = 0
+	user.BuildGID = 0
+
 	stream := runtime.Stream{}
 	err = ctr.Build(ws, -1, &user, progress, stream)
 

@@ -270,8 +270,8 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 				}
 
 				procSpec.Args = args
-				procSpec.User.UID = 0
-				procSpec.User.GID = 0
+				procSpec.User.UID = user.BuildUID
+				procSpec.User.GID = user.BuildGID
 				process, err := runCtr.Exec(stream, &procSpec)
 				if err != nil {
 					runCtr.Delete()

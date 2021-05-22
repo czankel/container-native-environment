@@ -23,6 +23,8 @@ type User struct {
 	GID       uint32
 	HomeDir   string
 	Pwd       string
+	BuildUID  uint32
+	BuildGID  uint32
 }
 
 func getProcessUser() (User, error) {
@@ -72,6 +74,8 @@ func getProcessUser() (User, error) {
 		Shell:     shell,
 		UID:       uint32(uid),
 		GID:       uint32(gid),
+		BuildUID:  uint32(uid),
+		BuildGID:  uint32(gid),
 	}
 
 	return user, nil
