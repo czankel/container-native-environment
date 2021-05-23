@@ -12,9 +12,11 @@ import (
 	"github.com/containerd/containerd/content"
 	ctrderr "github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/remotes"
 
 	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/image-spec/identity"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/czankel/cne/runtime"
@@ -182,4 +184,37 @@ func (img *image) CreatedAt() time.Time {
 func (img *image) Size() int64 {
 	size, _ := img.ctrdImage.Size(img.ctrdRuntime.context)
 	return size
+}
+
+func (img *image) Mount(path string) error {
+
+	ctrdRun := img.ctrdRuntime
+	ctrdCtx := ctrdRun.context
+
+	var mounts []mount.Mount
+	var err error
+
+	diffIDs, err := img.ctrdImage.RootFS(ctrdCtx)
+	if err != nil {
+		return runtime.Errorf("failed to get rootfs: %v", err)
+	}
+
+	digest := identity.ChainID(diffIDs).String()
+	snapName := digest + "-view"
+	mounts, _, err = createSnapshot(img.ctrdRuntime, snapName, digest, false)
+	if err != nil {
+		return err
+	}
+
+	err = mount.All(mounts, path)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (img *image) Unmount(path string) error {
+
+	return mount.UnmountAll(path, 0)
 }

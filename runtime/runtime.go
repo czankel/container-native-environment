@@ -90,6 +90,12 @@ type Image interface {
 
 	// Size returns the size of the image.
 	Size() int64
+
+	// Mount mounts the image to the provide path.
+	Mount(path string) error
+
+	// Unmount unmounts the image from the specified path,
+	Unmount(path string) error
 }
 
 // Container provides an abstraction for running processes in an isolated environment in user space.
