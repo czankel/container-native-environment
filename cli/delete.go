@@ -39,7 +39,7 @@ func deleteImageRunE(cmd *cobra.Command, args []string) error {
 
 var deleteWorkspaceCmd = &cobra.Command{
 	Use:     "workspace NAME",
-	Aliases: []string{"workspace", "w"},
+	Aliases: []string{"workspace", "ws"},
 	Short:   "delete workspace",
 	Args:    cobra.ExactArgs(1),
 	RunE:    deleteWorkspaceRunE,
@@ -152,14 +152,14 @@ func deleteContainerRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// delete all containers that match the domain+id
 	ctrs, err := container.Containers(run, prj)
 	if err != nil {
 		return err
 	}
-
 	for _, c := range ctrs {
 		if c.Name == args[0] {
-			c.Delete()
+			c.Purge()
 			break
 		}
 	}
