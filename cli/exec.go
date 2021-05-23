@@ -62,7 +62,7 @@ func execRunE(cmd *cobra.Command, args []string) error {
 		Terminal: true,
 	}
 
-	code, err := ctr.Exec(stream, args)
+	code, err := ctr.Exec(&user, stream, args)
 	if err != nil {
 		return err
 	}

@@ -4,11 +4,14 @@ package container
 
 import (
 	"encoding/hex"
+	"errors"
 	"os"
+	"os/signal"
 	"strings"
 	"time"
 
 	runspecs "github.com/opencontainers/runtime-spec/specs-go"
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 
 	"github.com/google/uuid"
 
@@ -347,13 +350,52 @@ func (ctr *Container) Commit(ws *project.Workspace, user config.User, rootPath s
 	return nil
 }
 
-func (ctr *Container) Exec(stream runtime.Stream, cmd []string) (uint32, error) {
+// Exec excutes the provided command, using the default proces runtime spec.
+// The user defines the current working directory and UID and GID.
+// It uses the default environment from the calling process.
+// I/O is defined by the provided stream.
+// The container must be started before calling this function
+func (ctr *Container) Exec(user *config.User, stream runtime.Stream, cmd []string) (uint32, error) {
 
 	procSpec := DefaultProcessSpec()
+	procSpec.Cwd = user.Pwd
+	procSpec.User.UID = user.UID
+	procSpec.User.GID = user.GID
+	procSpec.Args = cmd
+
+	// TODO: have a mechanism to permit or disallow sudo, i.e. 'sudo cne'
+	allowSudo := true
+	if user.IsSudo {
+		if !allowSudo {
+			return 0, errdefs.InvalidArgument("sudo not allowed")
+		}
+		procSpec.User.UID = 0
+	}
+
+	return commonExec(ctr, &procSpec, stream)
+}
+
+func (ctr *Container) BuildExec(user *config.User, stream runtime.Stream,
+	cmd []string) (uint32, error) {
+
+	procSpec := DefaultProcessSpec()
+	procSpec.User.UID = user.BuildUID
+	procSpec.User.GID = user.BuildGID
+	procSpec.Args = cmd
+	return commonExec(ctr, &procSpec, stream)
+}
+
+func commonExec(ctr *Container, procSpec *specs.Process, stream runtime.Stream) (uint32, error) {
+
+	runCtr := ctr.runContainer
+
 	procSpec.Env = os.Environ()
 	procSpec.Terminal = stream.Terminal
-	procSpec.Args = cmd
-	proc, err := ctr.runContainer.Exec(stream, &procSpec)
+
+	proc, err := runCtr.Exec(stream, procSpec)
+	if err != nil && errors.Is(err, errdefs.ErrNotFound) && errdefs.Resource(err) == "command" {
+		return 0, err
+	}
 	if err != nil {
 		return 0, err
 	}
@@ -363,7 +405,21 @@ func (ctr *Container) Exec(stream runtime.Stream, cmd []string) (uint32, error) 
 		return 0, err
 	}
 
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc)
+	go func() {
+		for {
+			s, more := <-sigc
+			if !more {
+				return
+			}
+			proc.Signal(s)
+		}
+	}()
+
 	exitStat := <-ch
+	signal.Stop(sigc)
+	close(sigc)
 	return exitStat.Code, exitStat.Error
 }
 
