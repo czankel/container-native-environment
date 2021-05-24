@@ -1,10 +1,15 @@
 package cli
 
 import (
+	"errors"
+
 	"github.com/spf13/cobra"
 
 	"github.com/czankel/cne/config"
+	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/project"
+	"github.com/czankel/cne/runtime"
+	"github.com/czankel/cne/support"
 )
 
 var showCmd = &cobra.Command{
@@ -108,6 +113,57 @@ func showWorkspaceRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+var showImageCmd = &cobra.Command{
+	Use:   "image [NAME]",
+	Short: "Show image details",
+	RunE:  showImageRunE,
+	Args:  cobra.ExactArgs(1),
+}
+
+type OS struct {
+	Name    string
+	Version string
+	ID      string
+	ID_LIKE string
+}
+
+func showImageRunE(cmd *cobra.Command, args []string) error {
+
+	run, err := runtime.Open(conf.Runtime)
+	if err != nil {
+		return err
+	}
+	defer run.Close()
+
+	imgName := conf.FullImageName(args[0])
+	img, err := run.GetImage(imgName)
+	if err != nil && errors.Is(err, errdefs.ErrNotFound) {
+		img, err = pullImage(run, imgName)
+	}
+	if err != nil {
+		return err
+	}
+
+	fullName := "<unknown>"
+	info, err := support.GetImageInfo(img)
+	if info != nil {
+		fullName = info.FullName
+	}
+
+	image := struct {
+		Name string
+		Size int64
+		OS   string
+	}{
+		Name: img.Name(),
+		Size: img.Size(),
+		OS:   fullName,
+	}
+
+	printValue("Field", "Value", "", image)
+	return nil
+}
+
 func init() {
 	rootCmd.AddCommand(showCmd)
 	showCmd.AddCommand(showConfigCmd)
@@ -117,4 +173,5 @@ func init() {
 		&showUserConfig, "user", "", false, "Show only user configurations")
 	showCmd.AddCommand(showProjectCmd)
 	showCmd.AddCommand(showWorkspaceCmd)
+	showCmd.AddCommand(showImageCmd)
 }

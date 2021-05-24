@@ -4,7 +4,6 @@ package support
 
 import (
 	"bufio"
-	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
