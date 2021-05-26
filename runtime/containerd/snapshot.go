@@ -29,12 +29,47 @@ func activeSnapshotName(domain, ctrID [16]byte) string {
 	return domStr + "-" + cidStr
 }
 
+func getSnapshotDomains(ctrdRun *containerdRuntime) ([][16]byte, error) {
+
+	var domains [][16]byte
+
+	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
+	err := snapSvc.Walk(ctrdRun.context, func(ctx context.Context, info snapshots.Info) error {
+
+		name := string(info.Name)
+		idx := strings.Index(name, "-")
+		if idx == 32 {
+			str, err := hex.DecodeString(name[:32])
+			if err != nil {
+				return runtime.Errorf("failed to decode domain '%s': $v", name, err)
+			}
+
+			var dom [16]byte
+			copy(dom[:], str)
+
+			found := false
+			for _, d := range domains {
+				if d == dom {
+					found = true
+					break
+				}
+			}
+			if !found {
+				domains = append(domains, dom)
+			}
+		}
+		return nil
+	})
+
+	return domains, err
+}
+
 func getSnapshots(ctrdRun *containerdRuntime) ([]runtime.Snapshot, error) {
 	var snaps []runtime.Snapshot
 
 	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
 	err := snapSvc.Walk(ctrdRun.context, func(ctx context.Context, info snapshots.Info) error {
-		snaps = append(snaps, &snapshot{info: info})
+		snaps = append(snaps, &snapshot{ctrdRuntime: ctrdRun, info: info})
 		return nil
 	})
 	return snaps, err
@@ -269,41 +304,6 @@ func getActiveSnapMounts(ctrdRun *containerdRuntime, dom, cid [16]byte) ([]mount
 	return snapSvc.Mounts(ctrdRun.context, snapName)
 }
 
-func getSnapshotDomains(ctrdRun *containerdRuntime) ([][16]byte, error) {
-
-	var domains [][16]byte
-
-	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
-	err := snapSvc.Walk(ctrdRun.context, func(ctx context.Context, info snapshots.Info) error {
-
-		name := string(info.Name)
-		idx := strings.Index(name, "-")
-		if idx == 32 {
-			str, err := hex.DecodeString(name[:32])
-			if err != nil {
-				return runtime.Errorf("failed to decode domain '%s': $v", name, err)
-			}
-
-			var dom [16]byte
-			copy(dom[:], str)
-
-			found := false
-			for _, d := range domains {
-				if d == dom {
-					found = true
-					break
-				}
-			}
-			if !found {
-				domains = append(domains, dom)
-			}
-		}
-		return nil
-	})
-
-	return domains, err
-}
-
 // delete the specified snapshot; return ErrNotFound if the snapshot doesn exist and
 // ErrInUse if it is still in use and referenced.
 func deleteSnapshot(ctrdRun *containerdRuntime, snapName string) error {
@@ -390,4 +390,30 @@ func (snap *snapshot) Parent() string {
 
 func (snap *snapshot) CreatedAt() time.Time {
 	return snap.info.Created
+}
+
+func (snap *snapshot) Size() (int64, error) {
+
+	ctrdRun := snap.ctrdRuntime
+	ctrdCtx := ctrdRun.context
+
+	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
+	usage, err := snapSvc.Usage(ctrdCtx, snap.Name())
+	if err != nil {
+		return -1, err
+	}
+	return usage.Size, nil
+}
+
+func (snap *snapshot) Inodes() (int64, error) {
+
+	ctrdRun := snap.ctrdRuntime
+	ctrdCtx := ctrdRun.context
+
+	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
+	usage, err := snapSvc.Usage(ctrdCtx, snap.Name())
+	if err != nil {
+		return -1, err
+	}
+	return usage.Inodes, nil
 }

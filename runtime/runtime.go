@@ -185,6 +185,12 @@ type Snapshot interface {
 
 	// CreatedAt returns the time the snapshot was created.
 	CreatedAt() time.Time
+
+	// Size returns the size of the snapshot.
+	Size() (int64, error)
+
+	// Inodex returns the number of additional inodes in the snapshot.
+	Inodes() (int64, error)
 }
 
 // Process describes a process running inside a container.
