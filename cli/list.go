@@ -120,17 +120,19 @@ func listSnapshotsRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	snapList := make([]struct {
-		Domain    string
-		Container string
 		Name      string
 		Parent    string
 		CreatedAt string
+		Size      int64
+		Inodes    int64
 	}, len(snapshots), len(snapshots))
 
 	for i, snap := range snapshots {
 		snapList[i].Name = snap.Name()
 		snapList[i].Parent = snap.Parent()
 		snapList[i].CreatedAt = timeToAgoString(snap.CreatedAt())
+		snapList[i].Size, _ = snap.Size()
+		snapList[i].Inodes, _ = snap.Inodes()
 	}
 	printList(snapList)
 

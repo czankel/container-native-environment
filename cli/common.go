@@ -222,14 +222,14 @@ func printList(list interface{}) {
 
 	items := reflect.ValueOf(list)
 	for i := 0; i < items.Len(); i++ {
-		format = "%s"
+		format = "%v"
 		item := items.Index(i)
 		for j := 0; j < item.NumField(); j++ {
 			if hdr.Field(j).Tag.Get("output") == "-" {
 				continue
 			}
 			fmt.Fprintf(w, format, item.Field(j).Interface())
-			format = "\t%s"
+			format = "\t%v"
 		}
 		fmt.Fprintf(w, "\n")
 	}
