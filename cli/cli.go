@@ -14,6 +14,7 @@ import (
 
 var conf *config.Config
 var user config.User
+var params config.Parameters
 
 var basenamee string
 var rootCneVersion bool

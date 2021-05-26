@@ -200,7 +200,8 @@ func findRootFs(ctr *Container,
 // process.
 // The progress argument is optional for outputting status updates during the build process.
 func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
-	user *config.User, progress chan []runtime.ProgressStatus, stream runtime.Stream) error {
+	user *config.User, params *config.Parameters,
+	progress chan []runtime.ProgressStatus, stream runtime.Stream) error {
 
 	runCtr := ctr.runContainer
 
@@ -244,6 +245,16 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 		return err
 	}
 
+	vars := struct {
+		Environment *project.Environment
+		User        *config.User
+		Parameters  *config.Parameters
+	}{
+		Environment: &ws.Environment,
+		User:        user,
+		Parameters:  params,
+	}
+
 	// build all remaining layers
 	procSpec := DefaultProcessSpec()
 	for ; bldLayerIdx < nextLayerIdx; bldLayerIdx++ {
@@ -253,7 +264,7 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 
 			for _, cmdline := range cmdgrp.Cmdlines {
 
-				args := cmdline
+				args, err := expandLine(cmdline, vars)
 				if err != nil {
 					runCtr.Delete() // ignore error
 					return err

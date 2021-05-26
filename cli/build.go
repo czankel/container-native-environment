@@ -85,7 +85,7 @@ func buildLayers(run runtime.Runtime, ctr *container.Container,
 	stream := rb.StreamWriter()
 
 	fmt.Printf("Building layers\n")
-	err := ctr.Build(ws, nextLayerIdx, &user, progress, stream)
+	err := ctr.Build(ws, nextLayerIdx, &user, &params, progress, stream)
 	if err != nil && errors.Is(err, errdefs.ErrCommandFailed) {
 		line := make([]byte, 100)
 		fmt.Printf("Output:\n")
