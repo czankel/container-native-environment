@@ -24,6 +24,8 @@ const (
 	projectFileVersion = "1.0"
 	projectFilePerm    = 0600
 
+	WorkspaceDefaultName = "main"
+
 	LayerNameImage = "image"
 	LayerNameTop   = ""
 )
@@ -200,6 +202,11 @@ func (prj *Project) Write() error {
 	return nil
 }
 
+// Delete removes the CNE project file
+func (prj *Project) Delete() error {
+	return os.Remove(prj.path)
+}
+
 // CurrentWorkspace retuns a pointer to the current workspace or nil if unset or no workspaces.
 // Returns an error if the workspace wasn't found.
 func (prj *Project) CurrentWorkspace() (*Workspace, error) {
@@ -246,7 +253,7 @@ func (prj *Project) SetCurrentWorkspace(name string) error {
 func (prj *Project) CreateWorkspace(name string, origin string, before string) (*Workspace, error) {
 
 	if name == "" {
-		name = "main"
+		name = WorkspaceDefaultName
 		idx := 0
 		for i := 0; i < len(prj.Workspaces); i++ {
 			if name == prj.Workspaces[i].Name {

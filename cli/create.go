@@ -28,7 +28,7 @@ var createWorkspaceCmd = &cobra.Command{
 	RunE:    createWorkspaceRunE,
 }
 
-var createWorkspaceFrom string
+var createWorkspaceImage string
 var createWorkspaceInsert string
 
 func createWorkspaceRunE(cmd *cobra.Command, args []string) error {
@@ -42,24 +42,31 @@ func createWorkspaceRunE(cmd *cobra.Command, args []string) error {
 	if len(args) != 0 {
 		wsName = args[0]
 	}
+	return initWorkspace(prj, wsName, createWorkspaceImage, createWorkspaceInsert)
+}
 
-	imgName := ""
-	if createWorkspaceFrom != "" {
+func initWorkspace(prj *project.Project, wsName, insert, imgName string) error {
 
+	imgName = conf.FullImageName(imgName)
+
+	_, err := prj.CreateWorkspace(wsName, imgName, insert)
+	if err != nil {
+		return err
+	}
+
+	if imgName != "" {
 		run, err := runtime.Open(conf.Runtime)
 		if err != nil {
 			return err
 		}
 		defer run.Close()
 
-		imgName = conf.FullImageName(createWorkspaceFrom)
 		_, err = pullImage(run, imgName)
 		if err != nil {
 			return err
 		}
 	}
 
-	_, err = prj.CreateWorkspace(wsName, imgName, createWorkspaceInsert)
 	if err != nil {
 		return err
 	}
@@ -164,7 +171,7 @@ func init() {
 
 	createCmd.AddCommand(createWorkspaceCmd)
 	createWorkspaceCmd.Flags().StringVar(
-		&createWorkspaceFrom, "from", "", "Base image for the workspace")
+		&createWorkspaceImage, "from", "", "Base image for the workspace")
 	createWorkspaceCmd.Flags().StringVar(
 		&createWorkspaceInsert, "insert", "", "Insert before this workspace")
 

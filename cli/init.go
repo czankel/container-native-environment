@@ -11,6 +11,8 @@ import (
 	"github.com/czankel/cne/project"
 )
 
+var initProjectImage string
+
 var initCmd = &cobra.Command{
 	Use:   "init [NAME]",
 	Short: "Create or initialize a project",
@@ -23,10 +25,6 @@ as the project name.`,
 	RunE: initProjectRunE,
 }
 
-func init() {
-	rootCmd.AddCommand(initCmd)
-}
-
 // initProject initializes and existing project or creates a new project.
 // name: optional name for new projects.
 func initProjectRunE(cmd *cobra.Command, args []string) error {
@@ -37,23 +35,41 @@ func initProjectRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	if errors.Is(err, errdefs.ErrNotFound) {
-		var path string
-		path, err = os.Getwd()
+
+		path, err := os.Getwd()
 		if err != nil {
 			return errdefs.SystemError(err,
 				"failed to setup project in working directory")
 		}
+
 		name := filepath.Base(path)
 		if len(args) > 0 {
 			name = args[0]
 		}
-		_, err = project.Create(name, path)
+
+		prj, err := project.Create(name, path)
 		if err != nil {
 			return err
 		}
+
+		if initProjectImage != "" {
+			err = initWorkspace(prj, project.WorkspaceDefaultName,
+				"" /* Insert */, initProjectImage)
+			if err != nil {
+				prj.Delete()
+				return err
+			}
+		}
+
 	} else if len(args) > 0 {
 		return errdefs.AlreadyExists("project", args[0])
 	}
 
 	return nil
+}
+
+func init() {
+	rootCmd.AddCommand(initCmd)
+	initCmd.Flags().StringVar(
+		&initProjectImage, "image", "", "Base image")
 }
