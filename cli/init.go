@@ -17,16 +17,14 @@ var initCmd = &cobra.Command{
 	Use:   "init [NAME]",
 	Short: "Create or initialize a project",
 	Long: `
-The init command creates a new project or initializes an existing project.
-The name argument is optional and can only be used for creating a new
-project. If omitted the project will be created with the directory name
-as the project name.`,
+The init command creates a new project in the current directory.
+The name argument is. If omitted, the name of the current directory
+is used as the project name.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: initProjectRunE,
 }
 
-// initProject initializes and existing project or creates a new project.
-// name: optional name for new projects.
+// initProject creates a new project with an optional name for the project.
 func initProjectRunE(cmd *cobra.Command, args []string) error {
 
 	_, err := project.Load()
