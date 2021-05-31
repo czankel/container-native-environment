@@ -42,6 +42,7 @@ func createWorkspaceRunE(cmd *cobra.Command, args []string) error {
 	if len(args) != 0 {
 		wsName = args[0]
 	}
+
 	return initWorkspace(prj, wsName, createWorkspaceImage, createWorkspaceInsert)
 }
 
@@ -76,8 +77,11 @@ func initWorkspace(prj *project.Project, wsName, insert, imgName string) error {
 	return prj.Write()
 }
 
+var createLayerSystem bool
+var createLayerInsert string
+
 var createLayerCmd = &cobra.Command{
-	Use:     "layer NAME [CMDLINE]",
+	Use:     "layer [FLAGS] NAME [CMDLINE]",
 	Short:   "Create a new layer",
 	Aliases: []string{"l"},
 	Args:    cobra.MinimumNArgs(1),
@@ -108,7 +112,7 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	isTerminal := term.IsTerminal(int(os.Stdin.Fd()))
-	if (len(args) > 1) != isTerminal {
+	if len(args) > 1 && !isTerminal {
 		return errdefs.InvalidArgument("too many arguments")
 	}
 
@@ -125,9 +129,9 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	atIndex := -1
-	if createWorkspaceInsert != "" {
+	if createLayerInsert != "" {
 		for i, l := range ws.Environment.Layers {
-			if l.Name == createWorkspaceInsert {
+			if l.Name == createLayerInsert {
 				atIndex = i
 				break
 			}
@@ -137,16 +141,26 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	layer, err := ws.CreateLayer(args[0], atIndex)
-	if err != nil {
-		return err
+	rebuildContainer := createLayerSystem
+	layerName := args[0]
+	for _, n := range project.SystemLayerTypes {
+		if layerName == n {
+			return errdefs.InvalidArgument("%s is a reserved layer name, use --system",
+				layerName)
+		}
 	}
+
+	layer, err := ws.CreateLayer(createLayerSystem, layerName, atIndex)
 	layer.Commands = []project.CommandGroup{{
 		"",
 		cmdLines,
 	}}
+	if err != nil {
+		return err
+	}
+	rebuildContainer = len(cmdLines) > 0
 
-	if len(cmdLines) > 0 {
+	if rebuildContainer {
 		_, err := buildContainer(run, ws)
 		if err != nil {
 			return err
@@ -171,9 +185,14 @@ func init() {
 
 	createCmd.AddCommand(createWorkspaceCmd)
 	createWorkspaceCmd.Flags().StringVar(
-		&createWorkspaceImage, "from", "", "Base image for the workspace")
+		&createWorkspaceImage, "image", "", "Base image for the workspace")
 	createWorkspaceCmd.Flags().StringVar(
 		&createWorkspaceInsert, "insert", "", "Insert before this workspace")
 
 	createCmd.AddCommand(createLayerCmd)
+	createLayerCmd.Flags().StringVar(
+		&createLayerInsert, "insert", "", "Insert before this layer")
+	createLayerCmd.Flags().BoolVarP(
+		&createLayerSystem, "system", "s", false,
+		"User the system handler of the same name")
 }

@@ -410,16 +410,16 @@ func TestProjectLayers(t *testing.T) {
 	layer2Name := "Layer2" // -> layer[2]
 	layer3Name := "Layer3" // -> layer[0]
 
-	_, err = ws.CreateLayer(layer1Name, -2)
+	_, err = ws.CreateLayer(false, layer1Name, -2)
 	if err == nil {
 		t.Fatalf("Inserting Layer1 at negative index should fail")
 	}
-	_, err = ws.CreateLayer(layer1Name, 1)
+	_, err = ws.CreateLayer(false, layer1Name, 1)
 	if err == nil {
 		t.Fatalf("Inserting Layer1 at invalid index should fail")
 	}
 
-	_, err = ws.CreateLayer(layer1Name, 0)
+	_, err = ws.CreateLayer(false, layer1Name, 0)
 	if err != nil {
 		t.Fatalf("Inserting Layer1 at 0 should succeed %v", err)
 	}
@@ -429,7 +429,7 @@ func TestProjectLayers(t *testing.T) {
 		t.Fatalf("TopLayer should be layer1")
 	}
 
-	_, err = ws.CreateLayer(layer2Name, 1)
+	_, err = ws.CreateLayer(false, layer2Name, 1)
 	if err != nil {
 		t.Fatalf("Appending layer at the end should succeed")
 	}
@@ -448,7 +448,7 @@ func TestProjectLayers(t *testing.T) {
 		t.Fatalf("TopLayer should be layer1")
 	}
 
-	_, err = ws.CreateLayer(layer3Name, 0)
+	_, err = ws.CreateLayer(false, layer3Name, 0)
 	if err != nil {
 		t.Fatalf("Inserting Layer3 at 0 should succeed")
 	}

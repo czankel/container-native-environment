@@ -111,8 +111,6 @@ func commitContainer(ctr *container.Container, ws *project.Workspace) error {
 
 // buildContainer builds the container for the provided workspace and outputs progress status.
 // Note that in an error case, it will keep any residual container and snapshots.
-// Also note that the workspace layers will be updated with snapshot digests, so the persistent
-// project should be updated.
 func buildContainer(run runtime.Runtime, ws *project.Workspace) (*container.Container, error) {
 
 	ctr, err := createContainer(run, ws)
@@ -149,6 +147,7 @@ var buildWorkspaceCmd = &cobra.Command{
 }
 
 var buildWorkspaceForce bool
+var buildWorkspaceUpgrade string
 
 func buildWorkspaceRunE(cmd *cobra.Command, args []string) error {
 
@@ -171,17 +170,22 @@ func buildWorkspaceRunE(cmd *cobra.Command, args []string) error {
 	}
 	defer run.Close()
 
+	// only allow a single build container at a time
 	ctr, err := container.Get(run, ws)
 	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 		return err
 	}
-	if ctr != nil && buildWorkspaceForce {
+	if err != nil {
+		if !buildWorkspaceForce && buildWorkspaceUpgrade == "" {
+			return errdefs.AlreadyExists("container", ctr.Name)
+		}
 		err = ctr.Purge()
 		if err != nil {
 			return err
 		}
 	}
 
+	params.Upgrade = buildWorkspaceUpgrade
 	_, err = buildContainer(run, ws)
 	if err != nil {
 		return err
@@ -197,4 +201,6 @@ func init() {
 	buildCmd.AddCommand(buildWorkspaceCmd)
 	buildWorkspaceCmd.Flags().BoolVar(
 		&buildWorkspaceForce, "force", false, "Force a rebuild of the container")
+	buildWorkspaceCmd.Flags().StringVar(
+		&buildWorkspaceUpgrade, "upgrade", "", "Upgrade image, apt, all")
 }

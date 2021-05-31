@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -26,9 +27,24 @@ const (
 
 	WorkspaceDefaultName = "main"
 
+	LayerTypeCustom = ""
+	LayerTypeImage  = "image"
+	LayerTypeUbuntu = "ubuntu"
+	LayerTypeApt    = "apt"
+	LayerTypeDnf    = "dnf"
+	LayerTypePip    = "pip"
+
 	LayerNameImage = "image"
 	LayerNameTop   = ""
 )
+
+var SystemLayerTypes = [...]string{
+	LayerTypeImage,
+	LayerTypeUbuntu,
+	LayerTypeApt,
+	LayerTypeDnf,
+	LayerTypePip,
+}
 
 type Header struct {
 	Version string
@@ -56,10 +72,24 @@ type Workspace struct {
 }
 
 // Environment describes the container-native environment
+// The options for the update strategy are as follows:
+//  * "never"  -  packages are never updated
+//  * "manual" -  manually (re-)building the image will update the packages
+//  * "auto"   -  packages will be updated whenever the package layer(s) are rebuild
 // Note that the image needs to be pulled manually to cause an update (using 'pull')
 type Environment struct {
 	Origin string // Name or link of the base image
+	Update string // Update package strategy: One of "never", "manual", "auto"
 	Layers []Layer
+}
+
+// Layer describes an 'overlay' layer. This can be virtual or explicit using an overlay FS
+// Note that ideally we could use compositions for apt and other handlers
+type Layer struct {
+	Name     string // Unique name for the layer in the workspace; must not contain '/'
+	Type     string // one of the system layer types or custom layer
+	Digest   string `output:"-"` // Images/Snaps for faster rebuilds
+	Commands []CommandGroup
 }
 
 // Command describes the command and its argument(s).
@@ -67,14 +97,6 @@ type Environment struct {
 type CommandGroup struct {
 	Name     string
 	Cmdlines [][]string `output:"flat" yaml:",flow"`
-}
-
-// Layer describes an 'overlay' layer. This can be virtual or explicit using an overlay FS
-// Note that ideally we could use compositions for apt and other handlers
-type Layer struct {
-	Name     string // Unique name for the layer in the workspace; must not contain '/'
-	Digest   string `output:"-"` // Images/Snaps for faster rebuilds
-	Commands []CommandGroup
 }
 
 // Create creates the project in the provide path
@@ -179,7 +201,6 @@ func Load() (*Project, error) {
 }
 
 // Write writes the project to the project path
-
 func (prj *Project) Write() error {
 
 	header := &Header{
@@ -317,10 +338,6 @@ func hashValueElem(w io.Writer, prefix string, elem reflect.Value, deep bool) {
 	kind := elem.Kind()
 
 	if deep && (kind == reflect.Struct || kind == reflect.Map || kind == reflect.Slice) {
-		return
-	}
-
-	if prefix != "" && (kind == reflect.Struct || kind == reflect.Map || kind == reflect.Slice) {
 		prefix = prefix + "/"
 	}
 
@@ -366,9 +383,9 @@ func (ws *Workspace) BaseHash() [16]byte {
 
 	var gen [16]byte
 
-	val := md5.New()
-	hashValueElem(val, "", reflect.ValueOf(ws.Environment), false /* deep */)
-	copy(gen[:], val.Sum(nil)[:])
+	hashVal := md5.New()
+	hashValueElem(hashVal, "", reflect.ValueOf(ws.Environment), false /* deep */)
+	copy(gen[:], hashVal.Sum(nil)[:])
 
 	return gen
 }
@@ -378,15 +395,20 @@ func (ws *Workspace) ConfigHash() [16]byte {
 
 	var gen [16]byte
 
-	hash := md5.New()
-	hashValueElem(hash, "", reflect.ValueOf(ws.Environment), true /* deep */)
-	copy(gen[:], hash.Sum(nil)[:])
+	hashVal := md5.New()
+	hashValueElem(hashVal, "", reflect.ValueOf(ws.Environment), true /* deep */)
+	copy(gen[:], hashVal.Sum(nil)[:])
 
 	return gen
 }
 
 // CreateLayer inserts a new layer (or layers) at the provided index, or at the end if index == -1
-func (ws *Workspace) CreateLayer(name string, atIndex int) (*Layer, error) {
+func (ws *Workspace) CreateLayer(systemLayer bool, name string, atIndex int) (*Layer, error) {
+
+	layerType := LayerTypeCustom
+	if systemLayer {
+		layerType = name
+	}
 
 	if atIndex < -1 || atIndex > len(ws.Environment.Layers) {
 		return nil, errdefs.InvalidArgument("invalid index: %d", atIndex)
@@ -402,31 +424,42 @@ func (ws *Workspace) CreateLayer(name string, atIndex int) (*Layer, error) {
 	}
 
 	ws.Environment.Layers = append(ws.Environment.Layers[:atIndex],
-		append([]Layer{Layer{Name: name}},
+		append([]Layer{Layer{Type: layerType, Name: name}},
 			ws.Environment.Layers[atIndex:]...)...)
 
 	return &ws.Environment.Layers[atIndex], nil
 }
 
-func (ws *Workspace) FindLayer(name string) *Layer {
+// FindLayer looks up the layer by name and returns the layer index starting with 0 for the first
+// layer in the list and a pointer to the Layer structure.
+// If the layer cannot be found, it returns an index value of -1 and nil for the layer.
+func (ws *Workspace) FindLayer(name string) (int, *Layer) {
 	for i, l := range ws.Environment.Layers {
 		if name == l.Name {
-			return &ws.Environment.Layers[i]
+			return i, &ws.Environment.Layers[i]
 		}
 	}
-	return nil
+	return -1, nil
 }
 
 // DeleteLayer removes the specified layer.
 func (ws *Workspace) DeleteLayer(name string) error {
-	for i, l := range ws.Environment.Layers {
-		if name == l.Name {
+
+	deleted := 0
+	for i := 0; i < len(ws.Environment.Layers); i++ {
+		l := ws.Environment.Layers[i]
+		prefix := name + "."
+		if name == l.Name || strings.HasPrefix(l.Name, prefix) {
 			ws.Environment.Layers = append(ws.Environment.Layers[:i],
 				ws.Environment.Layers[i+1:]...)
-			return nil
+			deleted++
+			i--
 		}
 	}
-	return errdefs.NotFound("layer", name)
+	if deleted == 0 {
+		return errdefs.NotFound("layer", name)
+	}
+	return nil
 }
 
 // TopLayer returns the pointer to the top layer.
@@ -437,4 +470,19 @@ func (ws *Workspace) TopLayer() *Layer {
 	}
 
 	return &ws.Environment.Layers[cnt-1]
+}
+
+// UpdateLayer ensures that any cached or reference data is updated
+func (ws *Workspace) UpdateLayer(layer *Layer) {
+
+	invalidate := false
+	for i := 0; i < len(ws.Environment.Layers); i++ {
+		l := &ws.Environment.Layers[i]
+		if l.Name == layer.Name {
+			invalidate = true
+		}
+		if invalidate {
+			l.Digest = ""
+		}
+	}
 }
