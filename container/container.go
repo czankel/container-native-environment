@@ -361,6 +361,20 @@ func (ctr *Container) Commit(ws *project.Workspace, user config.User, rootPath s
 	return nil
 }
 
+// Amend updates the current snapshot
+func (ctr *Container) Amend(ws *project.Workspace, bldLayerIdx int) error {
+
+	runCtr := ctr.runContainer
+	snap, err := runCtr.Amend()
+	if err != nil {
+		return err
+	}
+	layer := &ws.Environment.Layers[bldLayerIdx]
+	layer.Digest = snap.Name()
+
+	return nil
+}
+
 // Exec excutes the provided command, using the default proces runtime spec.
 // The user defines the current working directory and UID and GID.
 // It uses the default environment from the calling process.
@@ -434,6 +448,7 @@ func commonExec(ctr *Container, procSpec *specs.Process, stream runtime.Stream) 
 	return exitStat.Code, exitStat.Error
 }
 
+// Delete deletes the container if not already deleted but not any associated Snapshots.
 func (ctr *Container) Delete() error {
 	return ctr.runContainer.Delete()
 }
