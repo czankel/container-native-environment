@@ -11,7 +11,7 @@ require (
 	github.com/containerd/continuity v0.0.0-20190827140505-75bee3e2ccb6 // indirect
 	github.com/containerd/fifo v0.0.0-20190816180239-bda0ff6ed73c // indirect
 	github.com/containerd/ttrpc v0.0.0-20191028202541-4f1b8fe65a5c // indirect
-	github.com/containerd/typeurl v0.0.0-20190911142611-5eb25027c9fd // indirect
+	github.com/containerd/typeurl v0.0.0-20190911142611-5eb25027c9fd
 	github.com/docker/distribution v2.7.1+incompatible // indirect
 	github.com/docker/go-events v0.0.0-20190806004212-e31b211e4f1c // indirect
 	github.com/gogo/googleapis v1.3.0 // indirect
@@ -30,6 +30,7 @@ require (
 	golang.org/x/term v0.0.0-20191110171634-ad39bd3f0407
 	google.golang.org/grpc v1.25.1 // indirect
 	gopkg.in/yaml.v2 v2.3.0
+	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
 
 replace github.com/docker/distribution v2.7.1+incompatible => github.com/docker/distribution v2.7.1-0.20190205005809-0d3efadf0154+incompatible
