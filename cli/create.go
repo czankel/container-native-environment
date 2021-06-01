@@ -51,7 +51,7 @@ func initWorkspace(prj *project.Project, wsName, insert, imgName string) error {
 
 	imgName = conf.FullImageName(imgName)
 
-	_, err := prj.CreateWorkspace(wsName, imgName, insert)
+	ws, err := prj.CreateWorkspace(wsName, imgName, insert)
 	if err != nil {
 		return err
 	}
@@ -63,14 +63,15 @@ func initWorkspace(prj *project.Project, wsName, insert, imgName string) error {
 		}
 		defer run.Close()
 
-		_, err = pullImage(run, imgName)
+		img, err := pullImage(run, imgName)
 		if err != nil {
 			return err
 		}
-	}
 
-	if err != nil {
-		return err
+		err = support.SetupWorkspace(ws, img)
+		if err != nil {
+			return err
+		}
 	}
 
 	prj.CurrentWorkspaceName = wsName
