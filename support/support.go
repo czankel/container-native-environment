@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/czankel/cne/errdefs"
+	"github.com/czankel/cne/project"
 	"github.com/czankel/cne/runtime"
 )
 
@@ -16,6 +17,24 @@ type ImageInfo struct {
 	FullName string
 	ID       string
 	Version  string
+}
+
+func SetupWorkspace(ws *project.Workspace, img runtime.Image) error {
+
+	info, err := GetImageInfo(img)
+	if err != nil {
+		return err
+	}
+
+	switch info.ID {
+	case "ubuntu":
+		err = UbuntuCreateOSLayer(ws, -1)
+	}
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Try to identify the OS from the image.
@@ -69,4 +88,16 @@ func GetImageInfo(img runtime.Image) (*ImageInfo, error) {
 	}
 
 	return &imageinfo, nil
+}
+
+// CreateSystemLayer creates a system layer
+func CreateSystemLayer(ws *project.Workspace, name string, atIndex int) error {
+	switch name {
+	case project.LayerTypeApt:
+		return AptCreateLayers(ws, atIndex)
+	case project.LayerTypeUbuntu:
+		return UbuntuCreateOSLayer(ws, atIndex)
+	default:
+		return errdefs.InvalidArgument("system layer %s not supported", name)
+	}
 }

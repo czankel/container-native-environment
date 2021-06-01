@@ -11,6 +11,7 @@ import (
 	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/project"
 	"github.com/czankel/cne/runtime"
+	"github.com/czankel/cne/support"
 )
 
 var createCmd = &cobra.Command{
@@ -142,23 +143,30 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	rebuildContainer := createLayerSystem
-	layerName := args[0]
-	for _, n := range project.SystemLayerTypes {
-		if layerName == n {
-			return errdefs.InvalidArgument("%s is a reserved layer name, use --system",
-				layerName)
+	if createLayerSystem {
+		err = support.CreateSystemLayer(ws, args[0], atIndex)
+		if err != nil {
+			return err
 		}
-	}
+	} else {
+		layerName := args[0]
+		for _, n := range project.SystemLayerTypes {
+			if layerName == n {
+				return errdefs.InvalidArgument("%s is a reserved layer name, use --system",
+					layerName)
+			}
+		}
 
-	layer, err := ws.CreateLayer(createLayerSystem, layerName, atIndex)
-	layer.Commands = []project.CommandGroup{{
-		"",
-		cmdLines,
-	}}
-	if err != nil {
-		return err
+		layer, err := ws.CreateLayer(createLayerSystem, layerName, atIndex)
+		layer.Commands = []project.CommandGroup{{
+			"",
+			cmdLines,
+		}}
+		if err != nil {
+			return err
+		}
+		rebuildContainer = len(cmdLines) > 0
 	}
-	rebuildContainer = len(cmdLines) > 0
 
 	if rebuildContainer {
 		_, err := buildContainer(run, ws)
