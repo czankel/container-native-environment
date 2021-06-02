@@ -90,7 +90,7 @@ func installAptRunE(cmd *cobra.Command, args []string) error {
 		os.Exit(code)
 	}
 
-	ctr.Amend(ws, aptLayerIdx+1)
+	ctr.Amend(ws, aptLayerIdx)
 	if err != nil {
 		ctr.Delete() // delete the container and active snapshot
 		return err
