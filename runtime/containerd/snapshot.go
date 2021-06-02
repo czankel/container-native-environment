@@ -109,9 +109,13 @@ func commitSnapshot(ctrdRun *containerdRuntime,
 	}
 
 	parentSnap, err := getSnapshot(ctrdRun, parentName)
+	if err != nil {
+		return nil, runtime.Errorf("parent snapshot '%v' not found: %v", parentName, err)
+	}
+
 	parentMnts, err := snapSvc.View(ctrdCtx, parentName+"-view", parentName)
 	if err != nil {
-		return nil, runtime.Errorf("failed to create parent snapshot: %v", parentName)
+		return nil, runtime.Errorf("creating snapshot '%v' failed: %v", parentName, err)
 	}
 	defer snapSvc.Remove(ctrdCtx, parentName+"-view")
 

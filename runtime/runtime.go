@@ -152,7 +152,8 @@ type Container interface {
 
 	// Snapshot creates a snapshot of the current file system.
 	//
-	// Snapshot support is optional, and runtimes that don't support it will return nil.
+	// Snapshot support is optional, and runtimes that don't support it return an
+	// ErrNotImplemented error and nil for the snapshot.
 	Snapshot() (Snapshot, error)
 
 	// Amend amends the committed snapshot with the current changes to the filesystem.

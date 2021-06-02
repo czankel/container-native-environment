@@ -315,9 +315,14 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 			return err
 		}
 
-		// create a snapshot for the bldent layer, ignore any errors
+		// create a snapshot for the layer
+		layer.Digest = ""
 		snap, err := runCtr.Snapshot()
-		if err == nil {
+		if err != nil && !errors.Is(err, errdefs.ErrNotImplemented) {
+			runCtr.Delete()
+			return err
+		}
+		if snap != nil {
 			layer.Digest = snap.Name()
 		}
 		if progress != nil {
