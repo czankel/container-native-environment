@@ -200,7 +200,7 @@ func (img *image) Mount(path string) error {
 	}
 
 	digest := identity.ChainID(diffIDs).String()
-	snapName := digest + "-view"
+	snapName := digest + "-image"
 	mounts, _, err = createSnapshot(img.ctrdRuntime, snapName, digest, false)
 	if err != nil {
 		return err
@@ -216,5 +216,20 @@ func (img *image) Mount(path string) error {
 
 func (img *image) Unmount(path string) error {
 
-	return mount.UnmountAll(path, 0)
+	ctrdRun := img.ctrdRuntime
+	ctrdCtx := ctrdRun.context
+
+	err := mount.UnmountAll(path, 0)
+	if err != nil {
+		return err
+	}
+
+	diffIDs, err := img.ctrdImage.RootFS(ctrdCtx)
+	if err != nil {
+		return runtime.Errorf("failed to get rootfs: %v", err)
+	}
+
+	digest := identity.ChainID(diffIDs).String()
+	snapName := digest + "-image"
+	return deleteSnapshot(ctrdRun, snapName)
 }
