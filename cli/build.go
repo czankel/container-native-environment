@@ -53,13 +53,13 @@ func createContainer(run runtime.Runtime, ws *project.Workspace) (*container.Con
 }
 
 // buildLayers builds the layers of a container and outputs progress status.
-// The nextLayerIdx argument defines the layer index following the one that should be built,
+// The layerCount argument defines the number of layers that should have been built.
 // with 0 meaning no layer should be built.  Use -1 or len(layers) to build all layers.
 // This function is idempotent and can be called again to continue the build, for example,
 // for a higher layer.
 // Note that in an error case, it will keep any residual container and snapshots.
 func buildLayers(run runtime.Runtime, ctr *container.Container,
-	ws *project.Workspace, nextLayerIdx int) error {
+	ws *project.Workspace, layerCount int) error {
 
 	con := console.Current()
 	defer con.Reset()
@@ -84,7 +84,7 @@ func buildLayers(run runtime.Runtime, ctr *container.Container,
 	rb := NewRingBuffer(outputLineCount, outputLineLength)
 	stream := rb.StreamWriter()
 
-	err := ctr.Build(ws, nextLayerIdx, &user, &params, progress, stream)
+	err := ctr.Build(ws, layerCount, &user, &params, progress, stream)
 	if err != nil && errors.Is(err, errdefs.ErrCommandFailed) {
 		line := make([]byte, 100)
 		fmt.Printf("Output:\n")
