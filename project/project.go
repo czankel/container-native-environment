@@ -99,9 +99,19 @@ type CommandGroup struct {
 	Cmdlines [][]string `output:"flat" yaml:",flow"`
 }
 
+// NewProject returns an empty new project.
+func NewProject(name, path string) *Project {
+
+	return &Project{
+		Name: name,
+		UUID: uuid.New().String(),
+		path: path,
+	}
+}
+
 // Create creates the project in the provide path
 // The path can be empty to use the current working directory.
-func Create(name string, path string) (*Project, error) {
+func Create(name, path string) (*Project, error) {
 
 	if path == "" {
 		var err error
@@ -113,11 +123,7 @@ func Create(name string, path string) (*Project, error) {
 		path = path + "/"
 	}
 
-	prj := &Project{
-		Name: name,
-		UUID: uuid.New().String(),
-		path: path,
-	}
+	prj := NewProject(name, path)
 
 	flags := os.O_RDONLY | os.O_CREATE | os.O_EXCL | os.O_SYNC
 	file, err := os.OpenFile(path+projectFileName, flags, projectFilePerm)
