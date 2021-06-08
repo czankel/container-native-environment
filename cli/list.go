@@ -100,7 +100,7 @@ func listImagesRunE(cmd *cobra.Command, args []string) error {
 
 var listSnapshotsCmd = &cobra.Command{
 	Use:     "snapshots",
-	Aliases: []string{"snapshot", "i"},
+	Aliases: []string{"snapshot", "s"},
 	Short:   "list snapshots",
 	Args:    cobra.NoArgs,
 	RunE:    listSnapshotsRunE,
