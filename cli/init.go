@@ -18,7 +18,7 @@ var initCmd = &cobra.Command{
 	Short: "Create or initialize a project",
 	Long: `
 The init command creates a new project in the current directory.
-The name argument is. If omitted, the name of the current directory
+The project name is optional. If omitted, the name of the current directory
 is used as the project name.`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: initProjectRunE,
@@ -27,40 +27,36 @@ is used as the project name.`,
 // initProject creates a new project with an optional name for the project.
 func initProjectRunE(cmd *cobra.Command, args []string) error {
 
-	_, err := project.Load()
+	path, err := os.Getwd()
+	if err != nil {
+		return errdefs.SystemError(err, "failed to get current working directory")
+	}
+
+	name := filepath.Base(path)
+	if len(args) > 0 {
+		name = args[0]
+	}
+
+	_, err = project.Load()
 	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 		return err
 	}
+	if !errors.Is(err, errdefs.ErrNotFound) {
+		return errdefs.AlreadyExists("project", name)
+	}
 
-	if errors.Is(err, errdefs.ErrNotFound) {
+	prj, err := project.Create(name, path)
+	if err != nil {
+		return err
+	}
 
-		path, err := os.Getwd()
+	if initProjectImage != "" {
+		err = initWorkspace(prj, project.WorkspaceDefaultName,
+			"" /* Insert */, initProjectImage)
 		if err != nil {
-			return errdefs.SystemError(err,
-				"failed to setup project in working directory")
-		}
-
-		name := filepath.Base(path)
-		if len(args) > 0 {
-			name = args[0]
-		}
-
-		prj, err := project.Create(name, path)
-		if err != nil {
+			prj.Delete()
 			return err
 		}
-
-		if initProjectImage != "" {
-			err = initWorkspace(prj, project.WorkspaceDefaultName,
-				"" /* Insert */, initProjectImage)
-			if err != nil {
-				prj.Delete()
-				return err
-			}
-		}
-
-	} else if len(args) > 0 {
-		return errdefs.AlreadyExists("project", args[0])
 	}
 
 	return nil
