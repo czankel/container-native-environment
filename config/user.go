@@ -27,7 +27,8 @@ type User struct {
 	BuildGID  uint32
 }
 
-func getProcessUser() (User, error) {
+// CurrentUser returns a
+func CurrentUser() (User, error) {
 
 	usr, err := user.Current()
 	if err != nil {
