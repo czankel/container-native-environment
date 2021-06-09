@@ -310,11 +310,6 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 			}
 		}
 
-		if err != nil {
-			runCtr.Delete()
-			return err
-		}
-
 		// create a snapshot for the layer
 		layer.Digest = ""
 		snap, err := runCtr.Snapshot()
