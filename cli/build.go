@@ -75,12 +75,6 @@ func buildLayers(run runtime.Runtime, ctr *container.Container,
 		showBuildProgress(progress)
 	}()
 
-	// TODO: --------------------------------------------------
-	// TODO: running as root inside the container during build!
-	// TODO: --------------------------------------------------
-	user.BuildUID = 0
-	user.BuildGID = 0
-
 	rb := NewRingBuffer(outputLineCount, outputLineLength)
 	stream := rb.StreamWriter()
 

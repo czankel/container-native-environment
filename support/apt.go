@@ -93,14 +93,6 @@ func AptInstall(ws *project.Workspace, aptLayerIdx int, user config.User, ctr *c
 	}
 
 	// try to install the additional packages
-
-	// TODO: --------------------------------------------------
-	// TODO: running as root inside the container during build!
-	// TODO: --------------------------------------------------
-
-	user.BuildUID = 0
-	user.BuildGID = 0
-
 	if aptUpdate {
 		cmds := []string{"apt", "update"}
 		code, err := ctr.BuildExec(&user, stream, cmds)

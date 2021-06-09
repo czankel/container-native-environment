@@ -75,8 +75,13 @@ func CurrentUser() (User, error) {
 		Shell:     shell,
 		UID:       uint32(uid),
 		GID:       uint32(gid),
-		BuildUID:  uint32(uid),
-		BuildGID:  uint32(gid),
+
+		// TODO: --------------------------------------------------
+		// TODO: running as root inside the container during build!
+		// TODO: --------------------------------------------------
+
+		BuildUID: 0,
+		BuildGID: 0,
 	}
 
 	return user, nil
