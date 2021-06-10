@@ -174,10 +174,16 @@ func LoadFrom(path string) (*Project, error) {
 	}
 
 	var header Header
-	yaml.Unmarshal(str, &header)
+	err = yaml.Unmarshal(str, &header)
+	if err != nil {
+		return nil, errdefs.InvalidArgument("project file corrupt: %v", err)
+	}
 
 	var prj Project
-	yaml.Unmarshal(str, &prj)
+	err = yaml.Unmarshal(str, &prj)
+	if err != nil {
+		return nil, errdefs.InvalidArgument("project file corrupt: %v", err)
+	}
 
 	fileInfo, err := os.Stat(path)
 	prj.path = path
@@ -243,7 +249,6 @@ func (prj *Project) CurrentWorkspace() (*Workspace, error) {
 // Workspace returns a pointer to the workspace in the project specified by the provided name
 // or error if it doesn't exist in the project
 func (prj *Project) Workspace(name string) (*Workspace, error) {
-
 	if name == "" && len(prj.Workspaces) > 0 {
 		return &prj.Workspaces[0], nil
 	}
