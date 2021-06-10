@@ -118,13 +118,12 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 		return errdefs.InvalidArgument("too many arguments")
 	}
 
-	var cmdLines [][]string
+	var commands []project.Command
 	if len(args) > 1 {
-		cmdLines = scanLine(args[1])
+		commands = scanLine(args[1])
 	} else if !isTerminal {
 
-		line, err := readCommands(os.Stdin)
-		cmdLines = [][]string{line}
+		commands, err = readCommands(os.Stdin)
 		if err != nil {
 			return err
 		}
@@ -159,14 +158,11 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 		}
 
 		layer, err := ws.CreateLayer(createLayerSystem, layerName, atIndex)
-		layer.Commands = []project.CommandGroup{{
-			"",
-			cmdLines,
-		}}
+		layer.Commands = commands
 		if err != nil {
 			return err
 		}
-		rebuildContainer = len(cmdLines) > 0
+		rebuildContainer = len(commands) > 0
 	}
 
 	if rebuildContainer {

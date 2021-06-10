@@ -94,7 +94,7 @@ func GetImageInfo(img runtime.Image) (*ImageInfo, error) {
 func CreateSystemLayer(ws *project.Workspace, name string, atIndex int) error {
 	switch name {
 	case project.LayerTypeApt:
-		return AptCreateLayers(ws, atIndex)
+		return AptCreateLayer(ws, atIndex)
 	case project.LayerTypeUbuntu:
 		return UbuntuCreateOSLayer(ws, atIndex)
 	default:

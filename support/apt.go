@@ -12,6 +12,7 @@ const (
 	ImageLayerName = "Image"
 
 	aptLayerCmdUpdate  = "apt-update"
+	aptLayerCmdUpgrade = "apt-upgrade"
 	aptLayerCmdInstall = "apt-install"
 	aptLayerCmdRemove  = "apt-remove"
 )
@@ -22,7 +23,7 @@ type AptPackage struct {
 	Layer   string
 }
 
-func AptCreateLayers(ws *project.Workspace, atIndex int) error {
+func AptCreateLayer(ws *project.Workspace, atIndex int) error {
 
 	_, aptLayer := ws.FindLayer(project.LayerTypeApt)
 	if aptLayer != nil {
@@ -33,17 +34,19 @@ func AptCreateLayers(ws *project.Workspace, atIndex int) error {
 	if err != nil {
 		return err
 	}
-	aptLayer.Commands = []project.CommandGroup{{
+
+	aptLayer.Commands = []project.Command{{
 		aptLayerCmdUpdate,
-		[][]string{{
-			"apt", "update",
-		}, {
+		[]string{"apt", "update"},
+	}, {
+		aptLayerCmdUpgrade,
+		[]string{
 			"{{if .Environment.Update == auto || " +
 				".Environment.Update == manual && " +
 				".Parameters.Upgrade in [apt, all]}}",
 			"apt", "upgrade", "-y",
 			"{{end}}",
-		}},
+		},
 	}}
 	return nil
 }
@@ -54,40 +57,36 @@ func AptInstall(ws *project.Workspace, aptLayerIdx int, user config.User, ctr *c
 
 	aptLayer := &ws.Environment.Layers[aptLayerIdx]
 
-	var cmdGrp *project.CommandGroup
+	var cmds *project.Command
 	for i := 0; i < len(aptLayer.Commands); i++ {
-		l := &aptLayer.Commands[i]
-		if l.Name == aptLayerCmdInstall {
-			cmdGrp = l
+		c := &aptLayer.Commands[i]
+		if c.Name == aptLayerCmdInstall {
+			cmds = c
 			break
 		}
 	}
 
-	if cmdGrp == nil {
-		cmds := append([]string{"apt", "install", "-y"}, aptNames...)
+	if cmds == nil {
+		aptInstall := append([]string{"apt", "install", "-y"}, aptNames...)
 		aptLayer.Commands = append(aptLayer.Commands,
-			project.CommandGroup{aptLayerCmdInstall, [][]string{cmds}})
+			project.Command{aptLayerCmdInstall, aptInstall})
+		cmds = &aptLayer.Commands[len(aptLayer.Commands)-1]
 		ws.UpdateLayer(aptLayer)
 	} else {
-		if len(cmdGrp.Cmdlines) > 1 {
-			return 0, errdefs.InternalError("multiple lines in command group %s",
-				aptLayerCmdInstall)
-		}
-		cmdline := cmdGrp.Cmdlines[0]
-		if len(cmdline) < 4 && cmdline[0] != "apt" && cmdline[1] != "install" {
-			return 0, errdefs.InternalError("malformed command group %v",
+		if len(cmds.Args) < 4 && cmds.Args[0] != "apt" && cmds.Args[1] != "install" {
+			return 0, errdefs.InternalError("malformed apt install command %v",
 				aptLayerCmdInstall)
 		}
 
-		for i := 3; i < len(cmdline); i++ {
+		for i := 3; i < len(cmds.Args); i++ {
 			for j, a := range aptNames {
-				if cmdline[i] == a {
+				if cmds.Args[i] == a {
 					aptNames = append(aptNames[:j], aptNames[j+1:]...)
 				}
 			}
 		}
 		if len(aptNames) > 0 {
-			cmdGrp.Cmdlines[0] = append(cmdGrp.Cmdlines[0], aptNames...)
+			cmds.Args = append(cmds.Args, aptNames...)
 			ws.UpdateLayer(aptLayer)
 		}
 	}
@@ -104,8 +103,8 @@ func AptInstall(ws *project.Workspace, aptLayerIdx int, user config.User, ctr *c
 		}
 	}
 
-	cmds := append([]string{"apt", "install", "-y"}, aptNames...)
-	code, err := ctr.BuildExec(&user, stream, cmds)
+	args := append([]string{"apt", "install", "-y"}, aptNames...)
+	code, err := ctr.BuildExec(&user, stream, args)
 	if err != nil {
 		return 0, err
 	}

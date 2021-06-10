@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"strings"
 	"testing"
 
 	"bytes"
@@ -243,22 +242,22 @@ func TestPrintValueSlice(t *testing.T) {
 // TODO: implement splitting a command line into slices of arguments
 func compareCommands(t *testing.T, desc string, line string, exp [][]string) bool {
 
-	res := scanLine(line)
+	commands := scanLine(line)
 
-	if len(res) != len(exp) {
-		t.Errorf("Test '%s' failed: different length %d, should be %d %s",
-			desc, len(res), len(exp), strings.Join(res[0], ":"))
+	if len(commands) != len(exp) {
+		t.Errorf("Test '%s' failed: different length %d, should be %d",
+			desc, len(commands), len(exp))
 		return false
 	}
-	for i := range res {
-		if len(res[i]) != len(exp[i]) {
+	for i := range commands {
+		if len(commands[i].Args) != len(exp[i]) {
 			t.Errorf("Test '%s' failed in line %d: number of arguments mismatch",
 				desc, i)
 		}
-		for j := range res[i] {
-			if res[i][j] != exp[i][j] {
+		for j, arg := range commands[i].Args {
+			if arg != exp[i][j] {
 				t.Errorf("Test '%s' failed in line %d, index %d: '%s' (exp: '%s')",
-					desc, i, j, res[i][j], exp[i][j])
+					desc, i, j, arg, exp[i][j])
 				return false
 			}
 		}

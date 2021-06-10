@@ -260,60 +260,59 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 	for ; bldLayerIdx < nextLayerIdx; bldLayerIdx++ {
 
 		layer := &ws.Environment.Layers[bldLayerIdx]
-		for _, cmdgrp := range layer.Commands {
+		for _, command := range layer.Commands {
 
-			for _, cmdline := range cmdgrp.Cmdlines {
+			args, err := expandLine(command.Args, vars)
+			if err != nil {
+				runCtr.Delete() // ignore error
+				return err
+			}
 
-				args, err := expandLine(cmdline, vars)
-				if err != nil {
-					runCtr.Delete() // ignore error
-					return err
-				}
+			if len(args) == 0 {
+				continue
+			}
 
-				if len(args) == 0 {
-					continue
+			if progress != nil {
+				lineOut := "Executing: " + strings.Join(args, " ")
+				if len(lineOut) > MaxProgressOutputLength {
+					lineOut = lineOut[:MaxProgressOutputLength-4] + " ..."
 				}
+				layerStatus[bldLayerIdx].Status = runtime.StatusRunning
+				layerStatus[bldLayerIdx].Details = lineOut
+				stat := []runtime.ProgressStatus{layerStatus[bldLayerIdx]}
+				progress <- stat
+			}
 
-				if progress != nil {
-					lineOut := "Executing: " + strings.Join(args, " ")
-					if len(lineOut) > MaxProgressOutputLength {
-						lineOut = lineOut[:MaxProgressOutputLength-4] + " ..."
-					}
-					layerStatus[bldLayerIdx].Status = runtime.StatusRunning
-					layerStatus[bldLayerIdx].Details = lineOut
-					stat := []runtime.ProgressStatus{layerStatus[bldLayerIdx]}
-					progress <- stat
-				}
+			procSpec.Args = args
+			procSpec.User.UID = user.BuildUID
+			procSpec.User.GID = user.BuildGID
+			process, err := runCtr.Exec(stream, &procSpec)
+			if err != nil {
+				runCtr.Delete()
+				return err
+			}
 
-				procSpec.Args = args
-				procSpec.User.UID = user.BuildUID
-				procSpec.User.GID = user.BuildGID
-				process, err := runCtr.Exec(stream, &procSpec)
-				if err != nil {
-					runCtr.Delete()
-					return err
+			c, err := process.Wait()
+			if err == nil {
+				exitStatus := <-c
+				err = exitStatus.Error
+				code := exitStatus.Code
+				if code != 0 {
+					err = errdefs.CommandFailed(args)
 				}
-
-				c, err := process.Wait()
-				if err == nil {
-					exitStatus := <-c
-					err = exitStatus.Error
-					code := exitStatus.Code
-					if code != 0 {
-						err = errdefs.CommandFailed(args)
-					}
-				}
-				if err != nil {
-					runCtr.Purge() // ignore error
-					return err
-				}
+			}
+			if err != nil {
+				runCtr.Purge() // ignore error
+				return err
 			}
 		}
 
 		// create a snapshot for the layer
 		layer.Digest = ""
 		snap, err := runCtr.Snapshot()
-		if err != nil && !errors.Is(err, errdefs.ErrNotImplemented) {
+		if err != nil &&
+			!errors.Is(err, errdefs.ErrNotImplemented) &&
+			!errors.Is(err, errdefs.ErrAlreadyExists) {
 			runCtr.Delete()
 			return err
 		}

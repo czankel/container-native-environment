@@ -13,47 +13,51 @@ import (
 	"time"
 
 	"github.com/czankel/cne/errdefs"
+	"github.com/czankel/cne/project"
 	"github.com/czankel/cne/runtime"
 )
 
 // scanLine splits up commands separated by a ',' into multiple command lines
-func scanLine(line string) [][]string {
+func scanLine(line string) []project.Command {
 
 	line = strings.TrimSpace(line)
 	if len(line) == 0 {
-		return [][]string{}
+		return []project.Command{}
 	}
 
-	var cmdLines [][]string
+	var commands []project.Command
 	for {
 		pos := strings.IndexAny(line, ",")
 		if pos != -1 {
 			if pos > 0 {
-				cmdLines = append(cmdLines, []string{strings.TrimSpace(line[:pos])})
+				commands = append(commands, project.Command{
+					"",
+					[]string{strings.TrimSpace(line[:pos])},
+				})
 			}
 			line = strings.TrimSpace(line[pos+1:])
 		} else {
-			cmdLines = append(cmdLines, []string{line})
+			commands = append(commands, project.Command{"", []string{line}})
 			break
 		}
 	}
 
-	return cmdLines
+	return commands
 }
 
 // readCommands reads commands from the io.Reader into a slice of strings
-func readCommands(reader io.Reader) ([]string, error) {
+func readCommands(reader io.Reader) ([]project.Command, error) {
 
-	var cmdLines []string
+	var commands []project.Command
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		cmdLines = append(cmdLines, line)
+		commands = append(commands, project.Command{"", []string{line}})
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, errdefs.InvalidArgument("unable to read line: %v", err)
 	}
-	return cmdLines, nil
+	return commands, nil
 }
 
 // sizeToSIString converts the provide integer value to a SI size string from the 10^3x exponent

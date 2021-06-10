@@ -89,14 +89,14 @@ type Layer struct {
 	Name     string // Unique name for the layer in the workspace; must not contain '/'
 	Type     string // one of the system layer types or custom layer
 	Digest   string `output:"-"` // Images/Snaps for faster rebuilds
-	Commands []CommandGroup
+	Commands []Command
 }
 
 // Command describes the command and its argument(s).
 // The Name is optional and used by support functions to manage the command list.
-type CommandGroup struct {
-	Name     string
-	Cmdlines [][]string `output:"flat" yaml:",flow"`
+type Command struct {
+	Name string
+	Args []string `output:"flat" yaml:",flow"`
 }
 
 // NewProject returns an empty new project.

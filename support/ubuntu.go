@@ -14,9 +14,9 @@ func UbuntuCreateOSLayer(ws *project.Workspace, atIndex int) error {
 		return err
 	}
 
-	osLayer.Commands = []project.CommandGroup{{
-		"User",
-		[][]string{{
+	osLayer.Commands = []project.Command{{
+		Name: "ubuntu-user",
+		Args: []string{
 			"adduser",
 			"--system",
 			"--home", "{{.User.HomeDir}}",
@@ -25,7 +25,7 @@ func UbuntuCreateOSLayer(ws *project.Workspace, atIndex int) error {
 			"--group",
 			"{{.User.Username}}",
 		}},
-	}}
+	}
 
 	return nil
 }
