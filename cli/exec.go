@@ -108,7 +108,7 @@ func execRunE(cmd *cobra.Command, args []string) error {
 }
 
 func init() {
-	execCmd.Flags().BoolVarP(&execShell, "", "c", false,
+	execCmd.Flags().BoolVarP(&execShell, "shell", "s", false,
 		"Start a shell for the provided commands")
 	rootCmd.AddCommand(execCmd)
 }
