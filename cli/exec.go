@@ -2,6 +2,7 @@ package cli
 
 import (
 	"errors"
+	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -22,6 +23,8 @@ var execCmd = &cobra.Command{
 }
 
 var execShell bool
+var execLayerName string
+var execTestOnly bool
 
 // execCommandsInShell executes the provided commands in a shell.
 func execCommandsInShell(wsName, layerName string, args []string) (int, error) {
@@ -54,18 +57,6 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 		}
 	}
 
-	ctr, err := container.Get(run, ws)
-	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
-		return 0, err
-	}
-	if ctr == nil {
-		ctr, err = buildContainer(run, ws)
-		if err != nil {
-			return 0, err
-		}
-		prj.Write()
-	}
-
 	stream := runtime.Stream{
 		Stdin:    os.Stdin,
 		Stdout:   os.Stdout,
@@ -80,12 +71,73 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 	winSz, _ := con.Size()
 	con.Resize(winSz)
 
-	code, err := ctr.Exec(&user, stream, args)
-	if err != nil && errors.Is(err, errdefs.ErrNotFound) {
-		return 0, errors.New(args[0] + ": no such command")
-	}
-	if err != nil {
-		return int(code), nil
+	if execLayerName == "" {
+
+		ctr, err := container.Get(run, ws)
+		if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
+			return 0, err
+		}
+		if ctr == nil {
+			ctr, err = buildContainer(run, ws)
+			if err != nil {
+				return 0, err
+			}
+			prj.Write()
+		}
+
+		code, err := ctr.Exec(&user, stream, args)
+		if err != nil && errors.Is(err, errdefs.ErrNotFound) {
+			return 0, errors.New(args[0] + ": no such command")
+		}
+		if err != nil {
+			return int(code), nil
+		}
+
+	} else {
+
+		layerIdx, layer := ws.FindLayer(execLayerName)
+		if layer == nil {
+			return 0, errdefs.InvalidArgument("No such layer: %s", execLayerName)
+		}
+
+		ctr, err := createContainer(run, ws)
+		fmt.Printf("D %v\n", err)
+		if err != nil {
+			return 0, err
+		}
+
+		// build all layers including the destinationlayer (i.e. + 1)
+		err = buildLayers(run, ctr, ws, layerIdx+1)
+		fmt.Printf("E %v\n", err)
+		if err != nil {
+			return 0, err
+		}
+		fmt.Printf("A\n")
+		code, err := ctr.BuildExec(&user, stream, args)
+		fmt.Printf("B %v\n", err)
+		if err != nil {
+			return 0, err
+		}
+		if code != 0 {
+			return int(code), nil
+		}
+
+		if !execTestOnly {
+
+			layer.Commands = append(layer.Commands, project.Command{"", args})
+
+			err = ctr.Amend(ws, layerIdx)
+			if err != nil && !errors.Is(err, errdefs.ErrAlreadyExists) {
+				ctr.Delete() // delete the container and active snapshot
+				return 0, err
+			}
+
+			err = prj.Write()
+			if err != nil {
+				ctr.Delete() // delete the container and active snapshot
+				return 0, err
+			}
+		}
 	}
 
 	return 0, nil
@@ -110,5 +162,9 @@ func execRunE(cmd *cobra.Command, args []string) error {
 func init() {
 	execCmd.Flags().BoolVarP(&execShell, "shell", "s", false,
 		"Start a shell for the provided commands")
+	execCmd.Flags().StringVarP(&execLayerName, "layer", "l", "",
+		"Execute a command in this layer to rebuild the layer and amend the project")
+	execCmd.Flags().BoolVar(&execTestOnly, "test-only", false,
+		"Don't amend the layer")
 	rootCmd.AddCommand(execCmd)
 }
