@@ -23,6 +23,18 @@ import (
 
 const MaxProgressOutputLength = 80
 
+type ContainerInterface interface {
+	Create() error
+	Delete() error
+	Purge() error
+	Build(ws *project.Workspace, nextLayerIdx int,
+		user *config.User, params *config.Parameters,
+		progress chan []runtime.ProgressStatus, stream runtime.Stream) error
+	BuildExec(user *config.User, stream runtime.Stream, cmd []string) (uint32, error)
+	Amend(ws *project.Workspace, bldLayerIdx int) error
+	Commit(ws *project.Workspace, user config.User, rootPath string) error
+}
+
 type Container struct {
 	runRuntime   runtime.Runtime   `output:"-"`
 	runContainer runtime.Container `output:"-"`
