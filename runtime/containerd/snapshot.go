@@ -72,7 +72,10 @@ func getSnapshots(ctrdRun *containerdRuntime) ([]runtime.Snapshot, error) {
 		snaps = append(snaps, &snapshot{ctrdRuntime: ctrdRun, info: info})
 		return nil
 	})
-	return snaps, err
+	if err != nil {
+		return snaps, runtime.Errorf("failed to get snapshots: %v", err)
+	}
+	return snaps, nil
 }
 
 // getSnapshot returns the requested snapshot
@@ -85,7 +88,7 @@ func getSnapshot(ctrdRun *containerdRuntime, snapName string) (runtime.Snapshot,
 	if err != nil && ctrderr.IsNotFound(err) {
 		return nil, errdefs.NotFound("snapshot", snapName)
 	} else if err != nil {
-		return nil, err
+		return nil, runtime.Errorf("failed to get snapshot: %v", err)
 	}
 
 	return &snapshot{ctrdRuntime: ctrdRun, info: info}, nil
@@ -121,12 +124,12 @@ func commitSnapshot(ctrdRun *containerdRuntime,
 
 	snapMnts, err := snapSvc.Mounts(ctrdCtx, snap.Name())
 	if err != nil {
-		return nil, err
+		return nil, runtime.Errorf("failed to mount snapshot: %v", err)
 	}
 
 	desc, err := diffSvc.Compare(ctrdCtx, parentMnts, snapMnts)
 	if err != nil {
-		return nil, err
+		return nil, runtime.Errorf("failed to create diff between snapshots: %v", err)
 	}
 	digest := desc.Digest.String()
 
@@ -146,13 +149,13 @@ func commitSnapshot(ctrdRun *containerdRuntime,
 
 		amendMnts, err := snapSvc.Prepare(ctrdCtx, amendName+"-amend", amendName)
 		if err != nil {
-			return nil, err
+			return nil, runtime.Errorf("failed to create temporary snapshot: %v", err)
 		}
 
 		desc, err = diffSvc.Apply(ctrdCtx, desc, amendMnts)
 		if err != nil {
 			snapSvc.Remove(ctrdCtx, amendName+"-amend")
-			return nil, err
+			return nil, runtime.Errorf("failed to apply snapshot: %v", err)
 		}
 
 		digest = desc.Digest.String()
@@ -160,7 +163,7 @@ func commitSnapshot(ctrdRun *containerdRuntime,
 			snapshots.WithLabels(labels))
 		if err != nil {
 			snapSvc.Remove(ctrdCtx, amendName+"-amend")
-			return nil, err
+			return nil, runtime.Errorf("failed to commit snapshot: %v", err)
 		}
 
 		// TODO: log a warning on errors for these
@@ -170,8 +173,11 @@ func commitSnapshot(ctrdRun *containerdRuntime,
 	} else {
 
 		err = snapSvc.Commit(ctrdCtx, digest, activeSnapName, snapshots.WithLabels(labels))
+		if err != nil && ctrderr.IsAlreadyExists(err) {
+			return nil, errdefs.AlreadyExists("snapshot", digest)
+		}
 		if err != nil {
-			return nil, err
+			return nil, runtime.Errorf("failed to commit snapshot: %v", err)
 		}
 	}
 
@@ -190,8 +196,11 @@ func createSnapshot(ctrdRun *containerdRuntime,
 
 	// check if the snapshot already exists, take mutable flag into account
 	info, err := snapSvc.Stat(ctrdCtx, snapName)
+	if err != nil && ctrderr.IsAlreadyExists(err) {
+		return nil, nil, errdefs.AlreadyExists("snapshot", snapName)
+	}
 	if err != nil && !ctrderr.IsNotFound(err) {
-		return nil, nil, err
+		return nil, nil, runtime.Errorf("failed to create snapshot: %v", err)
 	}
 	if err == nil && (info.Kind == snapshots.KindActive && mutable ||
 		info.Kind == snapshots.KindView && !mutable) {
@@ -352,7 +361,7 @@ func deleteContainerSnapshots(ctrdRun *containerdRuntime, domain, id [16]byte) e
 		return nil
 	})
 	if err != nil {
-		return err
+		return runtime.Errorf("failed to get snapshot list: %v", err)
 	}
 
 	for refC := 0; refC == 0; {
@@ -365,7 +374,7 @@ func deleteContainerSnapshots(ctrdRun *containerdRuntime, domain, id [16]byte) e
 
 		err = snapSvc.Remove(ctrdRun.context, snapName)
 		if err != nil && !ctrderr.IsNotFound(err) {
-			return err
+			return runtime.Errorf("failed to remove snapshot: %v", err)
 		}
 
 		if parent == "" {
@@ -404,7 +413,7 @@ func (snap *snapshot) Size() (int64, error) {
 	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
 	usage, err := snapSvc.Usage(ctrdCtx, snap.Name())
 	if err != nil {
-		return -1, err
+		return -1, runtime.Errorf("failed to get snapshot usage: %v", err)
 	}
 	return usage.Size, nil
 }
@@ -417,7 +426,7 @@ func (snap *snapshot) Inodes() (int64, error) {
 	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
 	usage, err := snapSvc.Usage(ctrdCtx, snap.Name())
 	if err != nil {
-		return -1, err
+		return -1, runtime.Errorf("failed to get snapshot inodex: %v", err)
 	}
 	return usage.Inodes, nil
 }
