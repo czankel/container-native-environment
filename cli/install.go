@@ -72,10 +72,10 @@ func installAptRunE(cmd *cobra.Command, args []string) error {
 	con.Resize(winSz)
 
 	stream := runtime.Stream{
-		// keep Stdin empty
+		Stdin:    os.Stdin,
 		Stdout:   os.Stdout,
 		Stderr:   os.Stderr,
-		Terminal: false,
+		Terminal: true,
 	}
 
 	code, err := support.AptInstall(ws, aptLayerIdx, user, ctr, stream, installAptUpdate, args)
