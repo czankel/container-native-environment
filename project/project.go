@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strconv"
@@ -56,7 +57,7 @@ type Project struct {
 	UUID                 string // Universal Unique id for the project
 	CurrentWorkspaceName string
 	Workspaces           []Workspace
-	path                 string
+	path                 string // path for the project (excluding "/cneproject")
 	instanceID           uint64
 	modifiedAt           time.Time
 }
@@ -102,6 +103,10 @@ type Command struct {
 // NewProject returns an empty new project.
 func NewProject(name, path string) *Project {
 
+	if path[len(path)-1] == '/' {
+		path = path[:len(path)-1]
+	}
+
 	return &Project{
 		Name: name,
 		UUID: uuid.New().String(),
@@ -119,17 +124,17 @@ func Create(name, path string) (*Project, error) {
 		if err != nil {
 			return nil, errdefs.SystemError(err, "failed to get work directory")
 		}
-	} else if path[len(path)-1] != '/' {
-		path = path + "/"
+	} else if path[len(path)-1] == '/' {
+		path = path[:len(path)-1]
 	}
 
 	prj := NewProject(name, path)
 
 	flags := os.O_RDONLY | os.O_CREATE | os.O_EXCL | os.O_SYNC
-	file, err := os.OpenFile(path+projectFileName, flags, projectFilePerm)
+	file, err := os.OpenFile(path+"/"+projectFileName, flags, projectFilePerm)
 	if err != nil {
 		return nil, errdefs.SystemError(err,
-			"failed to create project file '%s'", path)
+			"failed to create project file in directory '%s'", path)
 	}
 
 	euid := os.Geteuid()
@@ -138,12 +143,12 @@ func Create(name, path string) (*Project, error) {
 	if euid != uid {
 		if err = file.Chown(uid, gid); err != nil {
 			return nil, errdefs.SystemError(err,
-				"failed to change file permissions '%s'", path)
+				"failed to change file permissions of the project file in '%s'", path)
 		}
 	}
 	file.Close()
 
-	fileInfo, err := os.Stat(path)
+	fileInfo, err := os.Stat(path + "/" + projectFileName)
 	prj.modifiedAt = fileInfo.ModTime()
 
 	stat, ok := fileInfo.Sys().(*syscall.Stat_t)
@@ -161,16 +166,20 @@ func LoadFrom(path string) (*Project, error) {
 	if len(path) == 0 {
 		return nil, errdefs.InvalidArgument("invalid path: '%s'", path)
 	}
-	if path[len(path)-1] != '/' {
-		path = path + "/"
+	if path[len(path)-1] == '/' {
+		path = path[:len(path)-1]
 	}
 
-	str, err := ioutil.ReadFile(path + projectFileName)
-	if os.IsNotExist(err) {
-		return nil, errdefs.NotFound("project", path)
-	}
-	if err != nil {
-		return nil, errdefs.SystemError(err, "failed to read project file '%s'", path)
+	str, err := ioutil.ReadFile(path + "/" + projectFileName)
+	for err != nil {
+		if err != nil && !os.IsNotExist(err) {
+			return nil, errdefs.SystemError(err, "failed to read project file '%s'", path)
+		}
+		if path == "/" || path == "." {
+			return nil, errdefs.NotFound("project", path)
+		}
+		path = filepath.Dir(path)
+		str, err = ioutil.ReadFile(path + "/" + projectFileName)
 	}
 
 	var header Header
@@ -185,7 +194,7 @@ func LoadFrom(path string) (*Project, error) {
 		return nil, errdefs.InvalidArgument("project file corrupt: %v", err)
 	}
 
-	fileInfo, err := os.Stat(path)
+	fileInfo, err := os.Stat(path + "/" + projectFileName)
 	prj.path = path
 	prj.modifiedAt = fileInfo.ModTime()
 	stat, ok := fileInfo.Sys().(*syscall.Stat_t)
@@ -228,7 +237,7 @@ func (prj *Project) Write() error {
 		return errdefs.InvalidArgument("project file corrupt")
 	}
 
-	err = ioutil.WriteFile(prj.path+projectFileName, append(hStr, pStr...), projectFilePerm)
+	err = ioutil.WriteFile(prj.path+"/"+projectFileName, append(hStr, pStr...), projectFilePerm)
 	if err != nil {
 		return errdefs.SystemError(err, "failed to write project")
 	}
