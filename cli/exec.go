@@ -2,7 +2,6 @@ package cli
 
 import (
 	"errors"
-	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -63,6 +62,7 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 		Stderr:   os.Stderr,
 		Terminal: true,
 	}
+
 	con := console.Current()
 	defer con.Reset()
 
@@ -101,20 +101,16 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 		}
 
 		ctr, err := createContainer(run, ws)
-		fmt.Printf("D %v\n", err)
 		if err != nil {
 			return 0, err
 		}
 
 		// build all layers including the destinationlayer (i.e. + 1)
 		err = buildLayers(run, ctr, ws, layerIdx+1)
-		fmt.Printf("E %v\n", err)
 		if err != nil {
 			return 0, err
 		}
-		fmt.Printf("A\n")
 		code, err := ctr.BuildExec(&user, stream, args)
-		fmt.Printf("B %v\n", err)
 		if err != nil {
 			return 0, err
 		}
