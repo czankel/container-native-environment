@@ -93,7 +93,7 @@ func listImagesRunE(cmd *cobra.Command, args []string) error {
 		imgList[i].CreatedAt = timeToAgoString(img.CreatedAt())
 		imgList[i].Size = sizeToSIString(img.Size())
 	}
-	printList(imgList)
+	printList(imgList, false)
 
 	return nil
 }
@@ -134,7 +134,7 @@ func listSnapshotsRunE(cmd *cobra.Command, args []string) error {
 		snapList[i].Size, _ = snap.Size()
 		snapList[i].Inodes, _ = snap.Inodes()
 	}
-	printList(snapList)
+	printList(snapList, false)
 
 	return nil
 }
@@ -175,7 +175,7 @@ func listContainersRunE(cmd *cobra.Command, args []string) error {
 		ctrList[i].CreatedAt = timeToAgoString(c.CreatedAt)
 	}
 
-	printList(ctrList)
+	printList(ctrList, false)
 
 	return nil
 }

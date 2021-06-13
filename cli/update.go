@@ -96,7 +96,7 @@ func updateConfigRunE(cmd *cobra.Command, args []string) error {
 		Configuration string
 		Value         string
 		Old           string
-	}{{path, newVal, oldVal}})
+	}{{path, newVal, oldVal}}, false)
 	return nil
 }
 

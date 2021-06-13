@@ -200,7 +200,7 @@ ValueAA ValueAB ValueAC
 ValueBA ValueBB ValueBC
 `
 	errPos, out := compareFuncOutput(
-		func() { printList(testList) }, expected)
+		func() { printList(testList, false) }, expected)
 	if errPos != -1 {
 		t.Errorf("Failed to print simple structure with prefix (pos %d)", errPos)
 		t.Errorf("\n" + out)

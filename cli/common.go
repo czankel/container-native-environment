@@ -201,7 +201,7 @@ func printValue(fieldHdr string, valueHdr string, prefix string, value interface
 }
 
 // printList prints a slice of structures using the field names as the header
-func printList(list interface{}) {
+func printList(list interface{}, withIndex bool) {
 
 	if reflect.TypeOf(list).Kind() != reflect.Slice {
 		panic("provided argument must be of the type: slice")
@@ -213,6 +213,10 @@ func printList(list interface{}) {
 	w := new(tabwriter.Writer)
 	w.Init(os.Stdout, 8, 0, 1, ' ', 0)
 	defer w.Flush()
+
+	if withIndex {
+		fmt.Fprintf(w, "INDEX\t")
+	}
 
 	format := "%s"
 	hdr := reflect.TypeOf(list).Elem()
@@ -226,6 +230,10 @@ func printList(list interface{}) {
 
 	items := reflect.ValueOf(list)
 	for i := 0; i < items.Len(); i++ {
+
+		if withIndex {
+			fmt.Fprintf(w, "%d\t", i)
+		}
 		format = "%v"
 		item := items.Index(i)
 		for j := 0; j < item.NumField(); j++ {
