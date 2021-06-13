@@ -1,15 +1,53 @@
 package cli
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/container"
+	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/project"
 	"github.com/czankel/cne/runtime"
 )
+
+func getLayer(prj *project.Project,
+	wsName, layerName string) (*project.Workspace, *project.Layer, error) {
+
+	var ws *project.Workspace
+	var err error
+	if wsName != "" {
+		ws, err = prj.Workspace(wsName)
+	} else {
+		ws, err = prj.CurrentWorkspace()
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if len(ws.Environment.Layers) == 0 {
+		return nil, nil, errdefs.InvalidArgument("No layers in workspace")
+	}
+
+	index := len(ws.Environment.Layers) - 1
+	if layerName != "" {
+		index, _ = ws.FindLayer(layerName)
+		if index == -1 {
+			index, err = strconv.Atoi(layerName)
+			if err != nil {
+				return nil, nil,
+					errdefs.InvalidArgument("No such layer: %s", layerName)
+			}
+			if index < 0 || index > len(ws.Environment.Layers)-1 {
+				return nil, nil,
+					errdefs.InvalidArgument("Layer index %d out of range", index)
+			}
+		}
+	}
+	return ws, &ws.Environment.Layers[index], nil
+}
 
 var listCmd = &cobra.Command{
 	Use:     "list",
@@ -27,7 +65,7 @@ var listRuntimeCmd = &cobra.Command{
 }
 
 func listRuntimeRunE(cmd *cobra.Command, args []string) error {
-	printValue("Index", "Runtime", "", runtime.Runtimes())
+	printList(runtime.Runtimes(), false)
 	return nil
 }
 
@@ -180,10 +218,44 @@ func listContainersRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+var listCommandsCmd = &cobra.Command{
+	Use:     "commands [NAME]",
+	Short:   "List all commands",
+	Aliases: []string{"command", "cmd"},
+	RunE:    listCommandsRunE,
+	Args:    cobra.NoArgs,
+}
+
+var listCommandsWorkspace string
+var listCommandsLayer string
+
+func listCommandsRunE(cmd *cobra.Command, args []string) error {
+
+	prj, err := project.Load()
+	if err != nil {
+		return err
+	}
+
+	_, layer, err := getLayer(prj, listCommandsWorkspace, listCommandsLayer)
+	if err != nil {
+		return err
+	}
+
+	printList(layer.Commands, true)
+
+	return nil
+}
+
 func init() {
 	rootCmd.AddCommand(listCmd)
 	listCmd.AddCommand(listRuntimeCmd)
 	listCmd.AddCommand(listImagesCmd)
 	listCmd.AddCommand(listContainersCmd)
 	listCmd.AddCommand(listSnapshotsCmd)
+	listCmd.AddCommand(listCommandsCmd)
+	listCommandsCmd.Flags().StringVarP(
+		&listCommandsWorkspace, "workspace", "w", "", "Name of the workspace")
+	listCommandsCmd.Flags().StringVarP(
+		&listCommandsLayer, "layer", "l", "", "Name or index of the layer")
+
 }

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"errors"
+	"strconv"
 
 	"github.com/spf13/cobra"
 
@@ -167,10 +168,77 @@ func deleteContainerRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+var deleteCommandCmd = &cobra.Command{
+	Use:     "command INDEX|NAME",
+	Short:   "delete commands",
+	Aliases: []string{"cmd"},
+	Args:    cobra.ExactArgs(1),
+	RunE:    deleteCommandRunE,
+}
+
+var deleteCommandWorkspace string
+var deleteCommandLayer string
+
+func deleteCommandRunE(cmd *cobra.Command, args []string) error {
+
+	prj, err := project.Load()
+	if err != nil {
+		return err
+	}
+
+	var ws *project.Workspace
+	if deleteCommandWorkspace != "" {
+		ws, err = prj.Workspace(deleteCommandWorkspace)
+	} else {
+		ws, err = prj.CurrentWorkspace()
+	}
+	if err != nil {
+		return err
+	}
+
+	if len(ws.Environment.Layers) == 0 {
+		return errdefs.InvalidArgument("No layers in workspace")
+	}
+
+	layer := &ws.Environment.Layers[len(ws.Environment.Layers)-1]
+	if deleteCommandLayer != "" {
+		_, layer = ws.FindLayer(deleteCommandLayer)
+		if layer == nil {
+			return errdefs.InvalidArgument("No such layer: %s", deleteCommandLayer)
+		}
+	}
+
+	index := -1
+	if index, err = strconv.Atoi(args[0]); err != nil {
+		for i, c := range layer.Commands {
+			if args[0] == c.Name {
+				index = i
+				break
+			}
+		}
+		if index == -1 {
+			return errdefs.InvalidArgument("No commands for name: %s", args[0])
+		}
+	}
+	if index >= len(layer.Commands) {
+		return errdefs.InvalidArgument("Index out of range: %d", index)
+	}
+
+	layer.Commands = append(layer.Commands[:index], layer.Commands[index+1:]...)
+
+	ws.UpdateLayer(layer)
+	return prj.Write()
+}
+
 func init() {
 	rootCmd.AddCommand(deleteCmd)
 	deleteCmd.AddCommand(deleteImageCmd)
 	deleteCmd.AddCommand(deleteWorkspaceCmd)
 	deleteCmd.AddCommand(deleteLayerCmd)
 	deleteCmd.AddCommand(deleteContainerCmd)
+	deleteCmd.AddCommand(deleteCommandCmd)
+	deleteCommandCmd.Flags().StringVarP(
+		&deleteCommandWorkspace, "workspace", "w", "", "Name of the workspace")
+	deleteCommandCmd.Flags().StringVarP(
+		&deleteCommandLayer, "layer", "l", "", "Name or index of the layer")
 }
