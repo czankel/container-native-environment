@@ -82,6 +82,9 @@ type Image interface {
 	// Digest returns the digest of the image.
 	Digest() digest.Digest
 
+	// RootFS returns the digests of the root fs the image consists of.
+	RootFS() ([]digest.Digest, error)
+
 	// CreatedAt returns the data the image was created.
 	CreatedAt() time.Time
 

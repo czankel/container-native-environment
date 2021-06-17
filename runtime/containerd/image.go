@@ -170,6 +170,16 @@ func (img *image) Digest() digest.Digest {
 	return imgConf.Digest
 }
 
+func (img *image) RootFS() ([]digest.Digest, error) {
+
+	rootFs, err := img.ctrdImage.RootFS(img.ctrdRuntime.context)
+	if err != nil {
+		return nil, runtime.Errorf("failed to get image rootfs %v", err)
+	}
+
+	return rootFs, nil
+}
+
 func (img *image) Name() string {
 	return img.ctrdImage.Name()
 }

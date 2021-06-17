@@ -150,14 +150,26 @@ func showImageRunE(cmd *cobra.Command, args []string) error {
 		fullName = info.FullName
 	}
 
+	rootfs := []string{}
+	imgRootFS, err := img.RootFS()
+	if err != nil {
+		return err
+	}
+
+	for _, r := range imgRootFS {
+		rootfs = append(rootfs, r.String())
+	}
+
 	image := struct {
-		Name string
-		Size int64
-		OS   string
+		Name   string
+		Size   int64
+		OS     string
+		RootFS []string
 	}{
-		Name: img.Name(),
-		Size: img.Size(),
-		OS:   fullName,
+		Name:   img.Name(),
+		Size:   img.Size(),
+		OS:     fullName,
+		RootFS: rootfs,
 	}
 
 	printValue("Field", "Value", "", image)
