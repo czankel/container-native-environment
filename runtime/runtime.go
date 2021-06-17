@@ -52,7 +52,7 @@ type Runtime interface {
 	Snapshots() ([]Snapshot, error)
 
 	// Containers returns all containers in the specified domain.
-	Containers(domain [16]byte) ([]Container, error)
+	Containers(filters ...interface{}) ([]Container, error)
 
 	// GetContainer looks up and returns the specified container by domain, id, and generation.
 	// It returns ErrNotFound if the container could not be found.

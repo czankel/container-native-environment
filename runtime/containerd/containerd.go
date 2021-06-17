@@ -224,8 +224,8 @@ func (ctrdRun *containerdRuntime) Snapshots() ([]runtime.Snapshot, error) {
 	return getSnapshots(ctrdRun)
 }
 
-func (ctrdRun *containerdRuntime) Containers(domain [16]byte) ([]runtime.Container, error) {
-	return getContainers(ctrdRun, domain)
+func (ctrdRun *containerdRuntime) Containers(filters ...interface{}) ([]runtime.Container, error) {
+	return getContainers(ctrdRun, filters...)
 }
 
 func (ctrdRun *containerdRuntime) GetContainer(

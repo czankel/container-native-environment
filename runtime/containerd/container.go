@@ -94,22 +94,37 @@ func getGenerationString(ctrdRun *containerdRuntime, ctrdCtr containerd.Containe
 }
 
 // getContainers returns all containers in the specified domain
-func getContainers(ctrdRun *containerdRuntime, domain [16]byte) ([]runtime.Container, error) {
+func getContainers(ctrdRun *containerdRuntime, filters ...interface{}) ([]runtime.Container, error) {
 
 	var runCtrs []runtime.Container
+
+	hasDomain := false
+	var domain [16]byte
+
+	if len(filters) > 1 {
+		return nil, errdefs.InvalidArgument("too many arguments to get containers")
+	}
+	if len(filters) == 1 {
+		domain, hasDomain = filters[0].([16]byte)
+		if !hasDomain {
+			return nil, errdefs.InvalidArgument("invalid arguments for getting containers")
+		}
+	}
 
 	ctrdCtrs, err := ctrdRun.client.Containers(ctrdRun.context)
 	if err != nil {
 		return nil, runtime.Errorf("failed to get containers: %v", err)
 	}
 
+	// skip containers where we cannot read certain variables
 	for _, c := range ctrdCtrs {
 
 		dom, id, err := splitCtrdID(c.ID())
 		if err != nil {
 			return nil, err
 		}
-		if dom != domain {
+
+		if hasDomain && dom != domain {
 			continue
 		}
 
