@@ -51,6 +51,9 @@ type Runtime interface {
 	// Snapshots returns all snapshots.
 	Snapshots() ([]Snapshot, error)
 
+	// DeleteSnapshot deletes the snapshot
+	DeleteSnapshot(name string) error
+
 	// Containers returns all containers in the specified domain.
 	Containers(filters ...interface{}) ([]Container, error)
 

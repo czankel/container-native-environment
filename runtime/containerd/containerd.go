@@ -224,6 +224,10 @@ func (ctrdRun *containerdRuntime) Snapshots() ([]runtime.Snapshot, error) {
 	return getSnapshots(ctrdRun)
 }
 
+func (ctrdRun *containerdRuntime) DeleteSnapshot(name string) error {
+	return deleteSnapshot(ctrdRun, name)
+}
+
 func (ctrdRun *containerdRuntime) Containers(filters ...interface{}) ([]runtime.Container, error) {
 	return getContainers(ctrdRun, filters...)
 }
