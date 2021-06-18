@@ -72,40 +72,6 @@ func (ctrdRun *containerdRuntime) Namespace() string {
 	return ctrdRun.namespace
 }
 
-func (ctrdRun *containerdRuntime) Domains() ([][16]byte, error) {
-
-	var domains [][16]byte
-
-	ctrdCtrs, err := ctrdRun.client.Containers(ctrdRun.context)
-	if err != nil {
-		return domains, err
-	}
-
-	for _, c := range ctrdCtrs {
-		dom, _, err := splitCtrdID(c.ID())
-		if err != nil {
-			return domains, err
-		}
-		found := false
-		for _, d := range domains {
-			if d == dom {
-				found = true
-				break
-			}
-		}
-		if !found {
-			domains = append(domains, dom)
-		}
-	}
-
-	snapDomains, err := getSnapshotDomains(ctrdRun)
-	if err != nil {
-		return nil, err
-	}
-
-	return append(domains, snapDomains...), nil
-}
-
 func (ctrdRun *containerdRuntime) Close() {
 	ctrdRun.client.Close()
 }

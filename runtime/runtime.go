@@ -24,9 +24,6 @@ type Runtime interface {
 	// Namespace returns the namespace that was used for opening the runtime
 	Namespace() string
 
-	// Domains returns all domains in the namespace
-	Domains() ([][16]byte, error)
-
 	// Close closes the runtime and any open descriptors
 	Close()
 
