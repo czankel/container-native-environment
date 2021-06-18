@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -69,6 +70,34 @@ func listRuntimeRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+var listCommandsCmd = &cobra.Command{
+	Use:     "commands [NAME]",
+	Short:   "List all commands",
+	Aliases: []string{"command", "cmd"},
+	RunE:    listCommandsRunE,
+	Args:    cobra.NoArgs,
+}
+
+var listCommandsWorkspace string
+var listCommandsLayer string
+
+func listCommandsRunE(cmd *cobra.Command, args []string) error {
+
+	prj, err := project.Load()
+	if err != nil {
+		return err
+	}
+
+	_, layer, err := getLayer(prj, listCommandsWorkspace, listCommandsLayer)
+	if err != nil {
+		return err
+	}
+
+	printList(layer.Commands, true)
+
+	return nil
+}
+
 var listImagesCmd = &cobra.Command{
 	Use:     "images",
 	Aliases: []string{"image", "i"},
@@ -100,13 +129,7 @@ func splitRepoNameTag(name string) (string, string) {
 	return dispName, name[tPos+1:]
 }
 
-func listImagesRunE(cmd *cobra.Command, args []string) error {
-
-	run, err := runtime.Open(conf.Runtime)
-	if err != nil {
-		return err
-	}
-	defer run.Close()
+func listImages(run runtime.Runtime) error {
 
 	images, err := run.Images()
 	if err != nil {
@@ -136,6 +159,17 @@ func listImagesRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func listImagesRunE(cmd *cobra.Command, args []string) error {
+
+	run, err := runtime.Open(conf.Runtime)
+	if err != nil {
+		return err
+	}
+	defer run.Close()
+
+	return listImages(run)
+}
+
 var listSnapshotsCmd = &cobra.Command{
 	Use:     "snapshots",
 	Aliases: []string{"snapshot", "s"},
@@ -144,13 +178,7 @@ var listSnapshotsCmd = &cobra.Command{
 	RunE:    listSnapshotsRunE,
 }
 
-func listSnapshotsRunE(cmd *cobra.Command, args []string) error {
-
-	run, err := runtime.Open(conf.Runtime)
-	if err != nil {
-		return err
-	}
-	defer run.Close()
+func listSnapshots(run runtime.Runtime) error {
 
 	snapshots, err := run.Snapshots()
 	if err != nil {
@@ -177,6 +205,17 @@ func listSnapshotsRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func listSnapshotsRunE(cmd *cobra.Command, args []string) error {
+
+	run, err := runtime.Open(conf.Runtime)
+	if err != nil {
+		return err
+	}
+	defer run.Close()
+
+	return listSnapshots(run)
+}
+
 var listContainersCmd = &cobra.Command{
 	Use:     "containers",
 	Aliases: []string{"c"},
@@ -187,22 +226,8 @@ var listContainersCmd = &cobra.Command{
 
 var listContainersAll bool
 
-func listContainersRunE(cmd *cobra.Command, args []string) error {
+func listContainers(run runtime.Runtime, prj *project.Project) error {
 
-	var prj *project.Project
-
-	run, err := runtime.Open(conf.Runtime)
-	if err != nil {
-		return err
-	}
-	defer run.Close()
-
-	if !listContainersAll {
-		prj, err = project.Load()
-		if err != nil {
-			return err
-		}
-	}
 	ctrs, err := container.Containers(run, prj, &user)
 	if err != nil {
 		return err
@@ -225,30 +250,70 @@ func listContainersRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-var listCommandsCmd = &cobra.Command{
-	Use:     "commands [NAME]",
-	Short:   "List all commands",
-	Aliases: []string{"command", "cmd"},
-	RunE:    listCommandsRunE,
-	Args:    cobra.NoArgs,
+func listContainersRunE(cmd *cobra.Command, args []string) error {
+
+	var prj *project.Project
+
+	run, err := runtime.Open(conf.Runtime)
+	if err != nil {
+		return err
+	}
+	defer run.Close()
+
+	if !listContainersAll {
+		prj, err = project.Load()
+		if err != nil {
+			return err
+		}
+	}
+
+	return listContainers(run, prj)
 }
 
-var listCommandsWorkspace string
-var listCommandsLayer string
+var listResourcesCmd = &cobra.Command{
+	Use:     "all",
+	Aliases: []string{"c"},
+	Short:   "list all resources (containers, snapshots, images)",
+	Args:    cobra.NoArgs,
+	RunE:    listResourcesRunE,
+}
 
-func listCommandsRunE(cmd *cobra.Command, args []string) error {
+var listResourcesAll bool
 
-	prj, err := project.Load()
+func listResourcesRunE(cmd *cobra.Command, args []string) error {
+
+	var prj *project.Project
+
+	run, err := runtime.Open(conf.Runtime)
+	if err != nil {
+		return err
+	}
+	defer run.Close()
+
+	if !listResourcesAll {
+		prj, err = project.Load()
+		if err != nil {
+			return err
+		}
+	}
+
+	fmt.Printf("\nIMAGES\n")
+	err = listImages(run)
 	if err != nil {
 		return err
 	}
 
-	_, layer, err := getLayer(prj, listCommandsWorkspace, listCommandsLayer)
+	fmt.Printf("\nCONTAINERS\n")
+	err = listContainers(run, prj)
 	if err != nil {
 		return err
 	}
 
-	printList(layer.Commands, true)
+	fmt.Printf("SNAPSHOTS\n")
+	err = listSnapshots(run)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -258,13 +323,15 @@ func init() {
 	listCmd.AddCommand(listRuntimeCmd)
 	listCmd.AddCommand(listImagesCmd)
 	listCmd.AddCommand(listContainersCmd)
-	listContainersCmd.Flags().BoolVar(
-		&listContainersAll, "all", false, "list containers of all projects")
+	listContainersCmd.Flags().BoolVarP(
+		&listContainersAll, "all", "A", false, "list containers of all projects")
 	listCmd.AddCommand(listSnapshotsCmd)
 	listCmd.AddCommand(listCommandsCmd)
 	listCommandsCmd.Flags().StringVarP(
 		&listCommandsWorkspace, "workspace", "w", "", "Name of the workspace")
 	listCommandsCmd.Flags().StringVarP(
 		&listCommandsLayer, "layer", "l", "", "Name or index of the layer")
-
+	listCmd.AddCommand(listResourcesCmd)
+	listResourcesCmd.Flags().BoolVarP(
+		&listResourcesAll, "all", "A", false, "list resources from all projects")
 }
