@@ -179,18 +179,17 @@ func listSnapshotsRunE(cmd *cobra.Command, args []string) error {
 
 var listContainersCmd = &cobra.Command{
 	Use:     "containers",
-	Aliases: []string{"containers", "c"},
+	Aliases: []string{"c"},
 	Short:   "list containers",
 	Args:    cobra.NoArgs,
 	RunE:    listContainersRunE,
 }
 
+var listContainersAll bool
+
 func listContainersRunE(cmd *cobra.Command, args []string) error {
 
-	prj, err := project.Load()
-	if err != nil {
-		return err
-	}
+	var prj *project.Project
 
 	run, err := runtime.Open(conf.Runtime)
 	if err != nil {
@@ -198,7 +197,13 @@ func listContainersRunE(cmd *cobra.Command, args []string) error {
 	}
 	defer run.Close()
 
-	ctrs, err := container.Containers(run, prj)
+	if !listContainersAll {
+		prj, err = project.Load()
+		if err != nil {
+			return err
+		}
+	}
+	ctrs, err := container.Containers(run, prj, &user)
 	if err != nil {
 		return err
 	}
@@ -206,11 +211,13 @@ func listContainersRunE(cmd *cobra.Command, args []string) error {
 	ctrList := make([]struct {
 		Name      string
 		CreatedAt string
+		UID       uint32
 	}, len(ctrs), len(ctrs))
 
 	for i, c := range ctrs {
 		ctrList[i].Name = c.Name
 		ctrList[i].CreatedAt = timeToAgoString(c.CreatedAt)
+		ctrList[i].UID = c.UID
 	}
 
 	printList(ctrList, false)
@@ -251,6 +258,8 @@ func init() {
 	listCmd.AddCommand(listRuntimeCmd)
 	listCmd.AddCommand(listImagesCmd)
 	listCmd.AddCommand(listContainersCmd)
+	listContainersCmd.Flags().BoolVar(
+		&listContainersAll, "all", false, "list containers of all projects")
 	listCmd.AddCommand(listSnapshotsCmd)
 	listCmd.AddCommand(listCommandsCmd)
 	listCommandsCmd.Flags().StringVarP(

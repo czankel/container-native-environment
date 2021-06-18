@@ -43,6 +43,7 @@ type Container struct {
 	Domain       [16]byte
 	ID           [16]byte
 	Generation   [16]byte
+	UID          uint32
 	CreatedAt    time.Time
 }
 
@@ -66,35 +67,43 @@ func containerNameRunCtr(runCtr runtime.Container) string {
 }
 
 // Containers returns all active containers in the project.
-func Containers(run runtime.Runtime, prj *project.Project) ([]Container, error) {
+func Containers(run runtime.Runtime, prj *project.Project, user *config.User) ([]Container, error) {
 
-	var domains [][16]byte
-
+	var domain [16]byte
+	var err error
 	if prj != nil {
-		dom, err := uuid.Parse(prj.UUID)
+		domain, err = uuid.Parse(prj.UUID)
 		if err != nil {
 			return nil, errdefs.InvalidArgument("invalid project UUID: '%v'", prj.UUID)
 		}
-		domains = [][16]byte{dom}
 	}
 
 	var ctrs []Container
-	for _, dom := range domains {
-		runCtrs, err := run.Containers(dom)
-		if err != nil {
-			return nil, err
+	runCtrs, err := run.Containers()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, c := range runCtrs {
+		dom := c.Domain()
+		if prj != nil && dom != domain {
+			continue
 		}
-		for _, c := range runCtrs {
-			cid := c.ID()
-			ctrs = append(ctrs, Container{
-				runContainer: c,
-				Name:         containerNameRunCtr(c),
-				Domain:       dom,
-				ID:           cid,
-				Generation:   c.Generation(),
-				CreatedAt:    c.CreatedAt(),
-			})
+
+		if !user.IsSudo && c.UID() != user.UID {
+			continue
 		}
+
+		cid := c.ID()
+		ctrs = append(ctrs, Container{
+			runContainer: c,
+			Name:         containerNameRunCtr(c),
+			Domain:       dom,
+			ID:           cid,
+			Generation:   c.Generation(),
+			UID:          c.UID(),
+			CreatedAt:    c.CreatedAt(),
+		})
 	}
 
 	return ctrs, nil
@@ -125,13 +134,14 @@ func Get(run runtime.Runtime, ws *project.Workspace) (*Container, error) {
 		Domain:       runCtr.Domain(),
 		ID:           cid,
 		Generation:   gen,
+		UID:          runCtr.UID(),
 		CreatedAt:    runCtr.CreatedAt(),
 	}, nil
 }
 
 // NewContainer defines a new Container with a default generation value for the Workspace without
 // the Layer configuration. The generation value will be updated through Commit().
-func NewContainer(run runtime.Runtime,
+func NewContainer(run runtime.Runtime, user *config.User,
 	ws *project.Workspace, img runtime.Image) (*Container, error) {
 
 	dom, err := uuid.Parse(ws.ProjectUUID)
@@ -149,7 +159,7 @@ func NewContainer(run runtime.Runtime,
 		return nil, err
 	}
 
-	runCtr, err := run.NewContainer(dom, cid, gen, img, &spec)
+	runCtr, err := run.NewContainer(dom, cid, gen, user.UID, img, &spec)
 	if err != nil {
 		return nil, err
 	}

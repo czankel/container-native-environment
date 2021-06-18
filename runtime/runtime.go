@@ -64,7 +64,7 @@ type Runtime interface {
 	GetContainer(domain, id, generation [16]byte) (Container, error)
 
 	// NewContainer defines a new Container without creating it.
-	NewContainer(domain, id, generation [16]byte,
+	NewContainer(domain, id, generation [16]byte, uid uint32,
 		image Image, spec *runspecs.Spec) (Container, error)
 
 	// DeleteContainer deletes the specified container. It returns ErrNotFound if the container
@@ -138,6 +138,9 @@ type Container interface {
 
 	// Generation returns a value representing the filesystem.
 	Generation() [16]byte
+
+	// Return the User ID
+	UID() uint32
 
 	// SetRootFSssets the rootfs to the provide snapshot.
 	//

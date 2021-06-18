@@ -35,7 +35,7 @@ func createContainer(run runtime.Runtime, ws *project.Workspace) (*container.Con
 		return nil, err
 	}
 
-	ctr, err := container.NewContainer(run, ws, img)
+	ctr, err := container.NewContainer(run, &user, ws, img)
 	if err != nil {
 		return nil, err
 	}

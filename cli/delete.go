@@ -154,7 +154,7 @@ func deleteContainerRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	// delete all containers that match the domain+id
-	ctrs, err := container.Containers(run, prj)
+	ctrs, err := container.Containers(run, prj, &user)
 	if err != nil {
 		return err
 	}

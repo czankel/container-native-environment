@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -28,6 +29,7 @@ type container struct {
 	domain        [16]byte
 	id            [16]byte
 	generation    [16]byte
+	uid           uint32
 	spec          runspecs.Spec
 	image         *image
 	ctrdRuntime   *containerdRuntime
@@ -82,6 +84,21 @@ func getGeneration(ctrdRun *containerdRuntime, ctrdCtr containerd.Container) ([1
 	return gen, nil
 }
 
+func getUID(ctrdRun *containerdRuntime, ctrdCtr containerd.Container) (uint32, error) {
+
+	labels, err := ctrdCtr.Labels(ctrdRun.context)
+	if err != nil {
+		return 0, runtime.Errorf("failed to get uid: %v", err)
+	}
+
+	val := labels[containerdUIDLabel]
+	uid, err := strconv.ParseUint(val, 10, 32)
+	if err != nil {
+		return 0, runtime.Errorf("invalid uid label: '%s'", val)
+	}
+	return uint32(uid), nil
+}
+
 // getGenerationString returns the generation of a containerD Container as a string.
 func getGenerationString(ctrdRun *containerdRuntime, ctrdCtr containerd.Container) string {
 
@@ -130,7 +147,12 @@ func getContainers(ctrdRun *containerdRuntime, filters ...interface{}) ([]runtim
 
 		gen, err := getGeneration(ctrdRun, c)
 		if err != nil {
-			return nil, err
+			continue
+		}
+
+		uid, err := getUID(ctrdRun, c)
+		if err != nil {
+			continue
 		}
 
 		img, err := c.Image(ctrdRun.context)
@@ -143,7 +165,7 @@ func getContainers(ctrdRun *containerdRuntime, filters ...interface{}) ([]runtim
 			return nil, runtime.Errorf("failed to get image spec: %v", err)
 		}
 
-		ctr := newContainer(ctrdRun, c, domain, id, gen, &image{ctrdRun, img}, spec)
+		ctr := newContainer(ctrdRun, c, dom, id, gen, uid, &image{ctrdRun, img}, spec)
 		if err != nil {
 			return nil, err
 		}
@@ -155,12 +177,13 @@ func getContainers(ctrdRun *containerdRuntime, filters ...interface{}) ([]runtim
 
 // newContainer defines a new container without creating it.
 func newContainer(ctrdRun *containerdRuntime, ctrdCtr containerd.Container,
-	domain, id, generation [16]byte, img *image, spec *runspecs.Spec) *container {
+	domain, id, generation [16]byte, uid uint32, img *image, spec *runspecs.Spec) *container {
 
 	return &container{
 		domain:        domain,
 		id:            id,
 		generation:    generation,
+		uid:           uid,
 		image:         img,
 		spec:          *spec,
 		ctrdRuntime:   ctrdRun,
@@ -193,6 +216,11 @@ func getContainer(ctrdRun *containerdRuntime, domain, id, generation [16]byte) (
 		return nil, errdefs.NotFound("container", ctrdID)
 	}
 
+	uid, err := getUID(ctrdRun, ctrdCtr)
+	if err != nil {
+		return nil, err
+	}
+
 	_, err = getActiveSnapshot(ctrdRun, domain, id)
 	if err != nil && errors.Is(err, errdefs.ErrNotFound) {
 		deleteCtrdContainer(ctrdRun, ctrdCtr, domain, id, false /*purge*/) // ignore error
@@ -212,7 +240,7 @@ func getContainer(ctrdRun *containerdRuntime, domain, id, generation [16]byte) (
 		return nil, runtime.Errorf("failed to get image spec: %v", err)
 	}
 
-	ctr := newContainer(ctrdRun, ctrdCtr, domain, id, generation, &image{ctrdRun, img}, spec)
+	ctr := newContainer(ctrdRun, ctrdCtr, domain, id, generation, uid, &image{ctrdRun, img}, spec)
 
 	return ctr, nil
 }
@@ -283,6 +311,10 @@ func (ctr *container) Generation() [16]byte {
 	return ctr.generation
 }
 
+func (ctr *container) UID() uint32 {
+	return ctr.uid
+}
+
 func (ctr *container) CreatedAt() time.Time {
 	// TODO: Container.CreatedAt not yet supported by containerd?
 	return time.Now()
@@ -348,6 +380,7 @@ func (ctr *container) Create() error {
 	uuidName := composeCtrdID(ctr.domain, ctr.id)
 	labels := map[string]string{}
 	labels[containerdGenerationLabel] = gen
+	labels[containerdUIDLabel] = strconv.FormatUint(uint64(ctr.uid), 10)
 
 	ctrdCtr, err = ctrdRun.client.NewContainer(ctrdRun.context, uuidName,
 		containerd.WithImage(ctr.image.ctrdImage),

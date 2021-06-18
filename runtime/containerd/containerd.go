@@ -23,6 +23,7 @@ import (
 )
 
 const containerdGenerationLabel = "CNE-GEN"
+const containerdUIDLabel = "CNE-UID"
 
 // containerdRuntime provides the runtime implementation for the containerd daemon
 // For more information about containerd, see: https://github.com/containerd/containerd
@@ -237,9 +238,9 @@ func (ctrdRun *containerdRuntime) GetContainer(
 	return getContainer(ctrdRun, domain, id, generation)
 }
 
-func (ctrdRun *containerdRuntime) NewContainer(domain, id, generation [16]byte,
+func (ctrdRun *containerdRuntime) NewContainer(domain, id, generation [16]byte, uid uint32,
 	img runtime.Image, spec *runspecs.Spec) (runtime.Container, error) {
-	return newContainer(ctrdRun, nil, domain, id, generation, img.(*image), spec), nil
+	return newContainer(ctrdRun, nil, domain, id, generation, uid, img.(*image), spec), nil
 }
 
 func (ctrdRun *containerdRuntime) DeleteContainer(domain, id, generation [16]byte) error {
