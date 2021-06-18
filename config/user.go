@@ -20,6 +20,7 @@ type User struct {
 	IsSudo    bool
 	IsSuid    bool
 	UID       uint32
+	EUID      uint32
 	GID       uint32
 	HomeDir   string
 	Pwd       string
@@ -27,7 +28,8 @@ type User struct {
 	BuildGID  uint32
 }
 
-// CurrentUser returns a
+// CurrentUser returns information about the current user.
+// Note that for IsSudo, the CNE binary must run as root and SUDO_ envvars must be set.
 func CurrentUser() (User, error) {
 
 	usr, err := user.Current()
@@ -35,14 +37,15 @@ func CurrentUser() (User, error) {
 		return User{}, err
 	}
 
+	euid := os.Geteuid()
 	uid := os.Getuid()
 	gid := os.Getgid()
 
-	isSuid := uid != os.Geteuid()
+	isSuid := uid != euid
 	isSudo := false
 	username := usr.Username
 	sudo_user := os.Getenv("SUDO_USER")
-	if sudo_user != "" {
+	if uid == 0 && sudo_user != "" {
 		isSudo = true
 		username = sudo_user
 		uid, _ = strconv.Atoi(os.Getenv("SUDO_UID"))
@@ -75,6 +78,7 @@ func CurrentUser() (User, error) {
 		Shell:     shell,
 		UID:       uint32(uid),
 		GID:       uint32(gid),
+		EUID:      uint32(euid),
 
 		// TODO: --------------------------------------------------
 		// TODO: running as root inside the container during build!
