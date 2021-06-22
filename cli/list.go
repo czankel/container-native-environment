@@ -297,19 +297,19 @@ func listResourcesRunE(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Printf("\nIMAGES\n")
+	fmt.Printf("\nIMAGES\n------\n")
 	err = listImages(run)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("\nCONTAINERS\n")
+	fmt.Printf("\nCONTAINERS\n----------\n")
 	err = listContainers(run, prj)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("SNAPSHOTS\n")
+	fmt.Printf("\nSNAPSHOTS\n---------\n")
 	err = listSnapshots(run)
 	if err != nil {
 		return err
