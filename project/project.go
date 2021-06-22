@@ -97,6 +97,7 @@ type Layer struct {
 // The Name is optional and used by support functions to manage the command list.
 type Command struct {
 	Name string
+	Envs []string `output:"flat" yaml:",flow"`
 	Args []string `output:"flat" yaml:",flow"`
 }
 

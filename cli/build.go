@@ -16,7 +16,7 @@ import (
 	"github.com/czankel/cne/runtime"
 )
 
-const outputLineLength = 160
+const outputLineLength = 200
 const outputLineCount = 100
 
 // createContainer defines and creates a new container

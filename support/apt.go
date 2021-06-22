@@ -36,10 +36,10 @@ func AptCreateLayer(ws *project.Workspace, atIndex int) error {
 	}
 
 	aptLayer.Commands = []project.Command{{
-		aptLayerCmdUpdate,
-		[]string{"apt", "update"},
+		aptLayerCmdUpdate, []string{}, []string{"apt", "update"},
 	}, {
 		aptLayerCmdUpgrade,
+		[]string{"DEBIAN_FRONTEND=noninteractive"},
 		[]string{
 			"{{if .Environment.Update == auto || " +
 				".Environment.Update == manual && " +
@@ -77,8 +77,12 @@ func AptInstall(ws *project.Workspace, aptLayerIdx int, user config.User,
 	_, cmds := getAptInstallCommand(aptLayer)
 	if cmds == nil {
 		aptInstall := append([]string{"apt", "install", "-y"}, aptNames...)
+
 		aptLayer.Commands = append(aptLayer.Commands,
-			project.Command{aptLayerCmdInstall, aptInstall})
+			project.Command{
+				aptLayerCmdInstall,
+				[]string{"DEBIAN_FRONTEND=noninteractive"},
+				aptInstall})
 		cmds = &aptLayer.Commands[len(aptLayer.Commands)-1]
 	} else {
 		n := aptNames
@@ -100,7 +104,7 @@ func AptInstall(ws *project.Workspace, aptLayerIdx int, user config.User,
 	// try to install the additional packages
 	if aptUpdate {
 		aptUpd := []string{"apt", "update"}
-		code, err := ctr.BuildExec(&user, stream, aptUpd)
+		code, err := ctr.BuildExec(&user, stream, aptUpd, []string{})
 		if err != nil {
 			return 0, err
 		}
@@ -110,7 +114,8 @@ func AptInstall(ws *project.Workspace, aptLayerIdx int, user config.User,
 	}
 
 	args := append([]string{"apt", "install", "-y"}, aptNames...)
-	code, err := ctr.BuildExec(&user, stream, args)
+	code, err := ctr.BuildExec(&user, stream, args, []string{"DEBIAN_FRONTEND=noninteractive"})
+
 	if err != nil {
 		return 0, err
 	}
@@ -158,7 +163,7 @@ func AptRemove(ws *project.Workspace, aptLayerIdx int, user config.User,
 	}
 
 	args := append([]string{"apt", "purge", "-y"}, delNames...)
-	code, err := ctr.BuildExec(&user, stream, args)
+	code, err := ctr.BuildExec(&user, stream, args, []string{"DEBIAN_FRONTEND=noninteractive"})
 	if err != nil {
 		return 0, err
 	}

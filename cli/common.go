@@ -32,12 +32,14 @@ func scanLine(line string) []project.Command {
 			if pos > 0 {
 				commands = append(commands, project.Command{
 					"",
+					[]string{},
 					[]string{strings.TrimSpace(line[:pos])},
 				})
 			}
 			line = strings.TrimSpace(line[pos+1:])
 		} else {
-			commands = append(commands, project.Command{"", []string{line}})
+			commands = append(commands,
+				project.Command{"", []string{}, []string{line}})
 			break
 		}
 	}
@@ -52,7 +54,8 @@ func readCommands(reader io.Reader) ([]project.Command, error) {
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		commands = append(commands, project.Command{"", []string{line}})
+		commands = append(commands,
+			project.Command{"", []string{}, []string{line}})
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, errdefs.InvalidArgument("unable to read line: %v", err)

@@ -33,7 +33,7 @@ type testContainer struct {
 }
 
 func (ctr *testContainer) BuildExec(user *config.User, stream runtime.Stream,
-	cmd []string) (uint32, error) {
+	cmd []string, env []string) (uint32, error) {
 
 	ctr.cmdlines = append(ctr.cmdlines, cmd)
 

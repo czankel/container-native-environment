@@ -110,7 +110,7 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		code, err := ctr.BuildExec(&user, stream, args)
+		code, err := ctr.BuildExec(&user, stream, args, []string{})
 		if err != nil {
 			return 0, err
 		}
@@ -120,7 +120,8 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 
 		if !execTestOnly {
 
-			layer.Commands = append(layer.Commands, project.Command{"", args})
+			layer.Commands = append(layer.Commands,
+				project.Command{"", []string{}, args})
 
 			err = ctr.Amend(ws, layerIdx)
 			if err != nil && !errors.Is(err, errdefs.ErrAlreadyExists) {

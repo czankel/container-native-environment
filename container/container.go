@@ -30,7 +30,8 @@ type ContainerInterface interface {
 	Build(ws *project.Workspace, nextLayerIdx int,
 		user *config.User, params *config.Parameters,
 		progress chan []runtime.ProgressStatus, stream runtime.Stream) error
-	BuildExec(user *config.User, stream runtime.Stream, cmd []string) (uint32, error)
+	BuildExec(user *config.User, stream runtime.Stream,
+		args []string, env []string) (uint32, error)
 	Amend(ws *project.Workspace, bldLayerIdx int) error
 	Commit(ws *project.Workspace, user config.User, rootPath string) error
 }
@@ -278,7 +279,6 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 	}
 
 	// build all remaining layers
-	procSpec := DefaultProcessSpec()
 	for ; bldLayerIdx < nextLayerIdx; bldLayerIdx++ {
 
 		layer := &ws.Environment.Layers[bldLayerIdx]
@@ -305,26 +305,12 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 				progress <- stat
 			}
 
-			procSpec.Args = args
-			procSpec.User.UID = user.BuildUID
-			procSpec.User.GID = user.BuildGID
-			process, err := runCtr.Exec(stream, &procSpec)
+			code, err := ctr.BuildExec(user, stream, args, command.Envs)
+			if code != 0 {
+				err = errdefs.CommandFailed(args)
+			}
 			if err != nil {
 				runCtr.Delete()
-				return err
-			}
-
-			c, err := process.Wait()
-			if err == nil {
-				exitStatus := <-c
-				err = exitStatus.Error
-				code := exitStatus.Code
-				if code != 0 {
-					err = errdefs.CommandFailed(args)
-				}
-			}
-			if err != nil {
-				runCtr.Purge() // ignore error
 				return err
 			}
 		}
@@ -401,13 +387,14 @@ func (ctr *Container) Amend(ws *project.Workspace, bldLayerIdx int) error {
 // It uses the default environment from the calling process.
 // I/O is defined by the provided stream.
 // The container must be started before calling this function
-func (ctr *Container) Exec(user *config.User, stream runtime.Stream, cmd []string) (uint32, error) {
+func (ctr *Container) Exec(user *config.User, stream runtime.Stream, args []string) (uint32, error) {
 
 	procSpec := DefaultProcessSpec()
 	procSpec.Cwd = user.Pwd
 	procSpec.User.UID = user.UID
 	procSpec.User.GID = user.GID
-	procSpec.Args = cmd
+	procSpec.Args = args
+	procSpec.Env = os.Environ()
 
 	// TODO: have a mechanism to permit or disallow sudo, i.e. 'sudo cne'
 	allowSudo := true
@@ -422,12 +409,13 @@ func (ctr *Container) Exec(user *config.User, stream runtime.Stream, cmd []strin
 }
 
 func (ctr *Container) BuildExec(user *config.User, stream runtime.Stream,
-	cmd []string) (uint32, error) {
+	args []string, envs []string) (uint32, error) {
 
 	procSpec := DefaultProcessSpec()
 	procSpec.User.UID = user.BuildUID
 	procSpec.User.GID = user.BuildGID
-	procSpec.Args = cmd
+	procSpec.Args = args
+	procSpec.Env = append(procSpec.Env, envs...)
 	return commonExec(ctr, &procSpec, stream)
 }
 
@@ -435,7 +423,6 @@ func commonExec(ctr *Container, procSpec *specs.Process, stream runtime.Stream) 
 
 	runCtr := ctr.runContainer
 
-	procSpec.Env = os.Environ()
 	procSpec.Terminal = stream.Terminal
 
 	proc, err := runCtr.Exec(stream, procSpec)
