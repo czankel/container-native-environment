@@ -9,15 +9,19 @@ import (
 )
 
 var cleanCmd = &cobra.Command{
-	Use:   "clean",
-	Short: "Clean up all containers and snapshots",
-	Args:  cobra.NoArgs,
-	RunE:  cleanRunE,
+	Use: "clean",
 }
 
-var cleanAll bool
+var cleanProjectCmd = &cobra.Command{
+	Use:   "project",
+	Short: "Clean up all project resources, including images, containers and snapshots",
+	Args:  cobra.NoArgs,
+	RunE:  cleanProjectRunE,
+}
 
-func cleanRunE(cmd *cobra.Command, args []string) error {
+var cleanProjectAll bool
+
+func cleanProjectRunE(cmd *cobra.Command, args []string) error {
 
 	var prj *project.Project
 
@@ -27,7 +31,7 @@ func cleanRunE(cmd *cobra.Command, args []string) error {
 	}
 	defer run.Close()
 
-	if !cleanAll {
+	if !cleanProjectAll {
 		prj, err = project.Load()
 		if err != nil {
 			return err
@@ -94,11 +98,11 @@ func cleanRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
-
 }
 
 func init() {
 	rootCmd.AddCommand(cleanCmd)
-	cleanCmd.Flags().BoolVarP(
-		&cleanAll, "all", "A", false, "list containers of all projects")
+	cleanCmd.AddCommand(cleanProjectCmd)
+	cleanProjectCmd.Flags().BoolVarP(
+		&cleanProjectAll, "all", "A", false, "clean containers of all projects")
 }
