@@ -165,38 +165,50 @@ func Create(name, path string) (*Project, error) {
 func LoadFrom(path string) (*Project, error) {
 
 	if len(path) == 0 {
-		return nil, errdefs.InvalidArgument("invalid path: '%s'", path)
-	}
-	if path[len(path)-1] == '/' {
-		path = path[:len(path)-1]
+		return nil, errdefs.InvalidArgument("invalid project path: '%s'", path)
 	}
 
-	str, err := ioutil.ReadFile(path + "/" + projectFileName)
-	for err != nil {
-		if err != nil && !os.IsNotExist(err) {
-			return nil, errdefs.SystemError(err, "failed to read project file '%s'", path)
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return nil, errdefs.InvalidArgument("invalid project path: '%s' (%v)", path, err)
+	}
+
+	var prjStr []byte
+	if fileInfo.Mode().IsDir() {
+		if path[len(path)-1] != '/' {
+			path = path + "/"
 		}
-		if path == "/" || path == "." {
-			return nil, errdefs.NotFound("project", path)
+		path = path + projectFileName
+
+		prjStr, err = ioutil.ReadFile(path)
+		for err != nil && os.IsNotExist(err) {
+			if path == "/" || path == "." {
+				return nil, errdefs.NotFound("project", path)
+			}
+			path = filepath.Dir(path)
+			prjStr, err = ioutil.ReadFile(path + "/" + projectFileName)
 		}
-		path = filepath.Dir(path)
-		str, err = ioutil.ReadFile(path + "/" + projectFileName)
+	} else {
+		prjStr, err = ioutil.ReadFile(path)
+	}
+	if err != nil {
+		return nil, errdefs.SystemError(err, "failed to read project file '%s'", path)
 	}
 
 	var header Header
-	err = yaml.Unmarshal(str, &header)
+	err = yaml.Unmarshal(prjStr, &header)
 	if err != nil {
 		return nil, errdefs.InvalidArgument("project file corrupt: %v", err)
 	}
 
 	var prj Project
-	err = yaml.Unmarshal(str, &prj)
+	err = yaml.Unmarshal(prjStr, &prj)
 	if err != nil {
 		return nil, errdefs.InvalidArgument("project file corrupt: %v", err)
 	}
 
-	fileInfo, err := os.Stat(path + "/" + projectFileName)
-	prj.path = path
+	fileInfo, err = os.Stat(path)
+	prj.path = filepath.Dir(path)
 	prj.modifiedAt = fileInfo.ModTime()
 	stat, ok := fileInfo.Sys().(*syscall.Stat_t)
 	if ok {
