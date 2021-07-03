@@ -5,7 +5,6 @@ import (
 
 	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/errdefs"
-	"github.com/czankel/cne/project"
 )
 
 var updateCmd = &cobra.Command{
@@ -28,7 +27,7 @@ var updateWorkspaceImage string
 
 func updateWorkspaceRunE(cmd *cobra.Command, args []string) error {
 
-	prj, err := project.Load()
+	prj, err := loadProject()
 	if err != nil {
 		return err
 	}
@@ -112,7 +111,7 @@ var updateProjectWorkspace string
 
 func updateProjectRunE(cmd *cobra.Command, args []string) error {
 
-	prj, err := project.Load()
+	prj, err := loadProject()
 	if err != nil {
 		return err
 	}

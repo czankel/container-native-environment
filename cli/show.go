@@ -73,7 +73,7 @@ var showProjectCmd = &cobra.Command{
 
 func showProjectRunE(cmd *cobra.Command, args []string) error {
 
-	prj, err := project.Load()
+	prj, err := loadProject()
 	if err != nil {
 		return err
 	}
@@ -92,7 +92,7 @@ var showWorkspaceCmd = &cobra.Command{
 
 func showWorkspaceRunE(cmd *cobra.Command, args []string) error {
 
-	prj, err := project.Load()
+	prj, err := loadProject()
 	if err != nil {
 		return err
 	}

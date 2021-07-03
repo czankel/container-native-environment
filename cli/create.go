@@ -34,7 +34,7 @@ var createWorkspaceInsert string
 
 func createWorkspaceRunE(cmd *cobra.Command, args []string) error {
 
-	prj, err := project.Load()
+	prj, err := loadProject()
 	if err != nil {
 		return err
 	}
@@ -92,7 +92,7 @@ var createLayerCmd = &cobra.Command{
 
 func createLayerRunE(cmd *cobra.Command, args []string) error {
 
-	prj, err := project.Load()
+	prj, err := loadProject()
 	if err != nil {
 		return err
 	}

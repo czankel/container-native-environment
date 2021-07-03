@@ -144,7 +144,7 @@ var buildWorkspaceUpgrade string
 
 func buildWorkspaceRunE(cmd *cobra.Command, args []string) error {
 
-	prj, err := project.Load()
+	prj, err := loadProject()
 	if err != nil {
 		return err
 	}

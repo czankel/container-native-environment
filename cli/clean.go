@@ -32,7 +32,7 @@ func cleanProjectRunE(cmd *cobra.Command, args []string) error {
 	defer run.Close()
 
 	if !cleanProjectAll {
-		prj, err = project.Load()
+		prj, err = loadProject()
 		if err != nil {
 			return err
 		}

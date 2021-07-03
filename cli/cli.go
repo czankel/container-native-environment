@@ -10,6 +10,7 @@ import (
 
 	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/errdefs"
+	"github.com/czankel/cne/project"
 )
 
 var conf *config.Config
@@ -18,6 +19,24 @@ var params config.Parameters
 
 var basenamee string
 var rootCneVersion bool
+
+var projectPath string
+
+// helper function to load the project
+func loadProject() (*project.Project, error) {
+
+	if projectPath == "" {
+		var err error
+		projectPath, err = os.Getwd()
+		if err != nil {
+			return nil, errdefs.SystemError(err,
+				"failed to load project file in '%s'",
+				projectPath)
+		}
+	}
+
+	return project.LoadFrom(projectPath)
+}
 
 var rootCmd = &cobra.Command{
 	SilenceErrors: true,
@@ -59,6 +78,8 @@ func init() {
 	rootCmd.Use = filepath.Base(os.Args[0])
 	rootCmd.Flags().BoolVar(
 		&rootCneVersion, "version", false, "Get version information")
+	rootCmd.PersistentFlags().StringVarP(
+		&projectPath, "project", "P", "", "Projet path")
 	rootCmd.AddCommand(rootVersionCmd)
 	cobra.OnInitialize(initConfig)
 }

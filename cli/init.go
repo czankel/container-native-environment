@@ -37,7 +37,7 @@ func initProjectRunE(cmd *cobra.Command, args []string) error {
 		name = args[0]
 	}
 
-	_, err = project.Load()
+	_, err = loadProject()
 	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 		return err
 	}

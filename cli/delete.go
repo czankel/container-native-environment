@@ -54,7 +54,7 @@ func deleteWorkspaceRunE(cmd *cobra.Command, args []string) error {
 	}
 	defer run.Close()
 
-	prj, err := project.Load()
+	prj, err := loadProject()
 	if err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func deleteLayerRunE(cmd *cobra.Command, args []string) error {
 	}
 	defer run.Close()
 
-	prj, err := project.Load()
+	prj, err := loadProject()
 	if err != nil {
 		return err
 	}
@@ -148,7 +148,7 @@ func deleteContainerRunE(cmd *cobra.Command, args []string) error {
 	}
 	defer run.Close()
 
-	prj, err := project.Load()
+	prj, err := loadProject()
 	if err != nil {
 		return err
 	}
@@ -181,7 +181,7 @@ var deleteCommandLayer string
 
 func deleteCommandRunE(cmd *cobra.Command, args []string) error {
 
-	prj, err := project.Load()
+	prj, err := loadProject()
 	if err != nil {
 		return err
 	}

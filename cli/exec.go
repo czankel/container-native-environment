@@ -43,7 +43,7 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 	}
 	defer run.Close()
 
-	prj, err := project.Load()
+	prj, err := loadProject()
 	if err != nil {
 		return 0, err
 	}

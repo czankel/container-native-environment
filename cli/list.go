@@ -83,7 +83,7 @@ var listCommandsLayer string
 
 func listCommandsRunE(cmd *cobra.Command, args []string) error {
 
-	prj, err := project.Load()
+	prj, err := loadProject()
 	if err != nil {
 		return err
 	}
@@ -261,7 +261,7 @@ func listContainersRunE(cmd *cobra.Command, args []string) error {
 	defer run.Close()
 
 	if !listContainersAll {
-		prj, err = project.Load()
+		prj, err = loadProject()
 		if err != nil {
 			return err
 		}
@@ -291,7 +291,7 @@ func listResourcesRunE(cmd *cobra.Command, args []string) error {
 	defer run.Close()
 
 	if !listResourcesAll {
-		prj, err = project.Load()
+		prj, err = loadProject()
 		if err != nil {
 			return err
 		}
