@@ -161,8 +161,8 @@ func Create(name, path string) (*Project, error) {
 	return prj, err
 }
 
-// LoadFrom loads the project from the provided path.
-func LoadFrom(path string) (*Project, error) {
+// Load loads the project from the provided path.
+func Load(path string) (*Project, error) {
 
 	if len(path) == 0 {
 		return nil, errdefs.InvalidArgument("invalid project path: '%s'", path)
@@ -221,17 +221,6 @@ func LoadFrom(path string) (*Project, error) {
 	}
 
 	return &prj, nil
-}
-
-// Load loads the project from the current working directory.
-func Load() (*Project, error) {
-
-	path, err := os.Getwd()
-	if err != nil {
-		return nil, errdefs.SystemError(err, "failed to load project file in '%s'", path)
-	}
-
-	return LoadFrom(path)
 }
 
 // Write writes the project to the project path

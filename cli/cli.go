@@ -35,7 +35,7 @@ func loadProject() (*project.Project, error) {
 		}
 	}
 
-	return project.LoadFrom(projectPath)
+	return project.Load(projectPath)
 }
 
 var rootCmd = &cobra.Command{

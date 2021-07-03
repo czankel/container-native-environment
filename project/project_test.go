@@ -21,7 +21,7 @@ func TestProjectCreate(t *testing.T) {
 	}
 	defer os.RemoveAll(dir)
 
-	_, err = LoadFrom(dir)
+	_, err = Load(dir)
 	if !errors.Is(err, errdefs.ErrNotFound) {
 		t.Fatalf("Should have failed to load non-existent project: %v", err)
 	}
@@ -39,7 +39,7 @@ func TestProjectCreate(t *testing.T) {
 		t.Errorf("modifiedAt earlier than 1s: %v", timediff)
 	}
 
-	prjChk, err := LoadFrom(dir)
+	prjChk, err := Load(dir)
 	if err != nil {
 		t.Fatalf("Failed to load project: %v", err)
 	}
@@ -125,14 +125,14 @@ func TestProjectCopyProjects(t *testing.T) {
 		t.Fatalf("0 bytes copied")
 	}
 
-	prjChk, err := LoadFrom(dir + "/test2")
+	prjChk, err := Load(dir + "/test2")
 	if prjChk.instanceID == prj.instanceID {
 		t.Fatalf("Copying project should have changed node id")
 	}
 
 	err = prjChk.Write()
 
-	prj3, err := LoadFrom(dir + "/test2")
+	prj3, err := Load(dir + "/test2")
 	if err != nil {
 		t.Fatalf("Failed to load project")
 	} else if prj3.instanceID != prjChk.instanceID {
