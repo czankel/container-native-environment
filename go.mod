@@ -9,7 +9,7 @@ require (
 	github.com/containerd/typeurl v1.0.2
 	github.com/google/uuid v1.2.0
 	github.com/opencontainers/go-digest v1.0.0
-	github.com/opencontainers/image-spec v1.0.1
+	github.com/opencontainers/image-spec v1.0.2
 	github.com/opencontainers/runtime-spec v1.0.3-0.20200929063507-e6143ca7d51d
 	github.com/opencontainers/selinux v1.8.2 // indirect
 	github.com/spf13/cobra v1.0.0
