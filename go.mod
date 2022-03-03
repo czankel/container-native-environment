@@ -6,10 +6,9 @@ require (
 	github.com/BurntSushi/toml v0.4.1
 	github.com/Microsoft/go-winio v0.5.1 // indirect
 	github.com/Microsoft/hcsshim v0.9.1 // indirect
-	github.com/bits-and-blooms/bitset v1.2.1 // indirect
 	github.com/containerd/cgroups v1.0.2 // indirect
 	github.com/containerd/console v1.0.3
-	github.com/containerd/containerd v1.5.8
+	github.com/containerd/containerd v1.5.10
 	github.com/containerd/continuity v0.2.1 // indirect
 	github.com/containerd/typeurl v1.0.2
 	github.com/gogo/googleapis v1.4.1 // indirect
