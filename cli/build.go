@@ -168,7 +168,7 @@ func buildWorkspaceRunE(cmd *cobra.Command, args []string) error {
 	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 		return err
 	}
-	if err != nil {
+	if err == nil {
 		if !buildWorkspaceForce && buildWorkspaceUpgrade == "" {
 			return errdefs.AlreadyExists("container", ctr.Name)
 		}
