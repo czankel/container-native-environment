@@ -68,7 +68,6 @@ type Project struct {
 type Workspace struct {
 	Name        string // Name of the workspace (must be unique)
 	ProjectUUID string `yaml:"-" output:"-"`
-	Path        string `yaml:"-"`
 	Environment Environment
 }
 
@@ -217,7 +216,6 @@ func Load(path string) (*Project, error) {
 	// Fixup workspaces
 	for i := 0; i < len(prj.Workspaces); i++ {
 		prj.Workspaces[i].ProjectUUID = prj.UUID
-		prj.Workspaces[i].Path = prj.path
 	}
 
 	return &prj, nil
@@ -311,7 +309,6 @@ func (prj *Project) CreateWorkspace(name string, origin string, before string) (
 		Name:        name,
 		ProjectUUID: prj.UUID,
 		Environment: Environment{Origin: origin, Layers: []Layer{}},
-		Path:        "",
 	}
 
 	idx := len(prj.Workspaces)

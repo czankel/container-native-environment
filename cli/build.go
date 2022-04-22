@@ -99,7 +99,7 @@ func buildLayers(run runtime.Runtime, ctr *container.Container,
 
 // commitContainer commits the container
 func commitContainer(ctr *container.Container, ws *project.Workspace) error {
-	return ctr.Commit(ws, user, ws.Path)
+	return ctr.Commit(ws, user)
 }
 
 // buildContainer builds the container for the provided workspace and outputs progress status.

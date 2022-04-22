@@ -33,7 +33,7 @@ type ContainerInterface interface {
 	BuildExec(user *config.User, stream runtime.Stream,
 		args []string, env []string) (uint32, error)
 	Amend(ws *project.Workspace, bldLayerIdx int) error
-	Commit(ws *project.Workspace, user config.User, rootPath string) error
+	Commit(ws *project.Workspace, user config.User) error
 }
 
 type Container struct {
@@ -338,7 +338,7 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 }
 
 // Commit commits a container that has been built and updates its configuration
-func (ctr *Container) Commit(ws *project.Workspace, user config.User, rootPath string) error {
+func (ctr *Container) Commit(ws *project.Workspace, user config.User) error {
 
 	spec, err := DefaultSpec(ctr.Namespace, ctr.Name)
 	if err != nil {
