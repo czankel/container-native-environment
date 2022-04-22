@@ -57,7 +57,7 @@ type Project struct {
 	UUID                 string // Universal Unique id for the project
 	CurrentWorkspaceName string
 	Workspaces           []Workspace
-	path                 string // path for the project (excluding "/cneproject")
+	path                 string // path to the project file
 	instanceID           uint64
 	modifiedAt           time.Time
 }
@@ -100,41 +100,41 @@ type Command struct {
 	Args []string `output:"flat" yaml:",flow"`
 }
 
-// NewProject returns an empty new project.
-func NewProject(name, path string) *Project {
-
-	if path[len(path)-1] == '/' {
-		path = path[:len(path)-1]
-	}
-
-	return &Project{
-		Name: name,
-		UUID: uuid.New().String(),
-		path: path,
-	}
-}
-
 // Create creates the project in the provide path
 // The path can be empty to use the current working directory.
+// Callers can provide a directory or a filename. If a filename is provided, it must not exist.
+// In general, using a different configuration file than the standard "cneproject" is
+// discouraged.
 func Create(name, path string) (*Project, error) {
 
+	isDir := true
 	if path == "" {
 		var err error
 		path, err = os.Getwd()
 		if err != nil {
 			return nil, errdefs.SystemError(err, "failed to get work directory")
 		}
-	} else if path[len(path)-1] == '/' {
-		path = path[:len(path)-1]
+	} else {
+		fileInfo, err := os.Stat(path)
+		if err != nil && !os.IsNotExist(err) {
+			return nil, errdefs.InvalidArgument("invalid project path: '%s' (%v)", path, err)
+		}
+		isDir = fileInfo.Mode().IsDir()
+		if isDir && err != nil {
+			return nil, errdefs.InvalidArgument("invalid project path: '%s' (%v)", path, err)
+		} else if !isDir && err == nil {
+			return nil, errdefs.AlreadyExists("project", path)
+		}
+	}
+	if isDir {
+		path = path + "/" + projectFileName
 	}
 
-	prj := NewProject(name, path)
-
 	flags := os.O_RDONLY | os.O_CREATE | os.O_EXCL | os.O_SYNC
-	file, err := os.OpenFile(path+"/"+projectFileName, flags, projectFilePerm)
+	file, err := os.OpenFile(path, flags, projectFilePerm)
 	if err != nil {
 		return nil, errdefs.SystemError(err,
-			"failed to create project file in directory '%s'", path)
+			"failed to create project file '%s'", path)
 	}
 
 	euid := os.Geteuid()
@@ -148,8 +148,17 @@ func Create(name, path string) (*Project, error) {
 	}
 	file.Close()
 
-	fileInfo, err := os.Stat(path + "/" + projectFileName)
-	prj.modifiedAt = fileInfo.ModTime()
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return nil, errdefs.SystemError(err, "failed to stat file '%s'", path)
+	}
+
+	prj := &Project{
+		Name:       name,
+		UUID:       uuid.New().String(),
+		path:       path,
+		modifiedAt: fileInfo.ModTime(),
+	}
 
 	stat, ok := fileInfo.Sys().(*syscall.Stat_t)
 	if ok {
@@ -177,15 +186,17 @@ func Load(path string) (*Project, error) {
 		if path[len(path)-1] != '/' {
 			path = path + "/"
 		}
+		dir := path
 		path = path + projectFileName
 
 		prjStr, err = ioutil.ReadFile(path)
 		for err != nil && os.IsNotExist(err) {
-			if path == "/" || path == "." {
+			if dir == "/" || dir == "." {
 				return nil, errdefs.NotFound("project", path)
 			}
-			path = filepath.Dir(path)
-			prjStr, err = ioutil.ReadFile(path + "/" + projectFileName)
+			dir = filepath.Dir(dir)
+			path = dir + "/" + projectFileName
+			prjStr, err = ioutil.ReadFile(path)
 		}
 	} else {
 		prjStr, err = ioutil.ReadFile(path)
@@ -207,7 +218,7 @@ func Load(path string) (*Project, error) {
 	}
 
 	fileInfo, err = os.Stat(path)
-	prj.path = filepath.Dir(path)
+	prj.path = path
 	prj.modifiedAt = fileInfo.ModTime()
 	stat, ok := fileInfo.Sys().(*syscall.Stat_t)
 	if ok {
@@ -237,7 +248,7 @@ func (prj *Project) Write() error {
 		return errdefs.InvalidArgument("project file corrupt")
 	}
 
-	err = ioutil.WriteFile(prj.path+"/"+projectFileName, append(hStr, pStr...), projectFilePerm)
+	err = ioutil.WriteFile(prj.path, append(hStr, pStr...), projectFilePerm)
 	if err != nil {
 		return errdefs.SystemError(err, "failed to write project")
 	}

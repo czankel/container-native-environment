@@ -44,11 +44,12 @@ func setupProject(t *testing.T) (*project.Project, *project.Workspace) {
 
 	prjName := "project"
 	prjOrigin := "image"
-	prjPath := "/some/path"
 	wsName := ""
 	nextWs := ""
 
-	prj := project.NewProject(prjName, prjPath)
+	prj := &project.Project{
+		Name: prjName,
+	}
 	ws, err := prj.CreateWorkspace(wsName, prjOrigin, nextWs)
 	if err != nil {
 		t.Fatalf("Failed to create workspace")
