@@ -6,9 +6,8 @@ require (
 	github.com/BurntSushi/toml v0.4.1
 	github.com/Microsoft/go-winio v0.5.1 // indirect
 	github.com/Microsoft/hcsshim v0.9.1 // indirect
-	github.com/containerd/cgroups v1.0.2 // indirect
 	github.com/containerd/console v1.0.3
-	github.com/containerd/containerd v1.5.10
+	github.com/containerd/containerd v1.5.13
 	github.com/containerd/continuity v0.2.1 // indirect
 	github.com/containerd/typeurl v1.0.2
 	github.com/gogo/googleapis v1.4.1 // indirect
@@ -22,7 +21,7 @@ require (
 	github.com/opencontainers/selinux v1.10.0 // indirect
 	github.com/spf13/cobra v1.3.0
 	golang.org/x/net v0.0.0-20211216030914-fe4d6282115f // indirect
-	golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e
+	golang.org/x/sys v0.0.0-20220412211240-33da011f77ad
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	google.golang.org/genproto v0.0.0-20211223182754-3ac035c7e7cb // indirect
 	google.golang.org/grpc v1.43.0 // indirect
