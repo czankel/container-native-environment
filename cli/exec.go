@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -27,7 +28,7 @@ var execTestOnly bool
 
 // execCommandsInShell executes the provided commands in a shell.
 func execCommandsInShell(wsName, layerName string, args []string) (int, error) {
-	args = append([]string{"/bin/sh", "-c"}, args...)
+	args = append([]string{"/bin/sh", "-c", strings.Join(args, " ")})
 	return execCommands(wsName, layerName, args)
 }
 
