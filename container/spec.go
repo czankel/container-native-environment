@@ -158,6 +158,12 @@ func DefaultSpec(namespace string, ctrID string) (specs.Spec, error) {
 				Options:     []string{"nosuid", "noexec", "nodev", "ro"},
 			},
 			{
+				Destination: "/sys/fs/cgroup",
+				Type:        "cgroup",
+				Source:      "cgroup",
+				Options:     []string{"all"},
+			},
+			{
 				Destination: "/run",
 				Type:        "tmpfs",
 				Source:      "tmpfs",
