@@ -237,6 +237,16 @@ func createSnapshot(ctrdRun *containerdRuntime,
 	return mounts, &snapshot{ctrdRuntime: ctrdRun, info: info}, nil
 }
 
+type mounter struct{}
+
+func (mounter) Mount(target string, mounts ...mount.Mount) error {
+	return mount.All(mounts, target)
+}
+
+func (mounter) Unmount(target string) error {
+	return mount.UnmountAll(target, 0)
+}
+
 func createActiveSnapshot(ctrdRun *containerdRuntime,
 	img *image, domain, id [16]byte, snap runtime.Snapshot) error {
 
@@ -250,6 +260,17 @@ func createActiveSnapshot(ctrdRun *containerdRuntime,
 			return runtime.Errorf("failed to get rootfs: %v", err)
 		}
 		rootFsSnapName = identity.ChainID(diffIDs).String()
+		_, err = getSnapshot(ctrdRun, rootFsSnapName)
+
+		// unpack 'image' if root snapshot was removed
+		if err != nil && errors.Is(err, errdefs.ErrNotFound) {
+			img.Unpack()
+			digest := identity.ChainID(diffIDs).String()
+			_, _, err = createSnapshot(img.ctrdRuntime, digest, digest, false)
+		}
+		if err != nil {
+			return err
+		}
 	}
 
 	// delete all 'old' snapshots down to the new rootfs or the image

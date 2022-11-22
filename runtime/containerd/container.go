@@ -520,6 +520,9 @@ func (ctr *container) Processes() ([]runtime.Process, error) {
 
 // deleteContainer deletes the container, task, and active snapshot.
 // This function returns not-found if a container was not specified and could not be found.
+
+// TODO: don't delete the image snapshot
+
 func deleteContainer(ctrdRun *containerdRuntime, domain, id [16]byte, purge bool) error {
 
 	ctrdID := composeCtrdID(domain, id)

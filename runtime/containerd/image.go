@@ -172,12 +172,12 @@ func (img *image) Digest() digest.Digest {
 
 func (img *image) RootFS() ([]digest.Digest, error) {
 
-	rootFs, err := img.ctrdImage.RootFS(img.ctrdRuntime.context)
+	rootFS, err := img.ctrdImage.RootFS(img.ctrdRuntime.context)
 	if err != nil {
 		return nil, runtime.Errorf("failed to get image rootfs %v", err)
 	}
 
-	return rootFs, nil
+	return rootFS, nil
 }
 
 func (img *image) Name() string {
@@ -242,4 +242,8 @@ func (img *image) Unmount(path string) error {
 	digest := identity.ChainID(diffIDs).String()
 	snapName := digest + "-image"
 	return deleteSnapshot(ctrdRun, snapName)
+}
+
+func (img *image) Unpack() error {
+	return img.ctrdImage.Unpack(img.ctrdRuntime.context, containerd.DefaultSnapshotter)
 }
