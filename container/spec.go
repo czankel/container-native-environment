@@ -161,7 +161,7 @@ func DefaultSpec(namespace string, ctrID string) (specs.Spec, error) {
 				Destination: "/sys/fs/cgroup",
 				Type:        "cgroup",
 				Source:      "cgroup",
-				Options:     []string{"all"},
+				Options:     []string{"ro"},
 			},
 			{
 				Destination: "/run",
