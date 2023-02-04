@@ -385,7 +385,7 @@ func (ctr *container) Create() error {
 	ctrdCtr, err = ctrdRun.client.NewContainer(ctrdRun.context, uuidName,
 		containerd.WithImage(ctr.image.ctrdImage),
 		containerd.WithSpec(&spec),
-		containerd.WithRuntime("io.containerd.runtime.v1.linux", nil),
+		containerd.WithRuntime(ctrdRun.client.Runtime(), nil),
 		containerd.WithContainerLabels(labels))
 	if err != nil {
 		return runtime.Errorf("failed to create container: %v", err)
@@ -539,6 +539,10 @@ func deleteContainer(ctrdRun *containerdRuntime, domain, id [16]byte, purge bool
 
 func deleteCtrdContainer(ctrdRun *containerdRuntime,
 	ctrdCtr containerd.Container, domain, id [16]byte, purge bool) error {
+
+	if ctrdCtr == nil {
+		return nil
+	}
 
 	err := deleteCtrdTask(ctrdRun, ctrdCtr)
 	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
