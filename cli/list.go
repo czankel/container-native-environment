@@ -66,7 +66,7 @@ var listRuntimeCmd = &cobra.Command{
 }
 
 func listRuntimeRunE(cmd *cobra.Command, args []string) error {
-	printList(runtime.Runtimes(), false)
+	printValue("INDEX", "RUNTIME", "", runtime.Runtimes())
 	return nil
 }
 

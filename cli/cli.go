@@ -22,6 +22,9 @@ var rootCneVersion bool
 
 var projectPath string
 
+// IsRemote ...
+var IsRemote bool
+
 // helper function to load the project
 func loadProject() (*project.Project, error) {
 
@@ -80,6 +83,8 @@ func init() {
 		&rootCneVersion, "version", false, "Get version information")
 	rootCmd.PersistentFlags().StringVarP(
 		&projectPath, "project", "P", "", "Projet path")
+	rootCmd.PersistentFlags().BoolVar(
+		&IsRemote, "remote", false, "Connect to a remote CNE")
 	rootCmd.AddCommand(rootVersionCmd)
 	cobra.OnInitialize(initConfig)
 }
