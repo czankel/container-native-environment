@@ -27,6 +27,8 @@ type ContainerInterface interface {
 	Create() error
 	Delete() error
 	Purge() error
+	Name() string
+	CreatedAt() time.Time
 	Build(ws *project.Workspace, nextLayerIdx int,
 		user *config.User, params *config.Parameters,
 		progress chan []runtime.ProgressStatus, stream runtime.Stream) error
@@ -39,13 +41,13 @@ type ContainerInterface interface {
 type Container struct {
 	runRuntime   runtime.Runtime   `output:"-"`
 	runContainer runtime.Container `output:"-"`
-	Namespace    string
-	Name         string
-	Domain       [16]byte
-	ID           [16]byte
-	Generation   [16]byte
-	UID          uint32
-	CreatedAt    time.Time
+	namespace    string
+	name         string
+	domain       [16]byte
+	id           [16]byte
+	generation   [16]byte
+	uid          uint32
+	createdAt    time.Time
 }
 
 // containerName is a helper function returning the unique name of a container consisting
@@ -98,12 +100,12 @@ func Containers(run runtime.Runtime, prj *project.Project, user *config.User) ([
 		cid := c.ID()
 		ctrs = append(ctrs, Container{
 			runContainer: c,
-			Name:         containerNameRunCtr(c),
-			Domain:       dom,
-			ID:           cid,
-			Generation:   c.Generation(),
-			UID:          c.UID(),
-			CreatedAt:    c.CreatedAt(),
+			name:         containerNameRunCtr(c),
+			domain:       dom,
+			id:           cid,
+			generation:   c.Generation(),
+			uid:          c.UID(),
+			createdAt:    c.CreatedAt(),
 		})
 	}
 
@@ -126,17 +128,16 @@ func Get(run runtime.Runtime, ws *project.Workspace) (*Container, error) {
 		return nil, err
 	}
 
-	name := containerNameRunCtr(runCtr)
 	return &Container{
 		runRuntime:   run,
 		runContainer: runCtr,
-		Namespace:    run.Namespace(),
-		Name:         name,
-		Domain:       runCtr.Domain(),
-		ID:           cid,
-		Generation:   gen,
-		UID:          runCtr.UID(),
-		CreatedAt:    runCtr.CreatedAt(),
+		namespace:    run.Namespace(),
+		name:         containerNameRunCtr(runCtr),
+		domain:       runCtr.Domain(),
+		id:           cid,
+		generation:   gen,
+		uid:          runCtr.UID(),
+		createdAt:    runCtr.CreatedAt(),
 	}, nil
 }
 
@@ -168,11 +169,11 @@ func NewContainer(run runtime.Runtime, user *config.User,
 	return &Container{
 		runRuntime:   run,
 		runContainer: runCtr,
-		Namespace:    run.Namespace(),
-		Name:         ctrName,
-		Domain:       dom,
-		ID:           cid,
-		Generation:   gen,
+		namespace:    run.Namespace(),
+		name:         ctrName,
+		domain:       dom,
+		id:           cid,
+		generation:   gen,
 	}, nil
 }
 
@@ -340,7 +341,7 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 // Commit commits a container that has been built and updates its configuration
 func (ctr *Container) Commit(ws *project.Workspace, user config.User) error {
 
-	spec, err := DefaultSpec(ctr.Namespace, ctr.Name)
+	spec, err := DefaultSpec(ctr.namespace, ctr.name)
 	if err != nil {
 		return err
 	}
@@ -364,7 +365,7 @@ func (ctr *Container) Commit(ws *project.Workspace, user config.User) error {
 		return err
 	}
 
-	ctr.Generation = confHash
+	ctr.generation = confHash
 	return nil
 }
 
@@ -464,4 +465,14 @@ func (ctr *Container) Delete() error {
 // Purge deletes the container if not already deleted and also all associated Snapshots.
 func (ctr *Container) Purge() error {
 	return ctr.runContainer.Purge()
+}
+
+// Name returns the container name
+func (ctr *Container) Name() string {
+	return ctr.name
+}
+
+// CreatedAt returns the time the container was created
+func (ctr *Container) CreatedAt() time.Time {
+	return ctr.createdAt
 }

@@ -42,7 +42,7 @@ func createContainer(run runtime.Runtime, ws *project.Workspace) (*container.Con
 
 	err = ctr.Create()
 	if err != nil && errors.Is(err, errdefs.ErrAlreadyExists) {
-		run.DeleteContainer(ctr.Domain, ctr.ID, ctr.Generation)
+		ctr.Delete()
 		err = ctr.Create()
 	}
 	if err != nil {
@@ -170,7 +170,7 @@ func buildWorkspaceRunE(cmd *cobra.Command, args []string) error {
 	}
 	if err == nil {
 		if !buildWorkspaceForce && buildWorkspaceUpgrade == "" {
-			return errdefs.AlreadyExists("container", ctr.Name)
+			return errdefs.AlreadyExists("container", ctr.Name())
 		}
 		err = ctr.Purge()
 		if err != nil {

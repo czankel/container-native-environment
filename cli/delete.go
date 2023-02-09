@@ -159,7 +159,7 @@ func deleteContainerRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	for _, c := range ctrs {
-		if c.Name == args[0] {
+		if c.Name() == args[0] {
 			c.Purge()
 			break
 		}
