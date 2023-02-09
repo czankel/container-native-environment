@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	projectFileName    = "cneproject"
+	ProjectFileName    = "cneproject"
 	projectFileVersion = "1.0"
 	projectFilePerm    = 0600
 
@@ -127,7 +127,7 @@ func Create(name, path string) (*Project, error) {
 		}
 	}
 	if isDir {
-		path = path + "/" + projectFileName
+		path = path + "/" + ProjectFileName
 	}
 
 	flags := os.O_RDONLY | os.O_CREATE | os.O_EXCL | os.O_SYNC
@@ -170,6 +170,7 @@ func Create(name, path string) (*Project, error) {
 }
 
 // Load loads the project from the provided path.
+// It also scans all parent paths for the project file if path is a directory.
 func Load(path string) (*Project, error) {
 
 	if len(path) == 0 {
@@ -187,7 +188,7 @@ func Load(path string) (*Project, error) {
 			path = path + "/"
 		}
 		dir := path
-		path = path + projectFileName
+		path = path + ProjectFileName
 
 		prjStr, err = ioutil.ReadFile(path)
 		for err != nil && os.IsNotExist(err) {
@@ -195,7 +196,7 @@ func Load(path string) (*Project, error) {
 				return nil, errdefs.NotFound("project", path)
 			}
 			dir = filepath.Dir(dir)
-			path = dir + "/" + projectFileName
+			path = dir + "/" + ProjectFileName
 			prjStr, err = ioutil.ReadFile(path)
 		}
 	} else {
