@@ -42,12 +42,10 @@ type Container struct {
 	runRuntime   runtime.Runtime   `output:"-"`
 	runContainer runtime.Container `output:"-"`
 	namespace    string
-	name         string
 	domain       [16]byte
 	id           [16]byte
 	generation   [16]byte
 	uid          uint32
-	createdAt    time.Time
 }
 
 // containerName is a helper function returning the unique name of a container consisting
@@ -100,12 +98,10 @@ func Containers(run runtime.Runtime, prj *project.Project, user *config.User) ([
 		cid := c.ID()
 		ctrs = append(ctrs, Container{
 			runContainer: c,
-			name:         containerNameRunCtr(c),
 			domain:       dom,
 			id:           cid,
 			generation:   c.Generation(),
 			uid:          c.UID(),
-			createdAt:    c.CreatedAt(),
 		})
 	}
 
@@ -132,12 +128,10 @@ func Get(run runtime.Runtime, ws *project.Workspace) (*Container, error) {
 		runRuntime:   run,
 		runContainer: runCtr,
 		namespace:    run.Namespace(),
-		name:         containerNameRunCtr(runCtr),
 		domain:       runCtr.Domain(),
 		id:           cid,
 		generation:   gen,
 		uid:          runCtr.UID(),
-		createdAt:    runCtr.CreatedAt(),
 	}, nil
 }
 
@@ -170,7 +164,6 @@ func NewContainer(run runtime.Runtime, user *config.User,
 		runRuntime:   run,
 		runContainer: runCtr,
 		namespace:    run.Namespace(),
-		name:         ctrName,
 		domain:       dom,
 		id:           cid,
 		generation:   gen,
@@ -341,7 +334,7 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 // Commit commits a container that has been built and updates its configuration
 func (ctr *Container) Commit(ws *project.Workspace, user config.User) error {
 
-	spec, err := DefaultSpec(ctr.namespace, ctr.name)
+	spec, err := DefaultSpec(ctr.namespace, containerNameRunCtr(ctr.runContainer))
 	if err != nil {
 		return err
 	}
@@ -469,10 +462,10 @@ func (ctr *Container) Purge() error {
 
 // Name returns the container name
 func (ctr *Container) Name() string {
-	return ctr.name
+	return containerNameRunCtr(ctr.runContainer)
 }
 
 // CreatedAt returns the time the container was created
 func (ctr *Container) CreatedAt() time.Time {
-	return ctr.createdAt
+	return ctr.runContainer.CreatedAt()
 }
