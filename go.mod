@@ -10,7 +10,6 @@ require (
 	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/google/uuid v1.3.0
 	github.com/klauspost/compress v1.13.6 // indirect
-	github.com/moby/sys/mountinfo v0.5.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.0.3-0.20211202183452-c5a74bcca799
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
