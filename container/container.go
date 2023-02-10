@@ -41,11 +41,6 @@ type ContainerInterface interface {
 type Container struct {
 	runRuntime   runtime.Runtime   `output:"-"`
 	runContainer runtime.Container `output:"-"`
-	namespace    string
-	domain       [16]byte
-	id           [16]byte
-	generation   [16]byte
-	uid          uint32
 }
 
 // containerName is a helper function returning the unique name of a container consisting
@@ -95,13 +90,8 @@ func Containers(run runtime.Runtime, prj *project.Project, user *config.User) ([
 			continue
 		}
 
-		cid := c.ID()
 		ctrs = append(ctrs, Container{
 			runContainer: c,
-			domain:       dom,
-			id:           cid,
-			generation:   c.Generation(),
-			uid:          c.UID(),
 		})
 	}
 
@@ -127,11 +117,6 @@ func Get(run runtime.Runtime, ws *project.Workspace) (*Container, error) {
 	return &Container{
 		runRuntime:   run,
 		runContainer: runCtr,
-		namespace:    run.Namespace(),
-		domain:       runCtr.Domain(),
-		id:           cid,
-		generation:   gen,
-		uid:          runCtr.UID(),
 	}, nil
 }
 
@@ -163,10 +148,6 @@ func NewContainer(run runtime.Runtime, user *config.User,
 	return &Container{
 		runRuntime:   run,
 		runContainer: runCtr,
-		namespace:    run.Namespace(),
-		domain:       dom,
-		id:           cid,
-		generation:   gen,
 	}, nil
 }
 
@@ -334,7 +315,8 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 // Commit commits a container that has been built and updates its configuration
 func (ctr *Container) Commit(ws *project.Workspace, user config.User) error {
 
-	spec, err := DefaultSpec(ctr.namespace, containerNameRunCtr(ctr.runContainer))
+	run := ctr.runRuntime
+	spec, err := DefaultSpec(run.Namespace(), containerNameRunCtr(ctr.runContainer))
 	if err != nil {
 		return err
 	}
@@ -358,7 +340,6 @@ func (ctr *Container) Commit(ws *project.Workspace, user config.User) error {
 		return err
 	}
 
-	ctr.generation = confHash
 	return nil
 }
 
