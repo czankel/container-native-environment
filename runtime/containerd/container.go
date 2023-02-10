@@ -299,6 +299,10 @@ func deleteCtrdTask(ctrdRun *containerdRuntime, ctrdCtr containerd.Container) er
 	return nil
 }
 
+func (ctr *container) Runtime() runtime.Runtime {
+	return ctr.ctrdRuntime
+}
+
 func (ctr *container) Domain() [16]byte {
 	return ctr.domain
 }

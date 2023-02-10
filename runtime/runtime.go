@@ -104,9 +104,10 @@ type Image interface {
 // Container provides an abstraction for running processes in an isolated environment in user space.
 //
 // Containers are uniquely identified by these fields:
-//  - domain:     identifies the project on a system
-//  - id:         identification of the container in the domain
-//  - generation: describing the underlying filesystem (snapshot)
+//   - domain:     identifies the project on a system
+//   - id:         identification of the container in the domain
+//   - generation: describing the underlying filesystem (snapshot)
+//
 // Domain and ID are immutable. Generation is mutable and updated for any modifications to the
 // configuration and filesystem.
 //
@@ -117,8 +118,10 @@ type Image interface {
 //
 // Note that the current implementation does not require to run any process, so the first
 // process created will become the init task (PID 1).
-//
 type Container interface {
+
+	// Runtime returns the runtime for the container
+	Runtime() Runtime
 
 	// CreatedAt returns the date the container was created.
 	CreatedAt() time.Time
