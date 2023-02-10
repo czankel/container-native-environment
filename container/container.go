@@ -39,7 +39,6 @@ type ContainerInterface interface {
 }
 
 type Container struct {
-	runRuntime   runtime.Runtime   `output:"-"`
 	runContainer runtime.Container `output:"-"`
 }
 
@@ -115,7 +114,6 @@ func Get(run runtime.Runtime, ws *project.Workspace) (*Container, error) {
 	}
 
 	return &Container{
-		runRuntime:   run,
 		runContainer: runCtr,
 	}, nil
 }
@@ -146,7 +144,6 @@ func NewContainer(run runtime.Runtime, user *config.User,
 	}
 
 	return &Container{
-		runRuntime:   run,
 		runContainer: runCtr,
 	}, nil
 }
@@ -164,7 +161,7 @@ func (ctr *Container) Create() error {
 func findRootFs(ctr *Container,
 	ws *project.Workspace, nextLayerIdx int) (int, runtime.Snapshot, error) {
 
-	run := ctr.runRuntime
+	run := ctr.runContainer.Runtime()
 
 	// identify the layer with the topmost existing snapshot
 	bldLayerIdx := 0
@@ -315,7 +312,7 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 // Commit commits a container that has been built and updates its configuration
 func (ctr *Container) Commit(ws *project.Workspace, user config.User) error {
 
-	run := ctr.runRuntime
+	run := ctr.runContainer.Runtime()
 	spec, err := DefaultSpec(run.Namespace(), containerNameRunCtr(ctr.runContainer))
 	if err != nil {
 		return err
