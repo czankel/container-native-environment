@@ -52,7 +52,7 @@ func containerName(dom, cid, gen [16]byte) string {
 }
 
 // containerNameRunCtr is a helper function to extract the container name from a runtime Container.
-func containerNameRunCtr(runCtr runtime.Container) string {
+func Name(runCtr runtime.Container) string {
 
 	dom := runCtr.Domain()
 	cid := runCtr.ID()
@@ -313,7 +313,7 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 func (ctr *Container) Commit(ws *project.Workspace, user config.User) error {
 
 	run := ctr.runContainer.Runtime()
-	spec, err := DefaultSpec(run.Namespace(), containerNameRunCtr(ctr.runContainer))
+	spec, err := DefaultSpec(run.Namespace(), Name(ctr.runContainer))
 	if err != nil {
 		return err
 	}
@@ -440,7 +440,7 @@ func (ctr *Container) Purge() error {
 
 // Name returns the container name
 func (ctr *Container) Name() string {
-	return containerNameRunCtr(ctr.runContainer)
+	return Name(ctr.runContainer)
 }
 
 // CreatedAt returns the time the container was created
