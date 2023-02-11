@@ -171,6 +171,11 @@ type Container interface {
 	// Commit commits the container after it has been built with a new generation value.
 	Commit(generation [16]byte) error
 
+	// Mount adds a local mount point to the container.
+	// This must be called before comitting the container, for example, to
+	// mount the home directory after building the container.
+	Mount(destination string, source string) error
+
 	// Exec starts the provided command in the process spec and returns immediately.
 	// The container must be started before calling Exec.
 	Exec(stream Stream, procSpec *runspecs.Process) (Process, error)

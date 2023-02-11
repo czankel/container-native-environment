@@ -10,10 +10,9 @@ import (
 	"strings"
 	"time"
 
-	runspecs "github.com/opencontainers/runtime-spec/specs-go"
-	specs "github.com/opencontainers/runtime-spec/specs-go"
-
 	"github.com/google/uuid"
+
+	specs "github.com/opencontainers/runtime-spec/specs-go"
 
 	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/errdefs"
@@ -312,25 +311,14 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 // Commit commits a container that has been built and updates its configuration
 func (ctr *Container) Commit(ws *project.Workspace, user config.User) error {
 
-	run := ctr.runContainer.Runtime()
-	spec, err := DefaultSpec(run.Namespace(), Name(ctr.runContainer))
-	if err != nil {
-		return err
-	}
+	runCtr := ctr.runContainer
 
 	// Mount $HOME
-	spec.Mounts = append(spec.Mounts, runspecs.Mount{
-		Destination: user.HomeDir,
-		Source:      user.HomeDir,
-		Options:     []string{"rbind"},
-	})
-
-	err = ctr.runContainer.UpdateSpec(&spec)
+	err := runCtr.Mount(user.HomeDir, user.HomeDir)
 	if err != nil {
 		return err
 	}
 
-	runCtr := ctr.runContainer
 	confHash := ws.ConfigHash()
 	err = runCtr.Commit(confHash)
 	if err != nil {

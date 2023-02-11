@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/uuid"
 
+	cnecontainer "github.com/czankel/cne/container"
 	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/runtime"
 )
@@ -439,6 +440,23 @@ func (ctr *container) UpdateSpec(newSpec *runspecs.Spec) error {
 	}
 
 	return nil
+}
+
+func (ctr *container) Mount(destination string, source string) error {
+
+	ctrdRun := ctr.ctrdRuntime
+	spec, err := cnecontainer.DefaultSpec(ctrdRun.Namespace(), cnecontainer.Name(ctr))
+	if err != nil {
+		return err
+	}
+
+	spec.Mounts = append(spec.Mounts, runspecs.Mount{
+		Destination: destination,
+		Source:      source,
+		Options:     []string{"rbind"},
+	})
+
+	return ctr.UpdateSpec(&spec)
 }
 
 // For containerd, we support the snapshots, so nothing to do here, other than setting the new
