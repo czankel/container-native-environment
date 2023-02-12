@@ -37,10 +37,6 @@ type ContainerInterface interface {
 	Commit(ws *project.Workspace, user config.User) error
 }
 
-type Container struct {
-	runContainer runtime.Container `output:"-"`
-}
-
 // containerName is a helper function returning the unique name of a container consisting
 // of the domain, container id, and generation.
 func containerName(dom, cid, gen [16]byte) string {
@@ -61,7 +57,7 @@ func Name(runCtr runtime.Container) string {
 }
 
 // Containers returns all active containers in the project.
-func Containers(run runtime.Runtime, prj *project.Project, user *config.User) ([]Container, error) {
+func Containers(run runtime.Runtime, prj *project.Project, user *config.User) ([]runtime.Container, error) {
 
 	var domain [16]byte
 	var err error
@@ -72,7 +68,7 @@ func Containers(run runtime.Runtime, prj *project.Project, user *config.User) ([
 		}
 	}
 
-	var ctrs []Container
+	var ctrs []runtime.Container
 	runCtrs, err := run.Containers()
 	if err != nil {
 		return nil, err
@@ -88,16 +84,14 @@ func Containers(run runtime.Runtime, prj *project.Project, user *config.User) ([
 			continue
 		}
 
-		ctrs = append(ctrs, Container{
-			runContainer: c,
-		})
+		ctrs = append(ctrs, c)
 	}
 
 	return ctrs, nil
 }
 
 // Get looks up the current active Container for the specified Workspace.
-func Get(run runtime.Runtime, ws *project.Workspace) (*Container, error) {
+func Get(run runtime.Runtime, ws *project.Workspace) (runtime.Container, error) {
 
 	dom, err := uuid.Parse(ws.ProjectUUID)
 	if err != nil {
@@ -112,15 +106,13 @@ func Get(run runtime.Runtime, ws *project.Workspace) (*Container, error) {
 		return nil, err
 	}
 
-	return &Container{
-		runContainer: runCtr,
-	}, nil
+	return runCtr, nil
 }
 
 // NewContainer defines a new Container with a default generation value for the Workspace without
 // the Layer configuration. The generation value will be updated through Commit().
 func NewContainer(run runtime.Runtime, user *config.User,
-	ws *project.Workspace, img runtime.Image) (*Container, error) {
+	ws *project.Workspace, img runtime.Image) (runtime.Container, error) {
 
 	dom, err := uuid.Parse(ws.ProjectUUID)
 	if err != nil {
@@ -142,25 +134,16 @@ func NewContainer(run runtime.Runtime, user *config.User,
 		return nil, err
 	}
 
-	return &Container{
-		runContainer: runCtr,
-	}, nil
-}
-
-// Create creates the container after it has been defined and before it can be built.
-func (ctr *Container) Create() error {
-
-	runCtr := ctr.runContainer
-	return runCtr.Create()
+	return runCtr, nil
 }
 
 // find an existing top-most snapshot up to but excluding nextLayerIdx
 // and return it with the layer index.
 // Layer index 0 and snaphost nil means that there is no snapshot that matches
-func findRootFs(ctr *Container,
+func findRootFs(runCtr runtime.Container,
 	ws *project.Workspace, nextLayerIdx int) (int, runtime.Snapshot, error) {
 
-	run := ctr.runContainer.Runtime()
+	run := runCtr.Runtime()
 
 	// identify the layer with the topmost existing snapshot
 	bldLayerIdx := 0
@@ -193,17 +176,15 @@ func findRootFs(ctr *Container,
 // A container may already be partially built. In that case, Build() will continue the build
 // process.
 // The progress argument is optional for outputting status updates during the build process.
-func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
+func Build(runCtr runtime.Container, ws *project.Workspace, nextLayerIdx int,
 	user *config.User, params *config.Parameters,
 	progress chan []runtime.ProgressStatus, stream runtime.Stream) error {
-
-	runCtr := ctr.runContainer
 
 	if nextLayerIdx == -1 {
 		nextLayerIdx = len(ws.Environment.Layers)
 	}
 
-	bldLayerIdx, rootFsSnap, err := findRootFs(ctr, ws, nextLayerIdx)
+	bldLayerIdx, rootFsSnap, err := findRootFs(runCtr, ws, nextLayerIdx)
 	if err != nil {
 		return err
 	}
@@ -276,7 +257,7 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 				progress <- stat
 			}
 
-			code, err := ctr.BuildExec(user, stream, args, command.Envs)
+			code, err := BuildExec(runCtr, user, stream, args, command.Envs)
 			if code != 0 {
 				err = errdefs.CommandFailed(args)
 			}
@@ -309,37 +290,31 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 }
 
 // Commit commits a container that has been built and updates its configuration
-func (ctr *Container) Commit(ws *project.Workspace, user config.User) error {
+func Commit(runCtr runtime.Container, confHash [16]byte, user config.User) error {
 
-	runCtr := ctr.runContainer
-
+	/* FIXME MOVE OUTSIDE
 	// Mount $HOME
 	err := runCtr.Mount(user.HomeDir, user.HomeDir)
 	if err != nil {
 		return err
 	}
-
-	confHash := ws.ConfigHash()
-	err = runCtr.Commit(confHash)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	*/
+	return runCtr.Commit(confHash)
 }
 
-// Amend updates the current snapshot
-func (ctr *Container) Amend(ws *project.Workspace, bldLayerIdx int) error {
+// Amend updates the current snapshot and returns the new digest
+func Amend(runCtr runtime.Container, ws *project.Workspace, bldLayerIdx int) (string, error) {
 
-	runCtr := ctr.runContainer
 	snap, err := runCtr.Amend()
 	if err != nil {
-		return err
+		return "", err
 	}
+	/* FIXME MOVE OUTSIDE
 	layer := &ws.Environment.Layers[bldLayerIdx]
 	layer.Digest = snap.Name()
-
 	return nil
+	*/
+	return snap.Name(), nil
 }
 
 // Exec excutes the provided command, using the default proces runtime spec.
@@ -347,7 +322,7 @@ func (ctr *Container) Amend(ws *project.Workspace, bldLayerIdx int) error {
 // It uses the default environment from the calling process.
 // I/O is defined by the provided stream.
 // The container must be started before calling this function
-func (ctr *Container) Exec(user *config.User, stream runtime.Stream, args []string) (uint32, error) {
+func Exec(runCtr runtime.Container, user *config.User, stream runtime.Stream, args []string) (uint32, error) {
 
 	procSpec := DefaultProcessSpec()
 	procSpec.Cwd = user.Pwd
@@ -365,10 +340,12 @@ func (ctr *Container) Exec(user *config.User, stream runtime.Stream, args []stri
 		procSpec.User.UID = 0
 	}
 
-	return commonExec(ctr, &procSpec, stream)
+	return commonExec(runCtr, &procSpec, stream)
 }
 
-func (ctr *Container) BuildExec(user *config.User, stream runtime.Stream,
+// FIXME: setup BuildSpec??
+// BuildExec executes the command in a build environment
+func BuildExec(runCtr runtime.Container, user *config.User, stream runtime.Stream,
 	args []string, envs []string) (uint32, error) {
 
 	procSpec := DefaultProcessSpec()
@@ -376,22 +353,25 @@ func (ctr *Container) BuildExec(user *config.User, stream runtime.Stream,
 	procSpec.User.GID = user.BuildGID
 	procSpec.Args = args
 	procSpec.Env = append(procSpec.Env, envs...)
-	return commonExec(ctr, &procSpec, stream)
+
+	return commonExec(runCtr, &procSpec, stream)
 }
 
-func commonExec(ctr *Container, procSpec *specs.Process, stream runtime.Stream) (uint32, error) {
-
-	runCtr := ctr.runContainer
+// FIXME: move to cli?
+func commonExec(runCtr runtime.Container, procSpec *specs.Process, stream runtime.Stream) (uint32, error) {
 
 	procSpec.Terminal = stream.Terminal
 
 	proc, err := runCtr.Exec(stream, procSpec)
+
 	if err != nil && errors.Is(err, errdefs.ErrNotFound) && errdefs.Resource(err) == "command" {
 		return 0, err
 	}
 	if err != nil {
 		return 0, err
 	}
+
+	// MOVE TO CLI??
 
 	ch, err := proc.Wait()
 	if err != nil {
@@ -414,24 +394,4 @@ func commonExec(ctr *Container, procSpec *specs.Process, stream runtime.Stream) 
 	signal.Stop(sigc)
 	close(sigc)
 	return exitStat.Code, exitStat.Error
-}
-
-// Delete deletes the container if not already deleted but not any associated Snapshots.
-func (ctr *Container) Delete() error {
-	return ctr.runContainer.Delete()
-}
-
-// Purge deletes the container if not already deleted and also all associated Snapshots.
-func (ctr *Container) Purge() error {
-	return ctr.runContainer.Purge()
-}
-
-// Name returns the container name
-func (ctr *Container) Name() string {
-	return Name(ctr.runContainer)
-}
-
-// CreatedAt returns the time the container was created
-func (ctr *Container) CreatedAt() time.Time {
-	return ctr.runContainer.CreatedAt()
 }

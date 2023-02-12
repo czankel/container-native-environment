@@ -494,6 +494,10 @@ func (ctr *container) Amend() (runtime.Snapshot, error) {
 	return updateSnapshot(ctr.ctrdRuntime, ctr.domain, ctr.id, true /* amend */)
 }
 
+func (ctr *container) ExecUser(user *config.User, stream Steram, args []string) (uint32, error) {
+
+}
+
 // Exec executes the provided command.
 func (ctr *container) Exec(stream runtime.Stream,
 	procSpec *runspecs.Process) (runtime.Process, error) {

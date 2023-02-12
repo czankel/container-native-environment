@@ -90,6 +90,17 @@ func installAptRunE(cmd *cobra.Command, args []string) error {
 		os.Exit(code)
 	}
 
+	/* FIXME
+	snap, err := ctr.Amend()
+	if err != nil {
+		ctr.Delete() // delete the container and active snapshot
+		return err
+	}
+
+	layer := &ws.Environment.Layers[bldLayerIdx]
+	layer.Digest = snap.Name()
+	*/
+
 	ctr.Amend(ws, aptLayerIdx)
 	if err != nil {
 		ctr.Delete() // delete the container and active snapshot

@@ -170,15 +170,25 @@ type Container interface {
 
 	// Commit commits the container after it has been built with a new generation value.
 	Commit(generation [16]byte) error
+	Commit(ws *project.Workspace, user config.User) error
 
 	// Mount adds a local mount point to the container.
 	// This must be called before comitting the container, for example, to
 	// mount the home directory after building the container.
 	Mount(destination string, source string) error
 
-	// Exec starts the provided command in the process spec and returns immediately.
+	// ExecUser starts the provided command in the process spec and returns immediately.
 	// The container must be started before calling Exec.
-	Exec(stream Stream, procSpec *runspecs.Process) (Process, error)
+	// FIXME Exec(stream Stream, procSpec *runspecs.Process) (Process, error)
+	ExecUser(user *config.User, stream Stream, args []string) (uint32, error)
+
+	// ExecBuilder runs the command in the builder context ...
+	ExecBuilder(user *config.User, stream Stream, args []string, env []string) (uint32, error)
+
+	// Build builds the container
+	Build(ws *project.Workspace, nextLayerIdx int,
+		user *config.User, params *config.Parameters,
+		progress chan []runtime.ProgressStatus, stream runtime.Stream) error
 }
 
 // Stream describes the IO channels to a process that is running in a container.

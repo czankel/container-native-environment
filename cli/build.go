@@ -20,7 +20,7 @@ const outputLineLength = 200
 const outputLineCount = 100
 
 // createContainer defines and creates a new container
-func createContainer(run runtime.Runtime, ws *project.Workspace) (*container.Container, error) {
+func createContainer(run runtime.Runtime, ws *project.Workspace) (runtime.Container, error) {
 
 	if ws.Environment.Origin == "" {
 		return nil, errdefs.InvalidArgument("Workspace has no image defined")
@@ -58,7 +58,7 @@ func createContainer(run runtime.Runtime, ws *project.Workspace) (*container.Con
 // This function is idempotent and can be called again to continue the build, for example,
 // for a higher layer.
 // Note that in an error case, it will keep any residual container and snapshots.
-func buildLayers(run runtime.Runtime, ctr *container.Container,
+func buildLayers(run runtime.Runtime, ctr runtime.Container,
 	ws *project.Workspace, layerCount int) error {
 
 	con := console.Current()
@@ -98,13 +98,21 @@ func buildLayers(run runtime.Runtime, ctr *container.Container,
 }
 
 // commitContainer commits the container
-func commitContainer(ctr *container.Container, ws *project.Workspace) error {
+func commitContainer(ctr runtime.Container, ws *project.Workspace) error {
+	/*
+		err := runCtr.Mount(user.HomeDir, user.HomeDir)
+		if err != nil {
+			return err
+		}
+		return ctr.Commit(ws.ConfigHash(), user)
+	*/
+
 	return ctr.Commit(ws, user)
 }
 
 // buildContainer builds the container for the provided workspace and outputs progress status.
 // Note that in an error case, it will keep any residual container and snapshots.
-func buildContainer(run runtime.Runtime, ws *project.Workspace) (*container.Container, error) {
+func buildContainer(run runtime.Runtime, ws *project.Workspace) (runtime.Container, error) {
 
 	ctr, err := createContainer(run, ws)
 	if err != nil {
