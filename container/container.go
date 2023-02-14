@@ -129,10 +129,9 @@ func NewContainer(run runtime.Runtime, user *config.User,
 
 	cid := ws.ID()
 	gen := ws.BaseHash()
-	ctrName := containerName(dom, cid, gen)
 
 	// start with a base container
-	spec, err := DefaultSpec(run.Namespace(), ctrName)
+	spec, err := DefaultSpec(run.Namespace())
 	if err != nil {
 		return nil, err
 	}

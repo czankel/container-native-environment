@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -342,6 +343,7 @@ func (ctr *container) SetRootFs(snap runtime.Snapshot) error {
 	return createActiveSnapshot(ctr.ctrdRuntime, ctr.image, ctr.domain, ctr.id, snap)
 }
 
+// TODO: CgroupsPath is set to only domain + ID, and not generation as before, is it needed?
 func (ctr *container) Create() error {
 
 	ctrdRun := ctr.ctrdRuntime
@@ -387,15 +389,15 @@ func (ctr *container) Create() error {
 			cwd = "/"
 		}
 		spec.Process.Cwd = cwd
+		spec.Linux.CgroupsPath = filepath.Join("/", ctrdRun.Namespace(), ctrdID)
 	}
 
 	// create container
-	uuidName := composeCtrdID(ctr.domain, ctr.id)
 	labels := map[string]string{}
 	labels[containerdGenerationLabel] = gen
 	labels[containerdUIDLabel] = strconv.FormatUint(uint64(ctr.uid), 10)
 
-	ctrdCtr, err = ctrdRun.client.NewContainer(ctrdRun.context, uuidName,
+	ctrdCtr, err = ctrdRun.client.NewContainer(ctrdRun.context, ctrdID,
 		containerd.WithImage(ctr.image.ctrdImage),
 		containerd.WithSpec(&spec),
 		containerd.WithRuntime(ctrdRun.client.Runtime(), nil),
@@ -453,7 +455,7 @@ func (ctr *container) UpdateSpec(newSpec *runspecs.Spec) error {
 func (ctr *container) Mount(destination string, source string) error {
 
 	ctrdRun := ctr.ctrdRuntime
-	spec, err := cnecontainer.DefaultSpec(ctrdRun.Namespace(), cnecontainer.Name(ctr))
+	spec, err := cnecontainer.DefaultSpec(ctrdRun.Namespace())
 	if err != nil {
 		return err
 	}

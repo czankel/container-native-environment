@@ -2,7 +2,6 @@ package container
 
 import (
 	specs "github.com/opencontainers/runtime-spec/specs-go"
-	"path/filepath"
 )
 
 const (
@@ -90,7 +89,7 @@ func DefaultProcessSpec() specs.Process {
 	}
 }
 
-func DefaultSpec(namespace string, ctrID string) (specs.Spec, error) {
+func DefaultSpec(namespace string) (specs.Spec, error) {
 
 	caps := []string{}
 
@@ -196,7 +195,6 @@ func DefaultSpec(namespace string, ctrID string) (specs.Spec, error) {
 				"/proc/sys",
 				"/proc/sysrq-trigger",
 			},
-			CgroupsPath: filepath.Join("/", namespace, ctrID),
 			Resources: &specs.LinuxResources{
 				Devices: []specs.LinuxDeviceCgroup{
 					{
