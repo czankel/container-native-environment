@@ -38,7 +38,7 @@ type ContainerInterface interface {
 }
 
 type Container struct {
-	runContainer runtime.Container `output:"-"`
+	RunContainer runtime.Container `output:"-"`
 }
 
 // containerName is a helper function returning the unique name of a container consisting
@@ -89,7 +89,7 @@ func Containers(run runtime.Runtime, prj *project.Project, user *config.User) ([
 		}
 
 		ctrs = append(ctrs, Container{
-			runContainer: c,
+			RunContainer: c,
 		})
 	}
 
@@ -113,7 +113,7 @@ func Get(run runtime.Runtime, ws *project.Workspace) (*Container, error) {
 	}
 
 	return &Container{
-		runContainer: runCtr,
+		RunContainer: runCtr,
 	}, nil
 }
 
@@ -142,14 +142,14 @@ func NewContainer(run runtime.Runtime, user *config.User,
 	}
 
 	return &Container{
-		runContainer: runCtr,
+		RunContainer: runCtr,
 	}, nil
 }
 
 // Create creates the container after it has been defined and before it can be built.
 func (ctr *Container) Create() error {
 
-	runCtr := ctr.runContainer
+	runCtr := ctr.RunContainer
 	return runCtr.Create()
 }
 
@@ -159,7 +159,7 @@ func (ctr *Container) Create() error {
 func findRootFs(ctr *Container,
 	ws *project.Workspace, nextLayerIdx int) (int, runtime.Snapshot, error) {
 
-	run := ctr.runContainer.Runtime()
+	run := ctr.RunContainer.Runtime()
 
 	// identify the layer with the topmost existing snapshot
 	bldLayerIdx := 0
@@ -196,7 +196,7 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 	user *config.User, params *config.Parameters,
 	progress chan []runtime.ProgressStatus, stream runtime.Stream) error {
 
-	runCtr := ctr.runContainer
+	runCtr := ctr.RunContainer
 
 	if nextLayerIdx == -1 {
 		nextLayerIdx = len(ws.Environment.Layers)
@@ -310,7 +310,7 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 // Commit commits a container that has been built and updates its configuration
 func (ctr *Container) Commit(ws *project.Workspace, user config.User) error {
 
-	runCtr := ctr.runContainer
+	runCtr := ctr.RunContainer
 
 	// Mount $HOME
 	err := runCtr.Mount(user.HomeDir, user.HomeDir)
@@ -330,7 +330,7 @@ func (ctr *Container) Commit(ws *project.Workspace, user config.User) error {
 // Amend updates the current snapshot
 func (ctr *Container) Amend(ws *project.Workspace, bldLayerIdx int) error {
 
-	runCtr := ctr.runContainer
+	runCtr := ctr.RunContainer
 	snap, err := runCtr.Amend()
 	if err != nil {
 		return err
@@ -380,7 +380,7 @@ func (ctr *Container) BuildExec(user *config.User, stream runtime.Stream,
 
 func commonExec(ctr *Container, procSpec *specs.Process, stream runtime.Stream) (uint32, error) {
 
-	runCtr := ctr.runContainer
+	runCtr := ctr.RunContainer
 
 	procSpec.Terminal = stream.Terminal
 
@@ -417,20 +417,20 @@ func commonExec(ctr *Container, procSpec *specs.Process, stream runtime.Stream) 
 
 // Delete deletes the container if not already deleted but not any associated Snapshots.
 func (ctr *Container) Delete() error {
-	return ctr.runContainer.Delete()
+	return ctr.RunContainer.Delete()
 }
 
 // Purge deletes the container if not already deleted and also all associated Snapshots.
 func (ctr *Container) Purge() error {
-	return ctr.runContainer.Purge()
+	return ctr.RunContainer.Purge()
 }
 
 // Name returns the container name
 func (ctr *Container) Name() string {
-	return Name(ctr.runContainer)
+	return Name(ctr.RunContainer)
 }
 
 // CreatedAt returns the time the container was created
 func (ctr *Container) CreatedAt() time.Time {
-	return ctr.runContainer.CreatedAt()
+	return ctr.RunContainer.CreatedAt()
 }
