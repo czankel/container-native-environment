@@ -85,11 +85,13 @@ func removeAptRunE(cmd *cobra.Command, args []string) error {
 		os.Exit(code)
 	}
 
-	ctr.Amend(ws, aptLayerIdx)
+	snap, err := ctr.RunContainer.Amend()
 	if err != nil {
 		ctr.RunContainer.Delete() // delete the container and active snapshot
 		return err
 	}
+	layer := &ws.Environment.Layers[aptLayerIdx]
+	layer.Digest = snap.Name()
 
 	err = prj.Write()
 	if err != nil {

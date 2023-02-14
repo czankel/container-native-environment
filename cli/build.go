@@ -99,7 +99,16 @@ func buildLayers(run runtime.Runtime, ctr *container.Container,
 
 // commitContainer commits the container
 func commitContainer(ctr *container.Container, ws *project.Workspace) error {
-	return ctr.Commit(ws, user)
+
+	runCtr := ctr.RunContainer
+
+	// Mount $HOME
+	err := runCtr.Mount(user.HomeDir, user.HomeDir)
+	if err != nil {
+		return err
+	}
+
+	return runCtr.Commit(ws.ConfigHash())
 }
 
 // buildContainer builds the container for the provided workspace and outputs progress status.

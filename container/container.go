@@ -27,8 +27,6 @@ type ContainerInterface interface {
 		progress chan []runtime.ProgressStatus, stream runtime.Stream) error
 	BuildExec(user *config.User, stream runtime.Stream,
 		args []string, env []string) (uint32, error)
-	Amend(ws *project.Workspace, bldLayerIdx int) error
-	Commit(ws *project.Workspace, user config.User) error
 }
 
 type Container struct {
@@ -271,40 +269,6 @@ func (ctr *Container) Build(ws *project.Workspace, nextLayerIdx int,
 			progress <- stat
 		}
 	}
-
-	return nil
-}
-
-// Commit commits a container that has been built and updates its configuration
-func (ctr *Container) Commit(ws *project.Workspace, user config.User) error {
-
-	runCtr := ctr.RunContainer
-
-	// Mount $HOME
-	err := runCtr.Mount(user.HomeDir, user.HomeDir)
-	if err != nil {
-		return err
-	}
-
-	confHash := ws.ConfigHash()
-	err = runCtr.Commit(confHash)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Amend updates the current snapshot
-func (ctr *Container) Amend(ws *project.Workspace, bldLayerIdx int) error {
-
-	runCtr := ctr.RunContainer
-	snap, err := runCtr.Amend()
-	if err != nil {
-		return err
-	}
-	layer := &ws.Environment.Layers[bldLayerIdx]
-	layer.Digest = snap.Name()
 
 	return nil
 }

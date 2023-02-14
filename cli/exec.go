@@ -124,11 +124,13 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 			layer.Commands = append(layer.Commands,
 				project.Command{"", []string{}, args})
 
-			err = ctr.Amend(ws, layerIdx)
+			snap, err := ctr.RunContainer.Amend()
 			if err != nil && !errors.Is(err, errdefs.ErrAlreadyExists) {
 				ctr.RunContainer.Delete() // delete the container and active snapshot
 				return 0, err
 			}
+			layer := &ws.Environment.Layers[layerIdx]
+			layer.Digest = snap.Name()
 
 			err = prj.Write()
 			if err != nil {
