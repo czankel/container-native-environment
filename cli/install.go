@@ -80,11 +80,11 @@ func installAptRunE(cmd *cobra.Command, args []string) error {
 
 	code, err := support.AptInstall(ws, aptLayerIdx, user, ctr, stream, installAptUpdate, args)
 	if err != nil {
-		ctr.Delete() // delete the container and active snapshot
+		ctr.RunContainer.Delete() // delete the container and active snapshot
 		return err
 	}
 	if code != 0 {
-		ctr.Delete()
+		ctr.RunContainer.Delete()
 		con.Reset()
 		run.Close()
 		os.Exit(code)
@@ -92,13 +92,13 @@ func installAptRunE(cmd *cobra.Command, args []string) error {
 
 	ctr.Amend(ws, aptLayerIdx)
 	if err != nil {
-		ctr.Delete() // delete the container and active snapshot
+		ctr.RunContainer.Delete() // delete the container and active snapshot
 		return err
 	}
 
 	err = prj.Write()
 	if err != nil {
-		ctr.Delete() // delete the container and active snapshot
+		ctr.RunContainer.Delete() // delete the container and active snapshot
 		return err
 	}
 

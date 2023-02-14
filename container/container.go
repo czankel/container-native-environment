@@ -3,7 +3,6 @@
 package container
 
 import (
-	"encoding/hex"
 	"errors"
 	"os"
 	"os/signal"
@@ -23,11 +22,6 @@ import (
 const MaxProgressOutputLength = 80
 
 type ContainerInterface interface {
-	Create() error
-	Delete() error
-	Purge() error
-	Name() string
-	CreatedAt() time.Time
 	Build(ws *project.Workspace, nextLayerIdx int,
 		user *config.User, params *config.Parameters,
 		progress chan []runtime.ProgressStatus, stream runtime.Stream) error
@@ -39,25 +33,6 @@ type ContainerInterface interface {
 
 type Container struct {
 	RunContainer runtime.Container `output:"-"`
-}
-
-// containerName is a helper function returning the unique name of a container consisting
-// of the domain, container id, and generation.
-func containerName(dom, cid, gen [16]byte) string {
-
-	return hex.EncodeToString(dom[:]) + "-" +
-		hex.EncodeToString(cid[:]) + "-" +
-		hex.EncodeToString(gen[:])
-}
-
-// containerNameRunCtr is a helper function to extract the container name from a runtime Container.
-func Name(runCtr runtime.Container) string {
-
-	dom := runCtr.Domain()
-	cid := runCtr.ID()
-	gen := runCtr.Generation()
-
-	return containerName(dom, cid, gen)
 }
 
 // Containers returns all active containers in the project.
@@ -144,13 +119,6 @@ func NewContainer(run runtime.Runtime, user *config.User,
 	return &Container{
 		RunContainer: runCtr,
 	}, nil
-}
-
-// Create creates the container after it has been defined and before it can be built.
-func (ctr *Container) Create() error {
-
-	runCtr := ctr.RunContainer
-	return runCtr.Create()
 }
 
 // find an existing top-most snapshot up to but excluding nextLayerIdx
@@ -413,24 +381,4 @@ func commonExec(ctr *Container, procSpec *specs.Process, stream runtime.Stream) 
 	signal.Stop(sigc)
 	close(sigc)
 	return exitStat.Code, exitStat.Error
-}
-
-// Delete deletes the container if not already deleted but not any associated Snapshots.
-func (ctr *Container) Delete() error {
-	return ctr.RunContainer.Delete()
-}
-
-// Purge deletes the container if not already deleted and also all associated Snapshots.
-func (ctr *Container) Purge() error {
-	return ctr.RunContainer.Purge()
-}
-
-// Name returns the container name
-func (ctr *Container) Name() string {
-	return Name(ctr.RunContainer)
-}
-
-// CreatedAt returns the time the container was created
-func (ctr *Container) CreatedAt() time.Time {
-	return ctr.RunContainer.CreatedAt()
 }

@@ -68,7 +68,7 @@ func deleteWorkspaceRunE(cmd *cobra.Command, args []string) error {
 	// ignore error TODO: print warning for error other than not-found
 	ctr, err := container.Get(run, ws)
 	if err == nil {
-		ctr.Purge()
+		ctr.RunContainer.Purge()
 	}
 
 	err = prj.DeleteWorkspace(name)
@@ -122,12 +122,12 @@ func deleteLayerRunE(cmd *cobra.Command, args []string) error {
 
 	err = prj.Write()
 	if err != nil {
-		ctr.Delete()
+		ctr.RunContainer.Delete()
 		return err
 	}
 
 	if oldCtr != nil {
-		oldCtr.Delete()
+		oldCtr.RunContainer.Delete()
 	}
 
 	return nil
@@ -159,8 +159,8 @@ func deleteContainerRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	for _, c := range ctrs {
-		if c.Name() == args[0] {
-			c.Purge()
+		if c.RunContainer.Name() == args[0] {
+			c.RunContainer.Purge()
 			break
 		}
 	}

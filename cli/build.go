@@ -40,10 +40,10 @@ func createContainer(run runtime.Runtime, ws *project.Workspace) (*container.Con
 		return nil, err
 	}
 
-	err = ctr.Create()
+	err = ctr.RunContainer.Create()
 	if err != nil && errors.Is(err, errdefs.ErrAlreadyExists) {
-		ctr.Delete()
-		err = ctr.Create()
+		ctr.RunContainer.Delete()
+		err = ctr.RunContainer.Create()
 	}
 	if err != nil {
 		return nil, err
@@ -170,9 +170,9 @@ func buildWorkspaceRunE(cmd *cobra.Command, args []string) error {
 	}
 	if err == nil {
 		if !buildWorkspaceForce && buildWorkspaceUpgrade == "" {
-			return errdefs.AlreadyExists("container", ctr.Name())
+			return errdefs.AlreadyExists("container", ctr.RunContainer.Name())
 		}
-		err = ctr.Purge()
+		err = ctr.RunContainer.Purge()
 		if err != nil {
 			return err
 		}

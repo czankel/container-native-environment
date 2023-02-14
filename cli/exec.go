@@ -126,13 +126,13 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 
 			err = ctr.Amend(ws, layerIdx)
 			if err != nil && !errors.Is(err, errdefs.ErrAlreadyExists) {
-				ctr.Delete() // delete the container and active snapshot
+				ctr.RunContainer.Delete() // delete the container and active snapshot
 				return 0, err
 			}
 
 			err = prj.Write()
 			if err != nil {
-				ctr.Delete() // delete the container and active snapshot
+				ctr.RunContainer.Delete() // delete the container and active snapshot
 				return 0, err
 			}
 		}

@@ -42,7 +42,7 @@ func cleanProjectRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	for _, c := range ctrs {
-		c.Purge() // Ignore errors
+		c.RunContainer.Purge() // Ignore errors
 	}
 
 	// add all snapshots to a map
