@@ -300,6 +300,14 @@ func deleteCtrdTask(ctrdRun *containerdRuntime, ctrdCtr containerd.Container) er
 	return nil
 }
 
+// Name returns the unique name of a container consisting of the domain,
+// container id, and generation.
+func (ctr *container) Name() string {
+
+	return composeCtrdID(ctr.domain, ctr.id) + "-" +
+		hex.EncodeToString(ctr.generation[:])
+}
+
 func (ctr *container) Runtime() runtime.Runtime {
 	return ctr.ctrdRuntime
 }

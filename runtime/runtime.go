@@ -120,6 +120,10 @@ type Image interface {
 // process created will become the init task (PID 1).
 type Container interface {
 
+	// Name returns the container name consisting of the concatenaded string
+	// of domain, ID, and generation
+	Name() string
+
 	// Runtime returns the runtime for the container
 	Runtime() Runtime
 
