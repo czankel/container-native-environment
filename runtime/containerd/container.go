@@ -21,6 +21,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/czankel/cne/config"
 	cnecontainer "github.com/czankel/cne/container"
 	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/runtime"
@@ -596,4 +597,14 @@ func (ctr *container) Delete() error {
 func (ctr *container) Purge() error {
 	return deleteCtrdContainer(ctr.ctrdRuntime,
 		ctr.ctrdContainer, ctr.domain, ctr.id, true /*purge*/)
+}
+
+func (ctr *container) Build(ws *project.Workspace, nextLayerIdx int,
+	user *config.User, params *config.Parameters,
+	progress chan []ProgressStatus, stream Stream) error {
+	return nil
+}
+
+func (ctr *container) Name() string {
+	return ""
 }
