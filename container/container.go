@@ -317,9 +317,6 @@ func commonExec(ctr *Container, procSpec *specs.Process, stream runtime.Stream) 
 	procSpec.Terminal = stream.Terminal
 
 	proc, err := runCtr.Exec(stream, procSpec)
-	if err != nil && errors.Is(err, errdefs.ErrNotFound) && errdefs.Resource(err) == "command" {
-		return 0, err
-	}
 	if err != nil {
 		return 0, err
 	}

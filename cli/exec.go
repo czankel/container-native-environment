@@ -87,7 +87,7 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 		}
 
 		code, err := ctr.Exec(&user, stream, args)
-		if err != nil && errors.Is(err, errdefs.ErrNotFound) {
+		if err != nil && errors.Is(err, errdefs.ErrNotFound) && errdefs.Resource(err) == "command" {
 			return 0, errors.New(args[0] + ": no such command")
 		}
 		if err != nil {
