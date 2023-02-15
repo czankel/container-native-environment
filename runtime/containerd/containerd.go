@@ -15,7 +15,6 @@ import (
 	"github.com/containerd/containerd/reference"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	runspecs "github.com/opencontainers/runtime-spec/specs-go"
 
 	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/errdefs"
@@ -205,8 +204,15 @@ func (ctrdRun *containerdRuntime) GetContainer(
 }
 
 func (ctrdRun *containerdRuntime) NewContainer(domain, id, generation [16]byte, uid uint32,
-	img runtime.Image, spec *runspecs.Spec) (runtime.Container, error) {
-	return newContainer(ctrdRun, nil, domain, id, generation, uid, img.(*image), spec), nil
+	img runtime.Image) (runtime.Container, error) {
+
+	// start with a base container
+	spec, err := runtime.DefaultSpec(ctrdRun.Namespace())
+	if err != nil {
+		return nil, err
+	}
+
+	return newContainer(ctrdRun, nil, domain, id, generation, uid, img.(*image), &spec), nil
 }
 
 func (ctrdRun *containerdRuntime) DeleteContainer(domain, id, generation [16]byte) error {

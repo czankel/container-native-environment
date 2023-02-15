@@ -11,8 +11,6 @@ import (
 
 	"github.com/google/uuid"
 
-	specs "github.com/opencontainers/runtime-spec/specs-go"
-
 	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/project"
@@ -20,6 +18,10 @@ import (
 )
 
 const MaxProgressOutputLength = 80
+
+var baseEnv = []string{
+	"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+}
 
 // Containers returns all active containers in the project.
 func Containers(run runtime.Runtime, prj *project.Project, user *config.User) ([]runtime.Container, error) {
@@ -86,14 +88,7 @@ func NewContainer(run runtime.Runtime, user *config.User,
 
 	cid := ws.ID()
 	gen := ws.BaseHash()
-
-	// start with a base container
-	spec, err := DefaultSpec(run.Namespace())
-	if err != nil {
-		return nil, err
-	}
-
-	runCtr, err := run.NewContainer(dom, cid, gen, user.UID, img, &spec)
+	runCtr, err := run.NewContainer(dom, cid, gen, user.UID, img)
 	if err != nil {
 		return nil, err
 	}
@@ -260,12 +255,13 @@ func Build(runCtr runtime.Container, ws *project.Workspace, nextLayerIdx int,
 // The container must be started before calling this function
 func Exec(runCtr runtime.Container, user *config.User, stream runtime.Stream, args []string) (uint32, error) {
 
-	procSpec := DefaultProcessSpec()
-	procSpec.Cwd = user.Pwd
-	procSpec.User.UID = user.UID
-	procSpec.User.GID = user.GID
-	procSpec.Args = args
-	procSpec.Env = os.Environ()
+	procSpec := runtime.ProcessSpec{
+		Cwd:  user.Pwd,
+		UID:  user.UID,
+		GID:  user.GID,
+		Args: args,
+		Env:  os.Environ(),
+	}
 
 	// TODO: have a mechanism to permit or disallow sudo, i.e. 'sudo cne'
 	allowSudo := true
@@ -273,7 +269,7 @@ func Exec(runCtr runtime.Container, user *config.User, stream runtime.Stream, ar
 		if !allowSudo {
 			return 0, errdefs.InvalidArgument("sudo not allowed")
 		}
-		procSpec.User.UID = 0
+		procSpec.UID = 0
 	}
 
 	return commonExec(runCtr, &procSpec, stream)
@@ -282,17 +278,16 @@ func Exec(runCtr runtime.Container, user *config.User, stream runtime.Stream, ar
 func BuildExec(runCtr runtime.Container, user *config.User, stream runtime.Stream,
 	args []string, envs []string) (uint32, error) {
 
-	procSpec := DefaultProcessSpec()
-	procSpec.User.UID = user.BuildUID
-	procSpec.User.GID = user.BuildGID
-	procSpec.Args = args
-	procSpec.Env = append(procSpec.Env, envs...)
+	procSpec := runtime.ProcessSpec{
+		UID:  user.BuildUID,
+		GID:  user.BuildGID,
+		Args: args,
+		Env:  append(baseEnv, envs...),
+	}
 	return commonExec(runCtr, &procSpec, stream)
 }
 
-func commonExec(runCtr runtime.Container, procSpec *specs.Process, stream runtime.Stream) (uint32, error) {
-
-	procSpec.Terminal = stream.Terminal
+func commonExec(runCtr runtime.Container, procSpec *runtime.ProcessSpec, stream runtime.Stream) (uint32, error) {
 
 	proc, err := runCtr.Exec(stream, procSpec)
 	if err != nil {

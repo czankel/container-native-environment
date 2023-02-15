@@ -22,7 +22,6 @@ import (
 
 	"github.com/google/uuid"
 
-	cnecontainer "github.com/czankel/cne/container"
 	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/runtime"
 )
@@ -455,7 +454,7 @@ func (ctr *container) UpdateSpec(newSpec *runspecs.Spec) error {
 func (ctr *container) Mount(destination string, source string) error {
 
 	ctrdRun := ctr.ctrdRuntime
-	spec, err := cnecontainer.DefaultSpec(ctrdRun.Namespace())
+	spec, err := runtime.DefaultSpec(ctrdRun.Namespace())
 	if err != nil {
 		return err
 	}
@@ -506,7 +505,7 @@ func (ctr *container) Amend() (runtime.Snapshot, error) {
 
 // Exec executes the provided command.
 func (ctr *container) Exec(stream runtime.Stream,
-	procSpec *runspecs.Process) (runtime.Process, error) {
+	runProcSpec *runtime.ProcessSpec) (runtime.Process, error) {
 
 	ctrdRun := ctr.ctrdRuntime
 	ctrdCtr := ctr.ctrdContainer
@@ -525,9 +524,20 @@ func (ctr *container) Exec(stream runtime.Stream,
 		cioOpts = append(cioOpts, cio.WithTerminal)
 	}
 
+	procSpec := runtime.DefaultProcessSpec()
+	if runProcSpec.Cwd != "" {
+		procSpec.Cwd = runProcSpec.Cwd
+	}
+	// FIXME: check that len(Args) > 0??
+	procSpec.User.UID = runProcSpec.UID
+	procSpec.User.GID = runProcSpec.GID
+	procSpec.Args = runProcSpec.Args
+	procSpec.Env = runProcSpec.Env
+	procSpec.Terminal = stream.Terminal
+
 	ioCreator := cio.NewCreator(cioOpts...)
 	execID := uuid.New()
-	ctrdProc, err := ctrdTask.Exec(ctrdCtx, execID.String(), procSpec, ioCreator)
+	ctrdProc, err := ctrdTask.Exec(ctrdCtx, execID.String(), &procSpec, ioCreator)
 	if err != nil {
 		return nil, runtime.Errorf("exec failed: %v", err)
 	}

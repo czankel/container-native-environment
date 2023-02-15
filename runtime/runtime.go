@@ -12,7 +12,6 @@ import (
 
 	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go/v1"
-	runspecs "github.com/opencontainers/runtime-spec/specs-go"
 
 	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/errdefs"
@@ -61,8 +60,7 @@ type Runtime interface {
 	GetContainer(domain, id, generation [16]byte) (Container, error)
 
 	// NewContainer defines a new Container without creating it.
-	NewContainer(domain, id, generation [16]byte, uid uint32,
-		image Image, spec *runspecs.Spec) (Container, error)
+	NewContainer(domain, id, generation [16]byte, uid uint32, image Image) (Container, error)
 
 	// DeleteContainer deletes the specified container. It returns ErrNotFound if the container
 	// doesn't exist.
@@ -151,9 +149,6 @@ type Container interface {
 	// The root filesystem can only be set when the container has not been created.
 	SetRootFs(snapshot Snapshot) error
 
-	// UpdateSpec updates the container spec.
-	UpdateSpec(spec *runspecs.Spec) error
-
 	// Create creates the container.
 	Create() error
 
@@ -182,7 +177,7 @@ type Container interface {
 
 	// Exec starts the provided command in the process spec and returns immediately.
 	// The container must be started before calling Exec.
-	Exec(stream Stream, procSpec *runspecs.Process) (Process, error)
+	Exec(stream Stream, procSpec *ProcessSpec) (Process, error)
 }
 
 // Stream describes the IO channels to a process that is running in a container.
@@ -191,6 +186,15 @@ type Stream struct {
 	Stdout   io.Writer
 	Stderr   io.Writer
 	Terminal bool
+}
+
+// ProcessSpec defines the process to be executed inside the container
+type ProcessSpec struct {
+	Args []string // arguments
+	Env  []string // environment variables
+	Cwd  string   // current directory
+	UID  uint32   // user ID
+	GID  uint32   // group ID
 }
 
 // Snapshot describes a snapshot of the current container filesystem.
