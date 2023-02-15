@@ -178,7 +178,7 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 	}
 	if oldCtr != nil {
 		// Ignore any errors, TOOD: add warning
-		oldCtr.RunContainer.Delete()
+		oldCtr.Delete()
 	}
 
 	return nil

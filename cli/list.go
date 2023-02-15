@@ -239,8 +239,8 @@ func listContainers(run runtime.Runtime, prj *project.Project) error {
 	}, len(ctrs), len(ctrs))
 
 	for i, c := range ctrs {
-		ctrList[i].Name = c.RunContainer.Name()
-		ctrList[i].CreatedAt = timeToAgoString(c.RunContainer.CreatedAt())
+		ctrList[i].Name = c.Name()
+		ctrList[i].CreatedAt = timeToAgoString(c.CreatedAt())
 	}
 
 	printList(ctrList, false)

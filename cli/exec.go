@@ -86,7 +86,7 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 			prj.Write()
 		}
 
-		code, err := ctr.Exec(&user, stream, args)
+		code, err := container.Exec(ctr, &user, stream, args)
 		if err != nil && errors.Is(err, errdefs.ErrNotFound) && errdefs.Resource(err) == "command" {
 			return 0, errors.New(args[0] + ": no such command")
 		}
@@ -111,7 +111,7 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		code, err := ctr.BuildExec(&user, stream, args, []string{})
+		code, err := container.BuildExec(ctr, &user, stream, args, []string{})
 		if err != nil {
 			return 0, err
 		}
@@ -124,9 +124,9 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 			layer.Commands = append(layer.Commands,
 				project.Command{"", []string{}, args})
 
-			snap, err := ctr.RunContainer.Amend()
+			snap, err := ctr.Amend()
 			if err != nil && !errors.Is(err, errdefs.ErrAlreadyExists) {
-				ctr.RunContainer.Delete() // delete the container and active snapshot
+				ctr.Delete() // delete the container and active snapshot
 				return 0, err
 			}
 			layer := &ws.Environment.Layers[layerIdx]
@@ -134,7 +134,7 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 
 			err = prj.Write()
 			if err != nil {
-				ctr.RunContainer.Delete() // delete the container and active snapshot
+				ctr.Delete() // delete the container and active snapshot
 				return 0, err
 			}
 		}

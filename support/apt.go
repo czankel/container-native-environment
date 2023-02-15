@@ -69,7 +69,7 @@ func getAptInstallCommand(aptLayer *project.Layer) (int, *project.Command) {
 
 // AptInstall attempts to install the specified app and adds it to the apt layer if successful.
 func AptInstall(ws *project.Workspace, aptLayerIdx int, user config.User,
-	ctr container.ContainerInterface,
+	runCtr runtime.Container,
 	stream runtime.Stream, aptUpdate bool, aptNames []string) (int, error) {
 
 	aptLayer := &ws.Environment.Layers[aptLayerIdx]
@@ -104,7 +104,7 @@ func AptInstall(ws *project.Workspace, aptLayerIdx int, user config.User,
 	// try to install the additional packages
 	if aptUpdate {
 		aptUpd := []string{"apt", "update"}
-		code, err := ctr.BuildExec(&user, stream, aptUpd, []string{})
+		code, err := container.BuildExec(runCtr, &user, stream, aptUpd, []string{})
 		if err != nil {
 			return 0, err
 		}
@@ -114,7 +114,7 @@ func AptInstall(ws *project.Workspace, aptLayerIdx int, user config.User,
 	}
 
 	args := append([]string{"apt", "install", "-y"}, aptNames...)
-	code, err := ctr.BuildExec(&user, stream, args, []string{"DEBIAN_FRONTEND=noninteractive"})
+	code, err := container.BuildExec(runCtr, &user, stream, args, []string{"DEBIAN_FRONTEND=noninteractive"})
 
 	if err != nil {
 		return 0, err
@@ -134,7 +134,7 @@ func AptInstall(ws *project.Workspace, aptLayerIdx int, user config.User,
 // or other layer.
 // This function returns the return code of the apt command and any error
 func AptRemove(ws *project.Workspace, aptLayerIdx int, user config.User,
-	ctr container.ContainerInterface, stream runtime.Stream, aptNames []string) (int, error) {
+	runCtr runtime.Container, stream runtime.Stream, aptNames []string) (int, error) {
 
 	aptLayer := &ws.Environment.Layers[aptLayerIdx]
 
@@ -163,7 +163,7 @@ func AptRemove(ws *project.Workspace, aptLayerIdx int, user config.User,
 	}
 
 	args := append([]string{"apt", "purge", "-y"}, delNames...)
-	code, err := ctr.BuildExec(&user, stream, args, []string{"DEBIAN_FRONTEND=noninteractive"})
+	code, err := container.BuildExec(runCtr, &user, stream, args, []string{"DEBIAN_FRONTEND=noninteractive"})
 	if err != nil {
 		return 0, err
 	}

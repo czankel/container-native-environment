@@ -75,19 +75,19 @@ func removeAptRunE(cmd *cobra.Command, args []string) error {
 
 	code, err := support.AptRemove(ws, aptLayerIdx, user, ctr, stream, args)
 	if err != nil {
-		ctr.RunContainer.Delete() // delete the container and active snapshot
+		ctr.Delete() // delete the container and active snapshot
 		return err
 	}
 	if code != 0 {
-		ctr.RunContainer.Delete()
+		ctr.Delete()
 		con.Reset()
 		run.Close()
 		os.Exit(code)
 	}
 
-	snap, err := ctr.RunContainer.Amend()
+	snap, err := ctr.Amend()
 	if err != nil {
-		ctr.RunContainer.Delete() // delete the container and active snapshot
+		ctr.Delete() // delete the container and active snapshot
 		return err
 	}
 	layer := &ws.Environment.Layers[aptLayerIdx]
@@ -95,7 +95,7 @@ func removeAptRunE(cmd *cobra.Command, args []string) error {
 
 	err = prj.Write()
 	if err != nil {
-		ctr.RunContainer.Delete() // delete the container and active snapshot
+		ctr.Delete() // delete the container and active snapshot
 		return err
 	}
 
