@@ -19,16 +19,22 @@ import (
 const outputLineLength = 200
 const outputLineCount = 100
 
-// createContainer creates the container for the provided workspace (and image),
-// and outputs progress status.
+// getContainer returns the existing active container for the workspace or
+// creates the container and outputs progress status.
 // Note that in an error case, it will keep any residual container and snapshots.
-func createContainer(run runtime.Runtime, ws *project.Workspace) (runtime.Container, error) {
+func getContainer(run runtime.Runtime, ws *project.Workspace) (runtime.Container, error) {
 
+	// check if container already exists
+	ctr, err := container.Get(run, ws)
+	if err == nil {
+		return ctr, nil
+	}
+
+	// check and pull the image, if required, for building the container
 	if ws.Environment.Origin == "" {
 		return nil, errdefs.InvalidArgument("Workspace has no image defined")
 	}
 
-	// check and pull the image, if required, for building the container
 	img, err := run.GetImage(ws.Environment.Origin)
 	if err != nil && errors.Is(err, errdefs.ErrNotFound) {
 		img, err = pullImage(run, ws.Environment.Origin)
@@ -86,16 +92,17 @@ func buildLayers(run runtime.Runtime, ctr runtime.Container,
 }
 
 // buildContainer builds the full container for the provided workspace and
-// committs it.
-func buildContainer(run runtime.Runtime, ws *project.Workspace) (runtime.Container, error) {
+// commits it.
+func buildContainer(run runtime.Runtime, ws *project.Workspace,
+	layerCount int) (runtime.Container, error) {
 
 	params.Upgrade = buildWorkspaceUpgrade
-	ctr, err := createContainer(run, ws)
+	ctr, err := getContainer(run, ws)
 	if err != nil {
 		return nil, err
 	}
 
-	err = buildLayers(run, ctr, ws, -1)
+	err = buildLayers(run, ctr, ws, layerCount)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +171,7 @@ func buildWorkspaceRunE(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	_, err = buildContainer(run, ws)
+	_, err = buildContainer(run, ws, -1)
 	if err != nil {
 		return err
 	}

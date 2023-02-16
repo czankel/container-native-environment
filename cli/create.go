@@ -166,7 +166,7 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	if rebuildContainer {
-		_, err := buildContainer(run, ws)
+		_, err := buildContainer(run, ws, -1)
 		if err != nil {
 			return err
 		}

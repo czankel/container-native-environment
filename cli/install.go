@@ -53,16 +53,7 @@ func installAptRunE(cmd *cobra.Command, args []string) error {
 		return errdefs.InvalidArgument("Workspace has no apt layer")
 	}
 
-	ctr, err := createContainer(run, ws)
-	if err != nil {
-		return err
-	}
-
-	// build all layers including the apt layer (i.e. + 1)
-	err = buildLayers(run, ctr, ws, aptLayerIdx+1)
-	if err != nil {
-		return err
-	}
+	ctr, err := buildContainer(run, ws, aptLayerIdx+1)
 
 	con := console.Current()
 	defer con.Reset()

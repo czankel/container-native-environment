@@ -78,8 +78,8 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 		if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 			return 0, err
 		}
-		if ctr == nil {
-			ctr, err = buildContainer(run, ws)
+		if errors.Is(err, errdefs.ErrNotFound) {
+			ctr, err = buildContainer(run, ws, -1)
 			if err != nil {
 				return 0, err
 			}
@@ -101,7 +101,7 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 			return 0, errdefs.InvalidArgument("No such layer: %s", execLayerName)
 		}
 
-		ctr, err := createContainer(run, ws)
+		ctr, err := getContainer(run, ws)
 		if err != nil {
 			return 0, err
 		}
@@ -111,6 +111,7 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 		if err != nil {
 			return 0, err
 		}
+
 		code, err := container.BuildExec(ctr, &user, stream, args, []string{})
 		if err != nil {
 			return 0, err

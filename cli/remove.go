@@ -49,7 +49,7 @@ func removeAptRunE(cmd *cobra.Command, args []string) error {
 		return errdefs.InvalidArgument("Workspace has no apt layer")
 	}
 
-	ctr, err := createContainer(run, ws)
+	ctr, err := getContainer(run, ws)
 	if err != nil {
 		return err
 	}

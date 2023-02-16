@@ -115,7 +115,7 @@ func deleteLayerRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	ctr, err := buildContainer(run, ws)
+	ctr, err := buildContainer(run, ws, -1)
 	if err != nil {
 		return err
 	}
