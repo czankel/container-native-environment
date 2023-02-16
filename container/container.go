@@ -78,8 +78,8 @@ func Get(run runtime.Runtime, ws *project.Workspace) (runtime.Container, error) 
 
 // NewContainer defines a new Container with a default generation value for the Workspace without
 // the Layer configuration. The generation value will be updated through Commit().
-func NewContainer(run runtime.Runtime, user *config.User,
-	ws *project.Workspace, img runtime.Image) (runtime.Container, error) {
+func NewContainer(run runtime.Runtime, ws *project.Workspace,
+	user *config.User, img runtime.Image) (runtime.Container, error) {
 
 	dom, err := uuid.Parse(ws.ProjectUUID)
 	if err != nil {
@@ -93,7 +93,20 @@ func NewContainer(run runtime.Runtime, user *config.User,
 		return nil, err
 	}
 
-	return runCtr, nil
+	if err != nil {
+		return nil, err
+	}
+
+	err = runCtr.Create()
+	if err != nil && errors.Is(err, errdefs.ErrAlreadyExists) {
+		runCtr.Delete()
+		err = runCtr.Create()
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return runCtr, err
 }
 
 // find an existing top-most snapshot up to but excluding nextLayerIdx

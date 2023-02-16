@@ -19,7 +19,9 @@ import (
 const outputLineLength = 200
 const outputLineCount = 100
 
-// createContainer defines and creates a new container
+// createContainer creates the container for the provided workspace (and image),
+// and outputs progress status.
+// Note that in an error case, it will keep any residual container and snapshots.
 func createContainer(run runtime.Runtime, ws *project.Workspace) (runtime.Container, error) {
 
 	if ws.Environment.Origin == "" {
@@ -35,21 +37,7 @@ func createContainer(run runtime.Runtime, ws *project.Workspace) (runtime.Contai
 		return nil, err
 	}
 
-	ctr, err := container.NewContainer(run, &user, ws, img)
-	if err != nil {
-		return nil, err
-	}
-
-	err = ctr.Create()
-	if err != nil && errors.Is(err, errdefs.ErrAlreadyExists) {
-		ctr.Delete()
-		err = ctr.Create()
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	return ctr, err
+	return container.NewContainer(run, ws, &user, img)
 }
 
 // buildLayers builds the layers of a container and outputs progress status.
