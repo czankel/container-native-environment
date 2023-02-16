@@ -1,9 +1,10 @@
 package config
 
 const (
-	UserConfigFile   = ".cneconfig"
-	SystemConfigFile = "/etc/cneconfig"
-	ConfigFilePerms  = 0644
+	UserConfigFile    = ".cneconfig"
+	SystemConfigFile  = "/etc/cneconfig"
+	ProjectConfigFile = "cneconfig"
+	ConfigFilePerms   = 0644
 
 	DefaultPackageVersion = "latest"
 

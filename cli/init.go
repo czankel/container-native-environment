@@ -32,16 +32,16 @@ func initProjectRunE(cmd *cobra.Command, args []string) error {
 		return errdefs.SystemError(err, "failed to get current working directory")
 	}
 
-	name := filepath.Base(path) + "/" + project.ProjectFileName
+	name := filepath.Base(path)
 	if len(args) > 0 {
 		name = args[0]
 	}
 
-	_, err = project.Load(projectPath + "/" + project.ProjectFileName)
+	_, err = project.Load(path + "/" + project.ProjectFileName)
 	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 		return err
 	}
-	if !errors.Is(err, errdefs.ErrNotFound) {
+	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 		return errdefs.AlreadyExists("project", name)
 	}
 

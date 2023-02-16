@@ -2,6 +2,7 @@ package cli
 
 import (
 	"errors"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 
@@ -33,18 +34,30 @@ configuration and the user option the configuration for the user.`,
 
 var showSystemConfig bool
 var showUserConfig bool
+var showProjectConfig bool
 
 func showConfigRunE(cmd *cobra.Command, args []string) error {
 
 	var err error
 
-	if showUserConfig == showSystemConfig {
-		conf, err = config.Load()
-	} else if showSystemConfig {
+	if showSystemConfig {
 		conf, err = config.LoadSystemConfig()
-	} else {
+	} else if showUserConfig {
 		conf, err = config.LoadUserConfig()
+	} else if showProjectConfig {
+		prj, err := loadProject()
+		if err != nil {
+			return err
+		}
+		conf, err = config.LoadProjectConfig(filepath.Dir(prj.Path))
+	} else {
+		conf, err = config.Load()
+		prj, err := loadProject()
+		if err == nil {
+			err = conf.UpdateProjectConfig(filepath.Dir(prj.Path))
+		}
 	}
+
 	if err != nil {
 		return err
 	}
@@ -181,6 +194,8 @@ func init() {
 	showCmd.AddCommand(showConfigCmd)
 	showConfigCmd.Flags().BoolVarP(
 		&showSystemConfig, "system", "", false, "Show only system configurations")
+	showConfigCmd.Flags().BoolVarP(
+		&showProjectConfig, "project", "", false, "Show only project configurations")
 	showConfigCmd.Flags().BoolVarP(
 		&showUserConfig, "user", "", false, "Show only user configurations")
 	showCmd.AddCommand(showProjectCmd)

@@ -35,7 +35,12 @@ func loadProject() (*project.Project, error) {
 		}
 	}
 
-	return project.Load(projectPath)
+	prj, err := project.Load(projectPath)
+	if err != nil {
+		return nil, err
+	}
+
+	return prj, conf.UpdateProjectConfig(filepath.Dir(prj.Path))
 }
 
 var rootCmd = &cobra.Command{

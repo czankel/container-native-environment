@@ -93,6 +93,21 @@ func LoadUserConfig() (*Config, error) {
 	return conf, err
 }
 
+// LoadProjectConfig loads only the project configuration, if exists
+func LoadProjectConfig(path string) (*Config, error) {
+
+	conf := &Config{}
+	err := conf.update(path + "/" + ProjectConfigFile)
+
+	return conf, err
+}
+
+// UpdateProjectConfig updates the configuration from the config file in the project path
+func (conf *Config) UpdateProjectConfig(path string) error {
+
+	return conf.update(path + "/" + ProjectConfigFile)
+}
+
 // getValue returns the reflect.Value for the element in the nested structure by the
 // concatenated filter (using '.' as the separator). The filter is case-insensitive.
 // This function also returns the actual path using the correctly capitalized letters
@@ -175,7 +190,7 @@ func (conf *Config) SetByName(name string, value string) (string, string, error)
 
 // Get returns the value of the configuration field specified by name
 // Errors:
-//  - ErrNotFound if the specified configuration field cannot be found
+//   - ErrNotFound if the specified configuration field cannot be found
 func (conf *Config) GetByName(name string) (string, string, error) {
 
 	path, field, _ := conf.getValue(name, false)
@@ -243,6 +258,25 @@ func (conf *Config) WriteUserConfig() error {
 				"failed to update permissions for '%s'", path)
 		}
 	}
+
+	writer := bufio.NewWriter(file)
+	err = toml.NewEncoder(writer).Encode(conf)
+	if err != nil {
+		return errdefs.SystemError(err, "failed to write configuration file '%s'", path)
+	}
+	return nil
+}
+
+// WriteLocalConfig writes the configuration to the project directory
+func (conf *Config) WriteProjectConfig(path string) error {
+
+	path = path + "/" + ProjectConfigFile
+	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, ConfigFilePerms)
+	if err != nil {
+		return errdefs.SystemError(err, "failed to write configuration file '%s'", path)
+	}
+	defer file.Close()
+	defer file.Sync()
 
 	writer := bufio.NewWriter(file)
 	err = toml.NewEncoder(writer).Encode(conf)

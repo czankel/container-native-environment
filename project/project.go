@@ -57,7 +57,7 @@ type Project struct {
 	UUID                 string // Universal Unique id for the project
 	CurrentWorkspaceName string
 	Workspaces           []Workspace
-	path                 string // path to the project file
+	Path                 string // path to the project file
 	instanceID           uint64
 	modifiedAt           time.Time
 }
@@ -73,9 +73,10 @@ type Workspace struct {
 
 // Environment describes the container-native environment
 // The options for the update strategy are as follows:
-//  * "never"  -  packages are never updated
-//  * "manual" -  manually (re-)building the image will update the packages
-//  * "auto"   -  packages will be updated whenever the package layer(s) are rebuild
+//   - "never"  -  packages are never updated
+//   - "manual" -  manually (re-)building the image will update the packages
+//   - "auto"   -  packages will be updated whenever the package layer(s) are rebuild
+//
 // Note that the image needs to be pulled manually to cause an update (using 'pull')
 type Environment struct {
 	Origin string // Name or link of the base image
@@ -156,7 +157,7 @@ func Create(name, path string) (*Project, error) {
 	prj := &Project{
 		Name:       name,
 		UUID:       uuid.New().String(),
-		path:       path,
+		Path:       path,
 		modifiedAt: fileInfo.ModTime(),
 	}
 
@@ -179,7 +180,7 @@ func Load(path string) (*Project, error) {
 
 	fileInfo, err := os.Stat(path)
 	if err != nil {
-		return nil, errdefs.InvalidArgument("invalid project path: '%s' (%v)", path, err)
+		return nil, errdefs.NotFound("project", path)
 	}
 
 	var prjStr []byte
@@ -219,7 +220,7 @@ func Load(path string) (*Project, error) {
 	}
 
 	fileInfo, err = os.Stat(path)
-	prj.path = path
+	prj.Path = path
 	prj.modifiedAt = fileInfo.ModTime()
 	stat, ok := fileInfo.Sys().(*syscall.Stat_t)
 	if ok {
@@ -249,7 +250,7 @@ func (prj *Project) Write() error {
 		return errdefs.InvalidArgument("project file corrupt")
 	}
 
-	err = ioutil.WriteFile(prj.path, append(hStr, pStr...), projectFilePerm)
+	err = ioutil.WriteFile(prj.Path, append(hStr, pStr...), projectFilePerm)
 	if err != nil {
 		return errdefs.SystemError(err, "failed to write project")
 	}
@@ -258,7 +259,7 @@ func (prj *Project) Write() error {
 
 // Delete removes the CNE project file
 func (prj *Project) Delete() error {
-	return os.Remove(prj.path)
+	return os.Remove(prj.Path)
 }
 
 // CurrentWorkspace retuns a pointer to the current workspace or nil if unset or no workspaces.
