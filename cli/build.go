@@ -85,22 +85,11 @@ func buildLayers(run runtime.Runtime, ctr runtime.Container,
 	return nil
 }
 
-// commitContainer commits the container
-func commitContainer(ctr runtime.Container, ws *project.Workspace) error {
-
-	// Mount $HOME
-	err := ctr.Mount(user.HomeDir, user.HomeDir)
-	if err != nil {
-		return err
-	}
-
-	return ctr.Commit(ws.ConfigHash())
-}
-
-// buildContainer builds the container for the provided workspace and outputs progress status.
-// Note that in an error case, it will keep any residual container and snapshots.
+// buildContainer builds the full container for the provided workspace and
+// committs it.
 func buildContainer(run runtime.Runtime, ws *project.Workspace) (runtime.Container, error) {
 
+	params.Upgrade = buildWorkspaceUpgrade
 	ctr, err := createContainer(run, ws)
 	if err != nil {
 		return nil, err
@@ -111,12 +100,14 @@ func buildContainer(run runtime.Runtime, ws *project.Workspace) (runtime.Contain
 		return nil, err
 	}
 
-	err = commitContainer(ctr, ws)
+	// Mount $HOME
+	err = ctr.Mount(user.HomeDir, user.HomeDir)
 	if err != nil {
 		return nil, err
 	}
 
-	return ctr, nil
+	err = ctr.Commit(ws.ConfigHash())
+	return ctr, err
 }
 
 var buildCmd = &cobra.Command{
@@ -173,14 +164,12 @@ func buildWorkspaceRunE(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	params.Upgrade = buildWorkspaceUpgrade
 	_, err = buildContainer(run, ws)
 	if err != nil {
 		return err
 	}
 
-	prj.Write()
-	return nil
+	return prj.Write()
 }
 
 func init() {
