@@ -69,6 +69,7 @@ type Workspace struct {
 	Name        string // Name of the workspace (must be unique)
 	ProjectUUID string `yaml:"-" output:"-"`
 	Environment Environment
+	/// FILES?? FIXME need path, modes, user/group?, hash
 }
 
 // Environment describes the container-native environment
@@ -99,6 +100,14 @@ type Command struct {
 	Name string
 	Envs []string `output:"flat" yaml:",flow"`
 	Args []string `output:"flat" yaml:",flow"`
+}
+
+// File information .... FIXME
+type File struct {
+	Path     string
+	Hash     string
+	FileMode dtring
+	ModTime  time.Time
 }
 
 // Create creates the project in the provide path
@@ -180,7 +189,7 @@ func Load(path string) (*Project, error) {
 
 	fileInfo, err := os.Stat(path)
 	if err != nil {
-		return nil, errdefs.NotFound("project", path)
+		return nil, errdefs.NotFound("project 1", path)
 	}
 
 	var prjStr []byte
@@ -194,7 +203,7 @@ func Load(path string) (*Project, error) {
 		prjStr, err = ioutil.ReadFile(path)
 		for err != nil && os.IsNotExist(err) {
 			if dir == "/" || dir == "." {
-				return nil, errdefs.NotFound("project", path)
+				return nil, errdefs.NotFound("project", ProjectFileName)
 			}
 			dir = filepath.Dir(dir)
 			path = dir + "/" + ProjectFileName

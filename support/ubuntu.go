@@ -19,7 +19,11 @@ func UbuntuCreateOSLayer(ws *project.Workspace, atIndex int) error {
 		Args: []string{
 			"adduser",
 			"--system",
+			"{{if .User.HomeDir == \"\"}}",
+			"--no-create-home",
+			"{{else}}",
 			"--home", "{{.User.HomeDir}}",
+			"{{endif}}",
 			"--shell", "{{.User.Shell}}",
 			"--uid", "{{.User.UID}}",
 			"--group",

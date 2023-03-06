@@ -90,3 +90,35 @@ func CurrentUser() (User, error) {
 
 	return user, nil
 }
+
+/*
+// DeploymentUser returns information about a deployment user....
+func DeploymentUser() (User, error) {
+
+	// Defaults:
+	//  Username: 	ProjectName
+	//  Groupname:	Username
+	//  Homedir: 	none? or /home/...
+	//  Pwd:	none? or /Projectname?
+	//  Shell:      bash ??
+	//  UID:        101
+	//  GID:        101
+	// FIXME: logging??
+
+	user := User{
+		Username:  prj.Deployment.Username,
+		Groupname: prj.Deployment.Groupname,
+		IsSudo:    false,
+		IsSuid:    false,
+		HomeDir:   prj.Homedir,
+		Pwd:       prj.Deployment.Pwd,
+		Shell:     prj.Deployment.Shell,
+		UID:       prj.Deployment.UID,
+		GID:       prj.Deployment.GID,
+		BuildID:   0,
+		BuildGID:  0,
+	}
+
+	return user, nil
+}
+*/
