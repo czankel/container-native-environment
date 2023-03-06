@@ -30,4 +30,5 @@ func serverRunE(cmd *cobra.Command, args []string) error {
 
 func init() {
 	rootCmd.AddCommand(serverCmd)
+	//	serverCmd.AddCommand(serverHelp)
 }

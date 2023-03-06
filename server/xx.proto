@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package cne;
+
+service Command {
+}
+
+
+message Command {
+  namespace
+  close
+
+  // image
+  images
+  getimage
+  pullimage
+  deleteimage
+
+  // snapshots
+  snapshots
+
+  //
+  containers
+  getcontainer
+  newcontainer
+  deletecontainer
+  purgecontainer
+}
+
+image {
+  name
+  digest
+  rootfs
+  createdat
+  config
+  size
+  mount
+  unmount
+}
+
+container {
+  createdat
+  updatedat
+  domain
+  id
+  generation
+  uid
+  setrootfs
+  // updatespec
+  create
+  delete
+  purge
+  amend
+  commit
+  exec
+}
+
+napshot {
+  name
+  parent
+  createdat
+  size
+  inodes
+}
+
+

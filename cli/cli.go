@@ -13,6 +13,8 @@ import (
 	"github.com/czankel/cne/project"
 )
 
+const CNEServerName = "cned"
+
 var conf *config.Config
 var user config.User
 var params config.Parameters
@@ -22,8 +24,8 @@ var rootCneVersion bool
 
 var projectPath string
 
-// IsRemote ...
-var IsRemote bool
+//
+var IsServer bool
 
 // helper function to load the project
 func loadProject() (*project.Project, error) {
@@ -84,7 +86,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(
 		&projectPath, "project", "P", "", "Projet path")
 	rootCmd.PersistentFlags().BoolVar(
-		&IsRemote, "remote", false, "Connect to a remote CNE")
+		&IsServer, "server", false, "Run CNE in server mode")
 	rootCmd.AddCommand(rootVersionCmd)
 	cobra.OnInitialize(initConfig)
 }
@@ -93,7 +95,14 @@ func init() {
 // in os.Args[1:]
 func Execute() error {
 
-	err := rootCmd.Execute()
+	var err error
+
+	// FIXME: moev this to cne.go and don't call into CLI? have different rootCmds??
+	if filepath.Base(os.Args[0]) == CNEServerName {
+		err := serverCmd.Execute()
+	} else {
+		err = rootCmd.Execute()
+	}
 	if err != nil && errdefs.IsCneError(err) {
 		err = fmt.Errorf("%s: %v", basenamee, err)
 	}
