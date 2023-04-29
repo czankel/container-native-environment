@@ -30,13 +30,18 @@ var deleteImageCmd = &cobra.Command{
 
 func deleteImageRunE(cmd *cobra.Command, args []string) error {
 
+	runCfg, err := conf.GetRuntime()
+	if err != nil {
+		return err
+	}
+
 	ctx := context.Background()
-	run, err := runtime.Open(ctx, &conf.Runtime)
+	run, err := runtime.Open(ctx, runCfg)
 	if err != nil {
 		return err
 	}
 	defer run.Close()
-	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
+	ctx = run.WithNamespace(ctx, runCfg.Namespace)
 
 	return run.DeleteImage(ctx, conf.FullImageName(args[0]))
 }
@@ -51,8 +56,13 @@ var deleteWorkspaceCmd = &cobra.Command{
 
 func deleteWorkspaceRunE(cmd *cobra.Command, args []string) error {
 
+	runCfg, err := conf.GetRuntime()
+	if err != nil {
+		return err
+	}
+
 	ctx := context.Background()
-	run, err := runtime.Open(ctx, &conf.Runtime)
+	run, err := runtime.Open(ctx, runCfg)
 	if err != nil {
 		return err
 	}
@@ -93,13 +103,18 @@ var deleteLayerCmd = &cobra.Command{
 
 func deleteLayerRunE(cmd *cobra.Command, args []string) error {
 
+	runCfg, err := conf.GetRuntime()
+	if err != nil {
+		return err
+	}
+
 	ctx := context.Background()
-	run, err := runtime.Open(ctx, &conf.Runtime)
+	run, err := runtime.Open(ctx, runCfg)
 	if err != nil {
 		return err
 	}
 	defer run.Close()
-	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
+	ctx = run.WithNamespace(ctx, runCfg.Namespace)
 
 	prj, err := loadProject()
 	if err != nil {
@@ -148,8 +163,13 @@ var deleteContainerCmd = &cobra.Command{
 
 func deleteContainerRunE(cmd *cobra.Command, args []string) error {
 
+	runCfg, err := conf.GetRuntime()
+	if err != nil {
+		return err
+	}
+
 	ctx := context.Background()
-	run, err := runtime.Open(ctx, &conf.Runtime)
+	run, err := runtime.Open(ctx, runCfg)
 	if err != nil {
 		return err
 	}

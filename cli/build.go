@@ -154,13 +154,18 @@ func buildWorkspaceRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx := context.Background()
-	run, err := runtime.Open(ctx, &conf.Runtime)
+	runCfg, err := conf.GetRuntime()
+	if err != nil {
+		return err
+	}
+
+	run, err := runtime.Open(ctx, runCfg)
 	if err != nil {
 		return err
 	}
 
 	defer run.Close()
-	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
+	ctx = run.WithNamespace(ctx, runCfg.Namespace)
 
 	// only allow a single build container at a time
 	ctr, err := container.Get(ctx, run, ws)

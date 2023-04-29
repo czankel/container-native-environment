@@ -37,8 +37,6 @@ var showSystemConfig bool
 var showUserConfig bool
 var showProjectConfig bool
 
-// FIXME: have --fullpath? concatenate  path
-
 func showConfigRunE(cmd *cobra.Command, args []string) error {
 
 	var err error
@@ -145,13 +143,19 @@ type OS struct {
 
 func showImageRunE(cmd *cobra.Command, args []string) error {
 
-	ctx := context.Background()
-	run, err := runtime.Open(ctx, &conf.Runtime)
+	runCfg, err := conf.GetRuntime()
 	if err != nil {
 		return err
 	}
+
+	ctx := context.Background()
+	run, err := runtime.Open(ctx, runCfg)
+	if err != nil {
+		return err
+	}
+
 	defer run.Close()
-	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
+	ctx = run.WithNamespace(ctx, runCfg.Namespace)
 
 	imgName := conf.FullImageName(args[0])
 	img, err := run.GetImage(ctx, imgName)

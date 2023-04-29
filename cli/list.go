@@ -117,12 +117,12 @@ func splitRepoNameTag(name string) (string, string) {
 	tPos := strings.Index(name, ":")
 	dispName := name[:tPos]
 
-	for rn, r := range conf.Registry {
+	for _, r := range conf.Registry {
 		p := r.Domain + "/" + r.RepoName
 		if strings.HasPrefix(dispName, p) {
 			dispName = name[len(p)+1 : tPos]
-			if rn != config.DefaultRegistryName {
-				dispName = rn + "/" + dispName
+			if r.Name != config.DefaultRegistryName {
+				dispName = r.Name + "/" + dispName
 			}
 		}
 	}
@@ -162,13 +162,18 @@ func listImages(ctx context.Context, run runtime.Runtime) error {
 
 func listImagesRunE(cmd *cobra.Command, args []string) error {
 
+	runCfg, err := conf.GetRuntime()
+	if err != nil {
+		return err
+	}
+
 	ctx := context.Background()
-	run, err := runtime.Open(ctx, &conf.Runtime)
+	run, err := runtime.Open(ctx, runCfg)
 	if err != nil {
 		return err
 	}
 	defer run.Close()
-	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
+	ctx = run.WithNamespace(ctx, runCfg.Namespace)
 
 	return listImages(ctx, run)
 }
@@ -210,13 +215,18 @@ func listSnapshots(ctx context.Context, run runtime.Runtime) error {
 
 func listSnapshotsRunE(cmd *cobra.Command, args []string) error {
 
+	runCfg, err := conf.GetRuntime()
+	if err != nil {
+		return err
+	}
+
 	ctx := context.Background()
-	run, err := runtime.Open(ctx, &conf.Runtime)
+	run, err := runtime.Open(ctx, runCfg)
 	if err != nil {
 		return err
 	}
 	defer run.Close()
-	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
+	ctx = run.WithNamespace(ctx, runCfg.Namespace)
 
 	return listSnapshots(ctx, run)
 }
@@ -257,13 +267,18 @@ func listContainersRunE(cmd *cobra.Command, args []string) error {
 
 	var prj *project.Project
 
+	runCfg, err := conf.GetRuntime()
+	if err != nil {
+		return err
+	}
+
 	ctx := context.Background()
-	run, err := runtime.Open(ctx, &conf.Runtime)
+	run, err := runtime.Open(ctx, runCfg)
 	if err != nil {
 		return err
 	}
 	defer run.Close()
-	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
+	ctx = run.WithNamespace(ctx, runCfg.Namespace)
 
 	if !listContainersAll {
 		prj, err = loadProject()
@@ -289,13 +304,18 @@ func listResourcesRunE(cmd *cobra.Command, args []string) error {
 
 	var prj *project.Project
 
+	runCfg, err := conf.GetRuntime()
+	if err != nil {
+		return err
+	}
+
 	ctx := context.Background()
-	run, err := runtime.Open(ctx, &conf.Runtime)
+	run, err := runtime.Open(ctx, runCfg)
 	if err != nil {
 		return err
 	}
 	defer run.Close()
-	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
+	ctx = run.WithNamespace(ctx, runCfg.Namespace)
 
 	if !listResourcesAll {
 		prj, err = loadProject()

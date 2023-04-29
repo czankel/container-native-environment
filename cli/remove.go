@@ -29,13 +29,18 @@ var removeAptCmd = &cobra.Command{
 
 func removeAptRunE(cmd *cobra.Command, args []string) error {
 
+	runCfg, err := conf.GetRuntime()
+	if err != nil {
+		return err
+	}
+
 	ctx := context.Background()
-	run, err := runtime.Open(ctx, &conf.Runtime)
+	run, err := runtime.Open(ctx, runCfg)
 	if err != nil {
 		return err
 	}
 	defer run.Close()
-	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
+	ctx = run.WithNamespace(ctx, runCfg.Namespace)
 
 	prj, err := loadProject()
 	if err != nil {

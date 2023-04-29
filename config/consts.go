@@ -8,9 +8,11 @@ const (
 
 	DefaultPackageVersion = "latest"
 
-	DefaultExecRuntimeName       = "containerd"
-	DefaultExecRuntimeSocketName = "/run/containerd/containerd.sock"
-	DefaultExecRuntimeNamespace  = "cne"
+	DefaultContextName = "default"
+
+	DefaultRuntimeName       = "containerd"
+	DefaultRuntimeSocketName = "/run/containerd/containerd.sock"
+	DefaultRuntimeNamespace  = "cne"
 
 	DefaultRegistryName     = "docker.io"
 	DefaultRegistryDomain   = "docker.io"

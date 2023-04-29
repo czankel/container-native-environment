@@ -39,13 +39,19 @@ func execCommandsInShell(wsName, layerName string, args []string) (int, error) {
 // similar return value as if the command was executed directly.
 func execCommands(wsName, layerName string, args []string) (int, error) {
 
+	runCfg, err := conf.GetRuntime()
+	if err != nil {
+		return 0, err
+	}
+
 	ctx := context.Background()
-	run, err := runtime.Open(ctx, &conf.Runtime)
+
+	run, err := runtime.Open(ctx, runCfg)
 	if err != nil {
 		return 0, err
 	}
 	defer run.Close()
-	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
+	ctx = run.WithNamespace(ctx, runCfg.Namespace)
 
 	prj, err := loadProject()
 	if err != nil {
