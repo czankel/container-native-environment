@@ -5,6 +5,7 @@
 package runtime
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -20,17 +21,17 @@ import (
 // Runtime is the main interface for managing containers, images, and snapshots.
 type Runtime interface {
 
-	// Namespace returns the namespace that was used for opening the runtime
-	Namespace() string
+	// WithNamespace sets the namespace
+	WithNamespace(ctx context.Context, ns string) context.Context
 
 	// Close closes the runtime and any open descriptors
 	Close()
 
 	// Images returns a list of images that are registered in the runtime
-	Images() ([]Image, error)
+	Images(ctx context.Context) ([]Image, error)
 
 	// GetImage returns an already pulled image or ErrNotFound if the image wasn't found.
-	GetImage(name string) (Image, error)
+	GetImage(ctx context.Context, name string) (Image, error)
 
 	// PullImage pulls an image into a local registry and returns an image instance.
 	//
@@ -39,36 +40,38 @@ type Runtime interface {
 	//
 	// Note that the status sent may exclude status information for entries that haven't
 	// changed.
-	PullImage(name string, progress chan<- []ProgressStatus) (Image, error)
+	PullImage(ctx context.Context, name string, progress chan<- []ProgressStatus) (Image, error)
 
 	// DeleteImage deletes the specified image from the registry.
-	DeleteImage(name string) error
+	DeleteImage(ctx context.Context, name string) error
 
 	// Snapshots returns all snapshots.
-	Snapshots() ([]Snapshot, error)
+	Snapshots(ctx context.Context) ([]Snapshot, error)
 
 	// DeleteSnapshot deletes the snapshot
-	DeleteSnapshot(name string) error
+	DeleteSnapshot(ctx context.Context, name string) error
 
 	// Containers returns all containers in the specified domain.
-	Containers(filters ...interface{}) ([]Container, error)
+	// FIXME: describe filters...
+	Containers(ctx context.Context, filters ...interface{}) ([]Container, error)
 
 	// GetContainer looks up and returns the specified container by domain, id, and generation.
 	// It returns ErrNotFound if the container could not be found.
 	//
 	// The container can be used to execute commands with Exec.
-	GetContainer(domain, id, generation [16]byte) (Container, error)
+	GetContainer(ctx context.Context, domain, id, generation [16]byte) (Container, error)
 
 	// NewContainer defines a new Container without creating it.
-	NewContainer(domain, id, generation [16]byte, uid uint32, image Image) (Container, error)
+	NewContainer(ctx context.Context,
+		domain, id, generation [16]byte, uid uint32, image Image) (Container, error)
 
 	// DeleteContainer deletes the specified container. It returns ErrNotFound if the container
 	// doesn't exist.
-	DeleteContainer(domain, id, generation [16]byte) error
+	DeleteContainer(ctx context.Context, domain, id, generation [16]byte) error
 
 	// PurgeContainer deletes the specified container and all associated resources. It returns
 	// ErrNotFound if the container doesn't exist.
-	PurgeContainer(domain, id, generation [16]byte) error
+	PurgeContainer(ctx context.Context, domain, id, generation [16]byte) error
 }
 
 // Image describes an image that consists of a file system and configuration options.
@@ -78,25 +81,25 @@ type Image interface {
 	Name() string
 
 	// Digest returns the digest of the image.
-	Digest() digest.Digest
-
-	// RootFS returns the digests of the root fs the image consists of.
-	RootFS() ([]digest.Digest, error)
+	Digest(ctx context.Context) digest.Digest
 
 	// CreatedAt returns the data the image was created.
 	CreatedAt() time.Time
 
+	// RootFS returns the digests of the root fs the image consists of.
+	RootFS(ctx context.Context) ([]digest.Digest, error)
+
 	// Config returns the configuration of the image.
-	Config() (*v1.ImageConfig, error)
+	Config(ctx context.Context) (*v1.ImageConfig, error)
 
 	// Size returns the size of the image.
-	Size() int64
+	Size(ctx context.Context) int64
 
 	// Mount mounts the image to the provide path.
-	Mount(path string) error
+	Mount(ctx context.Context, path string) error
 
 	// Unmount unmounts the image from the specified path,
-	Unmount(path string) error
+	Unmount(ctx context.Context, path string) error
 }
 
 // Container provides an abstraction for running processes in an isolated environment in user space.
@@ -144,40 +147,40 @@ type Container interface {
 	// Return the User ID
 	UID() uint32
 
-	// SetRootFSssets the rootfs to the provide snapshot.
+	// SetRootFs sets the rootfs to the provide snapshot.
 	//
 	// The root filesystem can only be set when the container has not been created.
-	SetRootFs(snapshot Snapshot) error
+	SetRootFs(ctx context.Context, snapshot Snapshot) error
 
 	// Create creates the container.
-	Create() error
+	Create(ctx context.Context) error
 
 	// Delete deletes the container.
-	Delete() error
+	Delete(ctx context.Context) error
 
 	// Purge deletes the container and all snapshots that are not otherwise used.
-	Purge() error
+	Purge(ctx context.Context) error
 
 	// Snapshot creates a snapshot of the current file system.
 	//
 	// Snapshot support is optional, and runtimes that don't support it return an
 	// ErrNotImplemented error and nil for the snapshot.
-	Snapshot() (Snapshot, error)
+	Snapshot(ctx context.Context) (Snapshot, error)
 
 	// Amend amends the committed snapshot with the current changes to the filesystem.
-	Amend() (Snapshot, error)
+	Amend(ctx context.Context) (Snapshot, error)
 
 	// Commit commits the container after it has been built with a new generation value.
-	Commit(generation [16]byte) error
+	Commit(ctx context.Context, generation [16]byte) error
 
 	// Mount adds a local mount point to the container.
 	// This must be called before comitting the container, for example, to
 	// mount the home directory after building the container.
-	Mount(destination string, source string) error
+	Mount(ctx context.Context, destination string, source string) error
 
 	// Exec starts the provided command in the process spec and returns immediately.
 	// The container must be started before calling Exec.
-	Exec(stream Stream, procSpec *ProcessSpec) (Process, error)
+	Exec(ctx context.Context, stream Stream, procSpec *ProcessSpec) (Process, error)
 }
 
 // Stream describes the IO channels to a process that is running in a container.
@@ -210,20 +213,20 @@ type Snapshot interface {
 	CreatedAt() time.Time
 
 	// Size returns the size of the snapshot.
-	Size() (int64, error)
+	Size(ctx context.Context) (int64, error)
 
 	// Inodex returns the number of additional inodes in the snapshot.
-	Inodes() (int64, error)
+	Inodes(ctx context.Context) (int64, error)
 }
 
 // Process describes a process running inside a container.
 type Process interface {
 
 	// Signal sends a signal to the process.
-	Signal(sig os.Signal) error
+	Signal(ctx context.Context, sig os.Signal) error
 
 	// Wait waits asynchronously for the process to exit and sends the exit code to the channel.
-	Wait() (<-chan ExitStatus, error)
+	Wait(ctx context.Context) (<-chan ExitStatus, error)
 }
 
 // Progress status values.
@@ -261,7 +264,7 @@ type ExitStatus struct {
 
 // RuntimeType is a construct that allows to self-register runtime implementations.
 type RuntimeType interface {
-	Open(config.Runtime) (Runtime, error)
+	Open(context.Context, *config.Runtime) (Runtime, error)
 }
 
 var runtimes map[string]RuntimeType
@@ -290,12 +293,12 @@ func Runtimes() []string {
 }
 
 // Open opens a new runtime for the specified name.
-func Open(confRun config.Runtime) (Runtime, error) {
+func Open(ctx context.Context, confRun *config.Runtime) (Runtime, error) {
 	reg, ok := runtimes[confRun.Name]
 	if !ok {
 		return nil, errdefs.NotFound("runtime", confRun.Name)
 	}
-	return reg.Open(confRun)
+	return reg.Open(ctx, confRun)
 }
 
 // Errorf is an internal function to create an error specific to the runtime.

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"os"
 
@@ -57,13 +58,15 @@ func initWorkspace(prj *project.Project, wsName, insert, imgName string) error {
 	}
 
 	if imgName != "" {
-		run, err := runtime.Open(conf.Runtime)
+		ctx := context.Background()
+		run, err := runtime.Open(ctx, &conf.Runtime)
 		if err != nil {
 			return err
 		}
 		defer run.Close()
+		ctx = run.WithNamespace(ctx, conf.Runtime.Name)
 
-		img, err := pullImage(run, imgName)
+		img, err := pullImage(ctx, run, imgName)
 		if err != nil {
 			return err
 		}
@@ -97,18 +100,20 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	run, err := runtime.Open(conf.Runtime)
+	ctx := context.Background()
+	run, err := runtime.Open(ctx, &conf.Runtime)
 	if err != nil {
 		return err
 	}
 	defer run.Close()
+	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
 
 	ws, err := prj.CurrentWorkspace()
 	if err != nil {
 		return err
 	}
 
-	oldCtr, err := container.Get(run, ws)
+	oldCtr, err := container.Get(ctx, run, ws)
 	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 		return err
 	}
@@ -166,7 +171,7 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	if rebuildContainer {
-		_, err := buildContainer(run, ws, -1)
+		_, err := buildContainer(ctx, run, ws, -1)
 		if err != nil {
 			return err
 		}
@@ -178,7 +183,7 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 	}
 	if oldCtr != nil {
 		// Ignore any errors, TOOD: add warning
-		oldCtr.Delete()
+		oldCtr.Delete(ctx)
 	}
 
 	return nil

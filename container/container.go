@@ -3,6 +3,7 @@
 package container
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/signal"
@@ -24,7 +25,8 @@ var baseEnv = []string{
 }
 
 // Containers returns all active containers in the project.
-func Containers(run runtime.Runtime, prj *project.Project, user *config.User) ([]runtime.Container, error) {
+func Containers(ctx context.Context, run runtime.Runtime,
+	prj *project.Project, user *config.User) ([]runtime.Container, error) {
 
 	var domain [16]byte
 	var err error
@@ -36,7 +38,7 @@ func Containers(run runtime.Runtime, prj *project.Project, user *config.User) ([
 	}
 
 	var ctrs []runtime.Container
-	runCtrs, err := run.Containers()
+	runCtrs, err := run.Containers(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +60,8 @@ func Containers(run runtime.Runtime, prj *project.Project, user *config.User) ([
 }
 
 // Get looks up the current active Container for the specified Workspace.
-func Get(run runtime.Runtime, ws *project.Workspace) (runtime.Container, error) {
+func Get(ctx context.Context,
+	run runtime.Runtime, ws *project.Workspace) (runtime.Container, error) {
 
 	dom, err := uuid.Parse(ws.ProjectUUID)
 	if err != nil {
@@ -68,7 +71,7 @@ func Get(run runtime.Runtime, ws *project.Workspace) (runtime.Container, error) 
 
 	cid := ws.ID()
 	gen := ws.ConfigHash()
-	runCtr, err := run.GetContainer(dom, cid, gen)
+	runCtr, err := run.GetContainer(ctx, dom, cid, gen)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +81,7 @@ func Get(run runtime.Runtime, ws *project.Workspace) (runtime.Container, error) 
 
 // NewContainer defines a new Container with a default generation value for the Workspace without
 // the Layer configuration. The generation value will be updated through Commit().
-func NewContainer(run runtime.Runtime, ws *project.Workspace,
+func NewContainer(ctx context.Context, run runtime.Runtime, ws *project.Workspace,
 	user *config.User, img runtime.Image) (runtime.Container, error) {
 
 	dom, err := uuid.Parse(ws.ProjectUUID)
@@ -88,7 +91,7 @@ func NewContainer(run runtime.Runtime, ws *project.Workspace,
 
 	cid := ws.ID()
 	gen := ws.BaseHash()
-	runCtr, err := run.NewContainer(dom, cid, gen, user.UID, img)
+	runCtr, err := run.NewContainer(ctx, dom, cid, gen, user.UID, img)
 	if err != nil {
 		return nil, err
 	}
@@ -97,10 +100,10 @@ func NewContainer(run runtime.Runtime, ws *project.Workspace,
 		return nil, err
 	}
 
-	err = runCtr.Create()
+	err = runCtr.Create(ctx)
 	if err != nil && errors.Is(err, errdefs.ErrAlreadyExists) {
-		runCtr.Delete()
-		err = runCtr.Create()
+		runCtr.Delete(ctx)
+		err = runCtr.Create(ctx)
 	}
 	if err != nil {
 		return nil, err
@@ -112,7 +115,7 @@ func NewContainer(run runtime.Runtime, ws *project.Workspace,
 // find an existing top-most snapshot up to but excluding nextLayerIdx
 // and return it with the layer index.
 // Layer index 0 and snaphost nil means that there is no snapshot that matches
-func findRootFs(runCtr runtime.Container,
+func findRootFs(ctx context.Context, runCtr runtime.Container,
 	ws *project.Workspace, nextLayerIdx int) (int, runtime.Snapshot, error) {
 
 	run := runCtr.Runtime()
@@ -121,7 +124,7 @@ func findRootFs(runCtr runtime.Container,
 	bldLayerIdx := 0
 	var snap runtime.Snapshot
 
-	snaps, err := run.Snapshots()
+	snaps, err := run.Snapshots(ctx)
 	if err != nil {
 		return -1, nil, err
 	}
@@ -148,7 +151,7 @@ func findRootFs(runCtr runtime.Container,
 // A container may already be partially built. In that case, Build() will continue the build
 // process.
 // The progress argument is optional for outputting status updates during the build process.
-func Build(runCtr runtime.Container, ws *project.Workspace, nextLayerIdx int,
+func Build(ctx context.Context, runCtr runtime.Container, ws *project.Workspace, nextLayerIdx int,
 	user *config.User, params *config.Parameters,
 	progress chan []runtime.ProgressStatus, stream runtime.Stream) error {
 
@@ -156,7 +159,7 @@ func Build(runCtr runtime.Container, ws *project.Workspace, nextLayerIdx int,
 		nextLayerIdx = len(ws.Environment.Layers)
 	}
 
-	bldLayerIdx, rootFsSnap, err := findRootFs(runCtr, ws, nextLayerIdx)
+	bldLayerIdx, rootFsSnap, err := findRootFs(ctx, runCtr, ws, nextLayerIdx)
 	if err != nil {
 		return err
 	}
@@ -187,7 +190,7 @@ func Build(runCtr runtime.Container, ws *project.Workspace, nextLayerIdx int,
 		progress <- stat
 	}
 
-	err = runCtr.SetRootFs(rootFsSnap)
+	err = runCtr.SetRootFs(ctx, rootFsSnap)
 	if err != nil {
 		return err
 	}
@@ -210,7 +213,7 @@ func Build(runCtr runtime.Container, ws *project.Workspace, nextLayerIdx int,
 
 			args, err := expandLine(command.Args, vars)
 			if err != nil {
-				runCtr.Delete() // ignore error
+				runCtr.Delete(ctx) // ignore error
 				return err
 			}
 
@@ -229,23 +232,23 @@ func Build(runCtr runtime.Container, ws *project.Workspace, nextLayerIdx int,
 				progress <- stat
 			}
 
-			code, err := BuildExec(runCtr, user, stream, args, command.Envs)
+			code, err := BuildExec(ctx, runCtr, user, stream, args, command.Envs)
 			if code != 0 {
 				err = errdefs.CommandFailed(args)
 			}
 			if err != nil {
-				runCtr.Delete()
+				runCtr.Delete(ctx)
 				return err
 			}
 		}
 
 		// create a snapshot for the layer
 		layer.Digest = ""
-		snap, err := runCtr.Snapshot()
+		snap, err := runCtr.Snapshot(ctx)
 		if err != nil &&
 			!errors.Is(err, errdefs.ErrNotImplemented) &&
 			!errors.Is(err, errdefs.ErrAlreadyExists) {
-			runCtr.Delete()
+			runCtr.Delete(ctx)
 			return err
 		}
 		if snap != nil {
@@ -266,7 +269,8 @@ func Build(runCtr runtime.Container, ws *project.Workspace, nextLayerIdx int,
 // It uses the default environment from the calling process.
 // I/O is defined by the provided stream.
 // The container must be started before calling this function
-func Exec(runCtr runtime.Container, user *config.User, stream runtime.Stream, args []string) (uint32, error) {
+func Exec(ctx context.Context, runCtr runtime.Container,
+	user *config.User, stream runtime.Stream, args []string) (uint32, error) {
 
 	procSpec := runtime.ProcessSpec{
 		Cwd:  user.Pwd,
@@ -285,10 +289,11 @@ func Exec(runCtr runtime.Container, user *config.User, stream runtime.Stream, ar
 		procSpec.UID = 0
 	}
 
-	return commonExec(runCtr, &procSpec, stream)
+	return commonExec(ctx, runCtr, &procSpec, stream)
 }
 
-func BuildExec(runCtr runtime.Container, user *config.User, stream runtime.Stream,
+func BuildExec(ctx context.Context, runCtr runtime.Container,
+	user *config.User, stream runtime.Stream,
 	args []string, envs []string) (uint32, error) {
 
 	procSpec := runtime.ProcessSpec{
@@ -297,17 +302,18 @@ func BuildExec(runCtr runtime.Container, user *config.User, stream runtime.Strea
 		Args: args,
 		Env:  append(baseEnv, envs...),
 	}
-	return commonExec(runCtr, &procSpec, stream)
+	return commonExec(ctx, runCtr, &procSpec, stream)
 }
 
-func commonExec(runCtr runtime.Container, procSpec *runtime.ProcessSpec, stream runtime.Stream) (uint32, error) {
+func commonExec(ctx context.Context, runCtr runtime.Container,
+	procSpec *runtime.ProcessSpec, stream runtime.Stream) (uint32, error) {
 
-	proc, err := runCtr.Exec(stream, procSpec)
+	proc, err := runCtr.Exec(ctx, stream, procSpec)
 	if err != nil {
 		return 0, err
 	}
 
-	ch, err := proc.Wait()
+	ch, err := proc.Wait(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -320,7 +326,7 @@ func commonExec(runCtr runtime.Container, procSpec *runtime.ProcessSpec, stream 
 			if !more {
 				return
 			}
-			proc.Signal(s)
+			proc.Signal(ctx, s)
 		}
 	}()
 

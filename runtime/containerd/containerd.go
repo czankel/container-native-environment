@@ -27,9 +27,7 @@ const containerdUIDLabel = "CNE-UID"
 // containerdRuntime provides the runtime implementation for the containerd daemon
 // For more information about containerd, see: https://github.com/containerd/containerd
 type containerdRuntime struct {
-	client    *containerd.Client
-	context   context.Context
-	namespace string
+	client *containerd.Client
 }
 
 type containerdRuntimeType struct {
@@ -43,7 +41,14 @@ func init() {
 
 // Runtime Interface
 
-func (r *containerdRuntimeType) Open(confRun config.Runtime) (runtime.Runtime, error) {
+func (ctrdRun *containerdRuntime) WithNamespace(ctx context.Context, ns string) context.Context {
+	return namespaces.WithNamespace(ctx, ns)
+}
+
+// Runtime Interface
+// FIXME: context should not be saved???
+func (r *containerdRuntimeType) Open(ctx context.Context,
+	confRun *config.Runtime) (runtime.Runtime, error) {
 
 	// Validate the provided port
 	_, err := os.Stat(confRun.SocketName)
@@ -58,26 +63,18 @@ func (r *containerdRuntimeType) Open(confRun config.Runtime) (runtime.Runtime, e
 			confRun.SocketName, err)
 	}
 
-	ctrdCtx := namespaces.WithNamespace(context.Background(), confRun.Namespace)
-
 	return &containerdRuntime{
-		client:    client,
-		context:   ctrdCtx,
-		namespace: confRun.Namespace,
+		client: client,
 	}, nil
-}
-
-func (ctrdRun *containerdRuntime) Namespace() string {
-	return ctrdRun.namespace
 }
 
 func (ctrdRun *containerdRuntime) Close() {
 	ctrdRun.client.Close()
 }
 
-func (ctrdRun *containerdRuntime) Images() ([]runtime.Image, error) {
+func (ctrdRun *containerdRuntime) Images(ctx context.Context) ([]runtime.Image, error) {
 
-	ctrdImgs, err := ctrdRun.client.ListImages(ctrdRun.context)
+	ctrdImgs, err := ctrdRun.client.ListImages(ctx)
 	if err != nil {
 		return nil, runtime.Errorf("ListImages failed: %v", err)
 	}
@@ -93,9 +90,10 @@ func (ctrdRun *containerdRuntime) Images() ([]runtime.Image, error) {
 	return runImgs, nil
 }
 
-func (ctrdRun *containerdRuntime) GetImage(name string) (runtime.Image, error) {
+func (ctrdRun *containerdRuntime) GetImage(ctx context.Context,
+	name string) (runtime.Image, error) {
 
-	ctrdImg, err := ctrdRun.client.GetImage(ctrdRun.context, name)
+	ctrdImg, err := ctrdRun.client.GetImage(ctx, name)
 	if errors.Is(err, ctrderr.ErrNotFound) {
 		return nil, errdefs.NotFound("image", name)
 	} else if err != nil {
@@ -111,7 +109,7 @@ func (ctrdRun *containerdRuntime) GetImage(name string) (runtime.Image, error) {
 // TODO: ContainerD is not really stable when interrupting an image pull (e.g. using CTRL-C)
 // TODO: Snapshots can stay in extracting stage and never complete.
 
-func (ctrdRun *containerdRuntime) PullImage(name string,
+func (ctrdRun *containerdRuntime) PullImage(ctx context.Context, name string,
 	progress chan<- []runtime.ProgressStatus) (runtime.Image, error) {
 
 	var mutex sync.Mutex
@@ -120,7 +118,7 @@ func (ctrdRun *containerdRuntime) PullImage(name string,
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	h := images.HandlerFunc(func(ctrdCtx context.Context,
+	h := images.HandlerFunc(func(ctx context.Context,
 		desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 
 		if desc.MediaType != images.MediaTypeDockerSchema1Manifest {
@@ -140,19 +138,19 @@ func (ctrdRun *containerdRuntime) PullImage(name string,
 		return nil, nil
 	})
 
-	pctx, stopProgress := context.WithCancel(ctrdRun.context)
+	pctx, stopProgress := context.WithCancel(ctx)
 	if progress != nil {
 		go func() {
 			defer wg.Done()
 			defer close(progress)
-			updateImageProgress(ctrdRun, pctx, &mutex, &descs, progress)
+			updateImageProgress(pctx, ctrdRun, &mutex, &descs, progress)
 		}()
 	}
 
 	// ignore signals while pulling - see comment above
 	signal.Ignore()
 
-	ctrdImg, err := ctrdRun.client.Pull(ctrdRun.context, name,
+	ctrdImg, err := ctrdRun.client.Pull(ctx, name,
 		containerd.WithPullUnpack, containerd.WithImageHandler(h))
 
 	signal.Reset()
@@ -174,10 +172,10 @@ func (ctrdRun *containerdRuntime) PullImage(name string,
 	}, nil
 }
 
-func (ctrdRun *containerdRuntime) DeleteImage(name string) error {
+func (ctrdRun *containerdRuntime) DeleteImage(ctx context.Context, name string) error {
 	imgSvc := ctrdRun.client.ImageService()
 
-	err := imgSvc.Delete(ctrdRun.context, name, images.SynchronousDelete())
+	err := imgSvc.Delete(ctx, name, images.SynchronousDelete())
 	if err != nil {
 		return runtime.Errorf("delete image '%s' failed: %v", name, err)
 	}
@@ -186,28 +184,37 @@ func (ctrdRun *containerdRuntime) DeleteImage(name string) error {
 
 }
 
-func (ctrdRun *containerdRuntime) Snapshots() ([]runtime.Snapshot, error) {
-	return getSnapshots(ctrdRun)
+func (ctrdRun *containerdRuntime) Snapshots(ctx context.Context) ([]runtime.Snapshot, error) {
+	return getSnapshots(ctx, ctrdRun)
 }
 
-func (ctrdRun *containerdRuntime) DeleteSnapshot(name string) error {
-	return deleteSnapshot(ctrdRun, name)
+func (ctrdRun *containerdRuntime) GetSnapshot(
+	ctx context.Context, name string) (runtime.Snapshot, error) {
+	return getSnapshot(ctx, ctrdRun, name)
 }
 
-func (ctrdRun *containerdRuntime) Containers(filters ...interface{}) ([]runtime.Container, error) {
-	return getContainers(ctrdRun, filters...)
+func (ctrdRun *containerdRuntime) DeleteSnapshot(ctx context.Context,
+	name string) error {
+
+	return deleteSnapshot(ctx, ctrdRun, name)
 }
 
-func (ctrdRun *containerdRuntime) GetContainer(
+func (ctrdRun *containerdRuntime) Containers(ctx context.Context,
+	filters ...interface{}) ([]runtime.Container, error) {
+	return getContainers(ctx, ctrdRun, filters...)
+}
+
+func (ctrdRun *containerdRuntime) GetContainer(ctx context.Context,
 	domain, id, generation [16]byte) (runtime.Container, error) {
-	return getContainer(ctrdRun, domain, id, generation)
+	return getContainer(ctx, ctrdRun, domain, id, generation)
 }
 
-func (ctrdRun *containerdRuntime) NewContainer(domain, id, generation [16]byte, uid uint32,
+func (ctrdRun *containerdRuntime) NewContainer(ctx context.Context,
+	domain, id, generation [16]byte, uid uint32,
 	img runtime.Image) (runtime.Container, error) {
 
 	// start with a base container
-	spec, err := runtime.DefaultSpec(ctrdRun.Namespace())
+	spec, err := runtime.DefaultSpec(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -215,10 +222,14 @@ func (ctrdRun *containerdRuntime) NewContainer(domain, id, generation [16]byte, 
 	return newContainer(ctrdRun, nil, domain, id, generation, uid, img.(*image), &spec), nil
 }
 
-func (ctrdRun *containerdRuntime) DeleteContainer(domain, id, generation [16]byte) error {
-	return deleteContainer(ctrdRun, domain, id, false /*purge*/)
+func (ctrdRun *containerdRuntime) DeleteContainer(ctx context.Context,
+	domain, id, generation [16]byte) error {
+
+	return deleteContainer(ctx, ctrdRun, domain, id, false /*purge*/)
 }
 
-func (ctrdRun *containerdRuntime) PurgeContainer(domain, id, generation [16]byte) error {
-	return deleteContainer(ctrdRun, domain, id, true /*purge*/)
+func (ctrdRun *containerdRuntime) PurgeContainer(ctx context.Context,
+	domain, id, generation [16]byte) error {
+
+	return deleteContainer(ctx, ctrdRun, domain, id, true /*purge*/)
 }

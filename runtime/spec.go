@@ -1,6 +1,8 @@
 package runtime
 
 import (
+	"context"
+
 	specs "github.com/opencontainers/runtime-spec/specs-go"
 )
 
@@ -89,7 +91,7 @@ func DefaultProcessSpec() specs.Process {
 	}
 }
 
-func DefaultSpec(namespace string) (specs.Spec, error) {
+func DefaultSpec(ctx context.Context) (specs.Spec, error) {
 
 	caps := []string{}
 

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"path/filepath"
 
@@ -35,6 +36,8 @@ configuration and the user option the configuration for the user.`,
 var showSystemConfig bool
 var showUserConfig bool
 var showProjectConfig bool
+
+// FIXME: have --fullpath? concatenate  path
 
 func showConfigRunE(cmd *cobra.Command, args []string) error {
 
@@ -142,16 +145,18 @@ type OS struct {
 
 func showImageRunE(cmd *cobra.Command, args []string) error {
 
-	run, err := runtime.Open(conf.Runtime)
+	ctx := context.Background()
+	run, err := runtime.Open(ctx, &conf.Runtime)
 	if err != nil {
 		return err
 	}
 	defer run.Close()
+	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
 
 	imgName := conf.FullImageName(args[0])
-	img, err := run.GetImage(imgName)
+	img, err := run.GetImage(ctx, imgName)
 	if err != nil && errors.Is(err, errdefs.ErrNotFound) {
-		img, err = pullImage(run, imgName)
+		img, err = pullImage(ctx, run, imgName)
 	}
 	if err != nil {
 		return err
@@ -164,7 +169,7 @@ func showImageRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	rootfs := []string{}
-	imgRootFS, err := img.RootFS()
+	imgRootFS, err := img.RootFS(ctx)
 	if err != nil {
 		return err
 	}
@@ -180,7 +185,7 @@ func showImageRunE(cmd *cobra.Command, args []string) error {
 		RootFS []string
 	}{
 		Name:   img.Name(),
-		Size:   img.Size(),
+		Size:   img.Size(ctx),
 		OS:     fullName,
 		RootFS: rootfs,
 	}

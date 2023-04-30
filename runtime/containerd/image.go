@@ -26,8 +26,8 @@ const updateIntervalMsecs = 100
 
 // updateImageProgress sends the current image download status in a regular 100ms interval
 // to the provided progress channel.
-func updateImageProgress(ctrdRun *containerdRuntime, ctx context.Context,
-	mutex *sync.Mutex, descs *[]ocispec.Descriptor,
+func updateImageProgress(ctx context.Context,
+	ctrdRun *containerdRuntime, mutex *sync.Mutex, descs *[]ocispec.Descriptor,
 	progress chan<- []runtime.ProgressStatus) {
 
 	var (
@@ -44,10 +44,10 @@ func updateImageProgress(ctrdRun *containerdRuntime, ctx context.Context,
 
 		select {
 		case <-ticker.C:
-			statuses, err = updateImageStatus(ctrdRun.context, start, cs, mutex, descs)
+			statuses, err = updateImageStatus(ctx, start, cs, mutex, descs)
 
 		case <-ctx.Done():
-			statuses, err = updateImageStatus(ctrdRun.context, start, cs, mutex, descs)
+			statuses, err = updateImageStatus(ctx, start, cs, mutex, descs)
 			loop = false
 		}
 
@@ -133,10 +133,9 @@ type image struct {
 	ctrdImage   containerd.Image
 }
 
-func (img *image) Config() (*ocispec.ImageConfig, error) {
+func (img *image) Config(ctx context.Context) (*ocispec.ImageConfig, error) {
 
-	ctrdRun := img.ctrdRuntime
-	ociDesc, err := img.ctrdImage.Config(ctrdRun.context)
+	ociDesc, err := img.ctrdImage.Config(ctx)
 	if err != nil {
 		return nil, runtime.Errorf("failed to get image configuration: %v", err)
 	}
@@ -149,7 +148,7 @@ func (img *image) Config() (*ocispec.ImageConfig, error) {
 	switch ociDesc.MediaType {
 	case ocispec.MediaTypeImageConfig, images.MediaTypeDockerSchema2Config:
 		store := img.ctrdImage.ContentStore()
-		blob, err := content.ReadBlob(ctrdRun.context, store, ociDesc)
+		blob, err := content.ReadBlob(ctx, store, ociDesc)
 		if err != nil {
 			return nil, runtime.Errorf("failed to read image configuration: %v", err)
 		}
@@ -165,14 +164,14 @@ func (img *image) Config() (*ocispec.ImageConfig, error) {
 	return &config, nil
 }
 
-func (img *image) Digest() digest.Digest {
-	imgConf, _ := img.ctrdImage.Config(img.ctrdRuntime.context)
+func (img *image) Digest(ctx context.Context) digest.Digest {
+	imgConf, _ := img.ctrdImage.Config(ctx)
 	return imgConf.Digest
 }
 
-func (img *image) RootFS() ([]digest.Digest, error) {
+func (img *image) RootFS(ctx context.Context) ([]digest.Digest, error) {
 
-	rootFS, err := img.ctrdImage.RootFS(img.ctrdRuntime.context)
+	rootFS, err := img.ctrdImage.RootFS(ctx)
 	if err != nil {
 		return nil, runtime.Errorf("failed to get image rootfs %v", err)
 	}
@@ -191,27 +190,24 @@ func (img *image) CreatedAt() time.Time {
 	return time.Now()
 }
 
-func (img *image) Size() int64 {
-	size, _ := img.ctrdImage.Size(img.ctrdRuntime.context)
+func (img *image) Size(ctx context.Context) int64 {
+	size, _ := img.ctrdImage.Size(ctx)
 	return size
 }
 
-func (img *image) Mount(path string) error {
-
-	ctrdRun := img.ctrdRuntime
-	ctrdCtx := ctrdRun.context
+func (img *image) Mount(ctx context.Context, path string) error {
 
 	var mounts []mount.Mount
 	var err error
 
-	diffIDs, err := img.ctrdImage.RootFS(ctrdCtx)
+	diffIDs, err := img.ctrdImage.RootFS(ctx)
 	if err != nil {
 		return runtime.Errorf("failed to get rootfs: %v", err)
 	}
 
 	digest := identity.ChainID(diffIDs).String()
 	snapName := digest + "-image"
-	mounts, _, err = createSnapshot(img.ctrdRuntime, snapName, digest, false)
+	mounts, _, err = createSnapshot(ctx, img.ctrdRuntime, snapName, digest, false)
 	if err != nil {
 		return err
 	}
@@ -224,26 +220,23 @@ func (img *image) Mount(path string) error {
 	return nil
 }
 
-func (img *image) Unmount(path string) error {
-
-	ctrdRun := img.ctrdRuntime
-	ctrdCtx := ctrdRun.context
+func (img *image) Unmount(ctx context.Context, path string) error {
 
 	err := mount.UnmountAll(path, 0)
 	if err != nil {
 		return err
 	}
 
-	diffIDs, err := img.ctrdImage.RootFS(ctrdCtx)
+	diffIDs, err := img.ctrdImage.RootFS(ctx)
 	if err != nil {
 		return runtime.Errorf("failed to get rootfs: %v", err)
 	}
 
 	digest := identity.ChainID(diffIDs).String()
 	snapName := digest + "-image"
-	return deleteSnapshot(ctrdRun, snapName)
+	return deleteSnapshot(ctx, img.ctrdRuntime, snapName)
 }
 
-func (img *image) Unpack() error {
-	return img.ctrdImage.Unpack(img.ctrdRuntime.context, containerd.DefaultSnapshotter)
+func (img *image) Unpack(ctx context.Context) error {
+	return img.ctrdImage.Unpack(ctx, containerd.DefaultSnapshotter)
 }

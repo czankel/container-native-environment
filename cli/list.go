@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -129,9 +130,9 @@ func splitRepoNameTag(name string) (string, string) {
 	return dispName, name[tPos+1:]
 }
 
-func listImages(run runtime.Runtime) error {
+func listImages(ctx context.Context, run runtime.Runtime) error {
 
-	images, err := run.Images()
+	images, err := run.Images(ctx)
 	if err != nil {
 		return err
 	}
@@ -148,11 +149,11 @@ func listImages(run runtime.Runtime) error {
 		name, tag := splitRepoNameTag(img.Name())
 		imgList[i].Name = name
 		imgList[i].Tag = tag
-		digest := img.Digest().String()
+		digest := img.Digest(ctx).String()
 		dPos := strings.Index(digest, ":")
 		imgList[i].ID = digest[dPos+1 : dPos+1+displayHashLength]
 		imgList[i].CreatedAt = timeToAgoString(img.CreatedAt())
-		imgList[i].Size = sizeToSIString(img.Size())
+		imgList[i].Size = sizeToSIString(img.Size(ctx))
 	}
 	printList(imgList, false)
 
@@ -161,13 +162,15 @@ func listImages(run runtime.Runtime) error {
 
 func listImagesRunE(cmd *cobra.Command, args []string) error {
 
-	run, err := runtime.Open(conf.Runtime)
+	ctx := context.Background()
+	run, err := runtime.Open(ctx, &conf.Runtime)
 	if err != nil {
 		return err
 	}
 	defer run.Close()
+	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
 
-	return listImages(run)
+	return listImages(ctx, run)
 }
 
 var listSnapshotsCmd = &cobra.Command{
@@ -178,9 +181,9 @@ var listSnapshotsCmd = &cobra.Command{
 	RunE:    listSnapshotsRunE,
 }
 
-func listSnapshots(run runtime.Runtime) error {
+func listSnapshots(ctx context.Context, run runtime.Runtime) error {
 
-	snapshots, err := run.Snapshots()
+	snapshots, err := run.Snapshots(ctx)
 	if err != nil {
 		return err
 	}
@@ -197,8 +200,8 @@ func listSnapshots(run runtime.Runtime) error {
 		snapList[i].Name = snap.Name()
 		snapList[i].Parent = snap.Parent()
 		snapList[i].CreatedAt = timeToAgoString(snap.CreatedAt())
-		snapList[i].Size, _ = snap.Size()
-		snapList[i].Inodes, _ = snap.Inodes()
+		snapList[i].Size, _ = snap.Size(ctx)
+		snapList[i].Inodes, _ = snap.Inodes(ctx)
 	}
 	printList(snapList, false)
 
@@ -207,13 +210,15 @@ func listSnapshots(run runtime.Runtime) error {
 
 func listSnapshotsRunE(cmd *cobra.Command, args []string) error {
 
-	run, err := runtime.Open(conf.Runtime)
+	ctx := context.Background()
+	run, err := runtime.Open(ctx, &conf.Runtime)
 	if err != nil {
 		return err
 	}
 	defer run.Close()
+	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
 
-	return listSnapshots(run)
+	return listSnapshots(ctx, run)
 }
 
 var listContainersCmd = &cobra.Command{
@@ -226,9 +231,9 @@ var listContainersCmd = &cobra.Command{
 
 var listContainersAll bool
 
-func listContainers(run runtime.Runtime, prj *project.Project) error {
+func listContainers(ctx context.Context, run runtime.Runtime, prj *project.Project) error {
 
-	ctrs, err := container.Containers(run, prj, &user)
+	ctrs, err := container.Containers(ctx, run, prj, &user)
 	if err != nil {
 		return err
 	}
@@ -252,11 +257,13 @@ func listContainersRunE(cmd *cobra.Command, args []string) error {
 
 	var prj *project.Project
 
-	run, err := runtime.Open(conf.Runtime)
+	ctx := context.Background()
+	run, err := runtime.Open(ctx, &conf.Runtime)
 	if err != nil {
 		return err
 	}
 	defer run.Close()
+	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
 
 	if !listContainersAll {
 		prj, err = loadProject()
@@ -265,7 +272,7 @@ func listContainersRunE(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	return listContainers(run, prj)
+	return listContainers(ctx, run, prj)
 }
 
 var listResourcesCmd = &cobra.Command{
@@ -282,11 +289,13 @@ func listResourcesRunE(cmd *cobra.Command, args []string) error {
 
 	var prj *project.Project
 
-	run, err := runtime.Open(conf.Runtime)
+	ctx := context.Background()
+	run, err := runtime.Open(ctx, &conf.Runtime)
 	if err != nil {
 		return err
 	}
 	defer run.Close()
+	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
 
 	if !listResourcesAll {
 		prj, err = loadProject()
@@ -296,19 +305,19 @@ func listResourcesRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("\nIMAGES\n------\n")
-	err = listImages(run)
+	err = listImages(ctx, run)
 	if err != nil {
 		return err
 	}
 
 	fmt.Printf("\nCONTAINERS\n----------\n")
-	err = listContainers(run, prj)
+	err = listContainers(ctx, run, prj)
 	if err != nil {
 		return err
 	}
 
 	fmt.Printf("\nSNAPSHOTS\n---------\n")
-	err = listSnapshots(run)
+	err = listSnapshots(ctx, run)
 	if err != nil {
 		return err
 	}

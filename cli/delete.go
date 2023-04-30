@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"strconv"
 
@@ -29,13 +30,15 @@ var deleteImageCmd = &cobra.Command{
 
 func deleteImageRunE(cmd *cobra.Command, args []string) error {
 
-	run, err := runtime.Open(conf.Runtime)
+	ctx := context.Background()
+	run, err := runtime.Open(ctx, &conf.Runtime)
 	if err != nil {
 		return err
 	}
 	defer run.Close()
+	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
 
-	return run.DeleteImage(conf.FullImageName(args[0]))
+	return run.DeleteImage(ctx, conf.FullImageName(args[0]))
 }
 
 var deleteWorkspaceCmd = &cobra.Command{
@@ -48,7 +51,8 @@ var deleteWorkspaceCmd = &cobra.Command{
 
 func deleteWorkspaceRunE(cmd *cobra.Command, args []string) error {
 
-	run, err := runtime.Open(conf.Runtime)
+	ctx := context.Background()
+	run, err := runtime.Open(ctx, &conf.Runtime)
 	if err != nil {
 		return err
 	}
@@ -66,9 +70,9 @@ func deleteWorkspaceRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	// ignore error TODO: print warning for error other than not-found
-	ctr, err := container.Get(run, ws)
+	ctr, err := container.Get(ctx, run, ws)
 	if err == nil {
-		ctr.Purge()
+		ctr.Purge(ctx)
 	}
 
 	err = prj.DeleteWorkspace(name)
@@ -89,11 +93,13 @@ var deleteLayerCmd = &cobra.Command{
 
 func deleteLayerRunE(cmd *cobra.Command, args []string) error {
 
-	run, err := runtime.Open(conf.Runtime)
+	ctx := context.Background()
+	run, err := runtime.Open(ctx, &conf.Runtime)
 	if err != nil {
 		return err
 	}
 	defer run.Close()
+	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
 
 	prj, err := loadProject()
 	if err != nil {
@@ -105,7 +111,7 @@ func deleteLayerRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	oldCtr, err := container.Get(run, ws)
+	oldCtr, err := container.Get(ctx, run, ws)
 	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 		return err
 	}
@@ -115,19 +121,19 @@ func deleteLayerRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	ctr, err := buildContainer(run, ws, -1)
+	ctr, err := buildContainer(ctx, run, ws, -1)
 	if err != nil {
 		return err
 	}
 
 	err = prj.Write()
 	if err != nil {
-		ctr.Delete()
+		ctr.Delete(ctx)
 		return err
 	}
 
 	if oldCtr != nil {
-		oldCtr.Delete()
+		oldCtr.Delete(ctx)
 	}
 
 	return nil
@@ -142,7 +148,8 @@ var deleteContainerCmd = &cobra.Command{
 
 func deleteContainerRunE(cmd *cobra.Command, args []string) error {
 
-	run, err := runtime.Open(conf.Runtime)
+	ctx := context.Background()
+	run, err := runtime.Open(ctx, &conf.Runtime)
 	if err != nil {
 		return err
 	}
@@ -154,13 +161,13 @@ func deleteContainerRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	// delete all containers that match the domain+id
-	ctrs, err := container.Containers(run, prj, &user)
+	ctrs, err := container.Containers(ctx, run, prj, &user)
 	if err != nil {
 		return err
 	}
 	for _, c := range ctrs {
 		if c.Name() == args[0] {
-			c.Purge()
+			c.Purge(ctx)
 			break
 		}
 	}

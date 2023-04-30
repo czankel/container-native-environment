@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"os"
 	"strings"
@@ -38,11 +39,13 @@ func execCommandsInShell(wsName, layerName string, args []string) (int, error) {
 // similar return value as if the command was executed directly.
 func execCommands(wsName, layerName string, args []string) (int, error) {
 
-	run, err := runtime.Open(conf.Runtime)
+	ctx := context.Background()
+	run, err := runtime.Open(ctx, &conf.Runtime)
 	if err != nil {
 		return 0, err
 	}
 	defer run.Close()
+	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
 
 	prj, err := loadProject()
 	if err != nil {
@@ -73,20 +76,19 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 	con.Resize(winSz)
 
 	if execLayerName == "" {
-
-		ctr, err := container.Get(run, ws)
+		ctr, err := container.Get(ctx, run, ws)
 		if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 			return 0, err
 		}
 		if errors.Is(err, errdefs.ErrNotFound) {
-			ctr, err = buildContainer(run, ws, -1)
+			ctr, err = buildContainer(ctx, run, ws, -1)
 			if err != nil {
 				return 0, err
 			}
 			prj.Write()
 		}
 
-		code, err := container.Exec(ctr, &user, stream, args)
+		code, err := container.Exec(ctx, ctr, &user, stream, args)
 		if err != nil && errors.Is(err, errdefs.ErrNotFound) && errdefs.Resource(err) == "command" {
 			return 0, errors.New(args[0] + ": no such command")
 		}
@@ -101,18 +103,18 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 			return 0, errdefs.InvalidArgument("No such layer: %s", execLayerName)
 		}
 
-		ctr, err := getContainer(run, ws)
+		ctr, err := getContainer(ctx, run, ws)
 		if err != nil {
 			return 0, err
 		}
 
 		// build all layers including the destinationlayer (i.e. + 1)
-		err = buildLayers(run, ctr, ws, layerIdx+1)
+		err = buildLayers(ctx, run, ctr, ws, layerIdx+1)
 		if err != nil {
 			return 0, err
 		}
 
-		code, err := container.BuildExec(ctr, &user, stream, args, []string{})
+		code, err := container.BuildExec(ctx, ctr, &user, stream, args, []string{})
 		if err != nil {
 			return 0, err
 		}
@@ -125,9 +127,9 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 			layer.Commands = append(layer.Commands,
 				project.Command{"", []string{}, args})
 
-			snap, err := ctr.Amend()
+			snap, err := ctr.Amend(ctx)
 			if err != nil && !errors.Is(err, errdefs.ErrAlreadyExists) {
-				ctr.Delete() // delete the container and active snapshot
+				ctr.Delete(ctx) // delete the container and active snapshot
 				return 0, err
 			}
 			layer := &ws.Environment.Layers[layerIdx]
@@ -135,7 +137,7 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 
 			err = prj.Write()
 			if err != nil {
-				ctr.Delete() // delete the container and active snapshot
+				ctr.Delete(ctx) // delete the container and active snapshot
 				return 0, err
 			}
 		}

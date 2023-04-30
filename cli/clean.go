@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 
 	"github.com/czankel/cne/container"
@@ -25,11 +27,13 @@ func cleanProjectRunE(cmd *cobra.Command, args []string) error {
 
 	var prj *project.Project
 
-	run, err := runtime.Open(conf.Runtime)
+	ctx := context.Background()
+	run, err := runtime.Open(ctx, &conf.Runtime)
 	if err != nil {
 		return err
 	}
 	defer run.Close()
+	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
 
 	if !cleanProjectAll {
 		prj, err = loadProject()
@@ -37,18 +41,18 @@ func cleanProjectRunE(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-	ctrs, err := container.Containers(run, prj, &user)
+	ctrs, err := container.Containers(ctx, run, prj, &user)
 	if err != nil {
 		return err
 	}
 	for _, c := range ctrs {
-		c.Purge() // Ignore errors
+		c.Purge(ctx) // Ignore errors
 	}
 
 	// add all snapshots to a map
 	tree := make(map[string]runtime.Snapshot)
 	leaves := []string{}
-	snaps, err := run.Snapshots()
+	snaps, err := run.Snapshots(ctx)
 	if err != nil {
 		return err
 	}
@@ -58,12 +62,12 @@ func cleanProjectRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	// exclude snapshots created extracting images
-	imgs, err := run.Images()
+	imgs, err := run.Images(ctx)
 	if err != nil {
 		return err
 	}
 	for _, i := range imgs {
-		rootfs, err := i.RootFS()
+		rootfs, err := i.RootFS(ctx)
 		if err != nil {
 			return err
 		}
@@ -89,7 +93,7 @@ func cleanProjectRunE(cmd *cobra.Command, args []string) error {
 			if !ok {
 				break
 			}
-			err = run.DeleteSnapshot(s.Name())
+			err = run.DeleteSnapshot(ctx, s.Name())
 			if err != nil {
 				break
 			}

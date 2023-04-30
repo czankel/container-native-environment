@@ -2,6 +2,7 @@
 package containerd
 
 import (
+	"context"
 	"os"
 	"syscall"
 
@@ -16,12 +17,12 @@ type process struct {
 	ctrdProc  containerd.Process
 }
 
-func (proc *process) Wait() (<-chan runtime.ExitStatus, error) {
+// Wait waits for the process to complete and returns the result or
+// the error for any context operation.
+func (proc *process) Wait(ctx context.Context) (<-chan runtime.ExitStatus, error) {
 
-	ctrdRun := proc.container.ctrdRuntime
+	ctrdExitStatus, err := proc.ctrdProc.Wait(ctx)
 	runExitStatus := make(chan runtime.ExitStatus)
-
-	ctrdExitStatus, err := proc.ctrdProc.Wait(ctrdRun.context)
 	if err != nil && ctrderr.IsNotFound(err) {
 		runExitStatus <- runtime.ExitStatus{}
 		return runExitStatus, nil
@@ -45,10 +46,10 @@ func (proc *process) Wait() (<-chan runtime.ExitStatus, error) {
 	return runExitStatus, nil
 }
 
-func (proc *process) Signal(sig os.Signal) error {
+func (proc *process) Signal(ctx context.Context, sig os.Signal) error {
 
 	s := sig.(syscall.Signal)
-	err := proc.ctrdProc.Kill(proc.container.ctrdRuntime.context, s)
+	err := proc.ctrdProc.Kill(ctx, s)
 	if err != nil {
 		return runtime.Errorf("kill failed: %v", err)
 	}

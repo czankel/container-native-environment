@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -22,10 +23,11 @@ const outputLineCount = 100
 // getContainer returns the existing active container for the workspace or
 // creates the container and outputs progress status.
 // Note that in an error case, it will keep any residual container and snapshots.
-func getContainer(run runtime.Runtime, ws *project.Workspace) (runtime.Container, error) {
+func getContainer(ctx context.Context,
+	run runtime.Runtime, ws *project.Workspace) (runtime.Container, error) {
 
 	// check if container already exists
-	ctr, err := container.Get(run, ws)
+	ctr, err := container.Get(ctx, run, ws)
 	if err == nil {
 		return ctr, nil
 	}
@@ -35,15 +37,16 @@ func getContainer(run runtime.Runtime, ws *project.Workspace) (runtime.Container
 		return nil, errdefs.InvalidArgument("Workspace has no image defined")
 	}
 
-	img, err := run.GetImage(ws.Environment.Origin)
+	// check and pull the image, if required, for building the container
+	img, err := run.GetImage(ctx, ws.Environment.Origin)
 	if err != nil && errors.Is(err, errdefs.ErrNotFound) {
-		img, err = pullImage(run, ws.Environment.Origin)
+		img, err = pullImage(ctx, run, ws.Environment.Origin)
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	return container.NewContainer(run, ws, &user, img)
+	return container.NewContainer(ctx, run, ws, &user, img)
 }
 
 // buildLayers builds the layers of a container and outputs progress status.
@@ -52,7 +55,7 @@ func getContainer(run runtime.Runtime, ws *project.Workspace) (runtime.Container
 // This function is idempotent and can be called again to continue the build, for example,
 // for a higher layer.
 // Note that in an error case, it will keep any residual container and snapshots.
-func buildLayers(run runtime.Runtime, ctr runtime.Container,
+func buildLayers(ctx context.Context, run runtime.Runtime, ctr runtime.Container,
 	ws *project.Workspace, layerCount int) error {
 
 	con := console.Current()
@@ -72,7 +75,7 @@ func buildLayers(run runtime.Runtime, ctr runtime.Container,
 	rb := NewRingBuffer(outputLineCount, outputLineLength)
 	stream := rb.StreamWriter()
 
-	err := container.Build(ctr, ws, layerCount, &user, &params, progress, stream)
+	err := container.Build(ctx, ctr, ws, layerCount, &user, &params, progress, stream)
 	if err != nil && errors.Is(err, errdefs.ErrCommandFailed) {
 		line := make([]byte, 100)
 		fmt.Printf("Output:\n")
@@ -93,27 +96,27 @@ func buildLayers(run runtime.Runtime, ctr runtime.Container,
 
 // buildContainer builds the full container for the provided workspace and
 // commits it.
-func buildContainer(run runtime.Runtime, ws *project.Workspace,
+func buildContainer(ctx context.Context, run runtime.Runtime, ws *project.Workspace,
 	layerCount int) (runtime.Container, error) {
 
 	params.Upgrade = buildWorkspaceUpgrade
-	ctr, err := getContainer(run, ws)
+	ctr, err := getContainer(ctx, run, ws)
 	if err != nil {
 		return nil, err
 	}
 
-	err = buildLayers(run, ctr, ws, layerCount)
+	err = buildLayers(ctx, run, ctr, ws, layerCount)
 	if err != nil {
 		return nil, err
 	}
 
 	// Mount $HOME
-	err = ctr.Mount(user.HomeDir, user.HomeDir)
+	err = ctr.Mount(ctx, user.HomeDir, user.HomeDir)
 	if err != nil {
 		return nil, err
 	}
 
-	err = ctr.Commit(ws.ConfigHash())
+	err = ctr.Commit(ctx, ws.ConfigHash())
 	return ctr, err
 }
 
@@ -150,14 +153,17 @@ func buildWorkspaceRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	run, err := runtime.Open(conf.Runtime)
+	ctx := context.Background()
+	run, err := runtime.Open(ctx, &conf.Runtime)
 	if err != nil {
 		return err
 	}
+
 	defer run.Close()
+	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
 
 	// only allow a single build container at a time
-	ctr, err := container.Get(run, ws)
+	ctr, err := container.Get(ctx, run, ws)
 	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 		return err
 	}
@@ -165,13 +171,13 @@ func buildWorkspaceRunE(cmd *cobra.Command, args []string) error {
 		if !buildWorkspaceForce && buildWorkspaceUpgrade == "" {
 			return errdefs.AlreadyExists("container", ctr.Name())
 		}
-		err = ctr.Purge()
+		err = ctr.Purge(ctx)
 		if err != nil {
 			return err
 		}
 	}
 
-	_, err = buildContainer(run, ws, -1)
+	_, err = buildContainer(ctx, run, ws, -1)
 	if err != nil {
 		return err
 	}

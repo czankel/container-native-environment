@@ -29,12 +29,12 @@ func activeSnapshotName(domain, ctrID [16]byte) string {
 	return domStr + "-" + cidStr
 }
 
-func getSnapshotDomains(ctrdRun *containerdRuntime) ([][16]byte, error) {
+func getSnapshotDomains(ctx context.Context, ctrdRun *containerdRuntime) ([][16]byte, error) {
 
 	var domains [][16]byte
 
 	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
-	err := snapSvc.Walk(ctrdRun.context, func(ctx context.Context, info snapshots.Info) error {
+	err := snapSvc.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
 
 		name := string(info.Name)
 		idx := strings.Index(name, "-")
@@ -64,11 +64,11 @@ func getSnapshotDomains(ctrdRun *containerdRuntime) ([][16]byte, error) {
 	return domains, err
 }
 
-func getSnapshots(ctrdRun *containerdRuntime) ([]runtime.Snapshot, error) {
+func getSnapshots(ctx context.Context, ctrdRun *containerdRuntime) ([]runtime.Snapshot, error) {
 	var snaps []runtime.Snapshot
 
 	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
-	err := snapSvc.Walk(ctrdRun.context, func(ctx context.Context, info snapshots.Info) error {
+	err := snapSvc.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
 		snaps = append(snaps, &snapshot{ctrdRuntime: ctrdRun, info: info})
 		return nil
 	})
@@ -80,11 +80,11 @@ func getSnapshots(ctrdRun *containerdRuntime) ([]runtime.Snapshot, error) {
 
 // getSnapshot returns the requested snapshot
 // It returns an error if the snapshot doesn't exist
-func getSnapshot(ctrdRun *containerdRuntime, snapName string) (runtime.Snapshot, error) {
+func getSnapshot(ctx context.Context,
+	ctrdRun *containerdRuntime, snapName string) (runtime.Snapshot, error) {
 
-	ctrdCtx := ctrdRun.context
 	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
-	info, err := snapSvc.Stat(ctrdCtx, snapName)
+	info, err := snapSvc.Stat(ctx, snapName)
 	if err != nil && ctrderr.IsNotFound(err) {
 		return nil, errdefs.NotFound("snapshot", snapName)
 	} else if err != nil {
@@ -94,14 +94,14 @@ func getSnapshot(ctrdRun *containerdRuntime, snapName string) (runtime.Snapshot,
 	return &snapshot{ctrdRuntime: ctrdRun, info: info}, nil
 }
 
-func getActiveSnapshot(ctrdRun *containerdRuntime, domain, id [16]byte) (runtime.Snapshot, error) {
-	return getSnapshot(ctrdRun, activeSnapshotName(domain, id))
+func getActiveSnapshot(ctx context.Context,
+	ctrdRun *containerdRuntime, domain, id [16]byte) (runtime.Snapshot, error) {
+	return getSnapshot(ctx, ctrdRun, activeSnapshotName(domain, id))
 }
 
-func commitSnapshot(ctrdRun *containerdRuntime,
+func commitSnapshot(ctx context.Context, ctrdRun *containerdRuntime,
 	snap runtime.Snapshot, amend bool) (runtime.Snapshot, error) {
 
-	ctrdCtx := ctrdRun.context
 	activeSnapName := snap.Name()
 	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
 	diffSvc := ctrdRun.client.DiffService()
@@ -111,23 +111,23 @@ func commitSnapshot(ctrdRun *containerdRuntime,
 		return nil, runtime.Errorf("snapshot %s doesn't have a parent", snap.Name())
 	}
 
-	parentSnap, err := getSnapshot(ctrdRun, parentName)
+	parentSnap, err := getSnapshot(ctx, ctrdRun, parentName)
 	if err != nil {
 		return nil, runtime.Errorf("parent snapshot '%v' not found: %v", parentName, err)
 	}
 
-	parentMnts, err := snapSvc.View(ctrdCtx, parentName+"-view", parentName)
+	parentMnts, err := snapSvc.View(ctx, parentName+"-view", parentName)
 	if err != nil {
 		return nil, runtime.Errorf("creating snapshot '%v' failed: %v", parentName, err)
 	}
-	defer snapSvc.Remove(ctrdCtx, parentName+"-view")
+	defer snapSvc.Remove(ctx, parentName+"-view")
 
-	snapMnts, err := snapSvc.Mounts(ctrdCtx, snap.Name())
+	snapMnts, err := snapSvc.Mounts(ctx, snap.Name())
 	if err != nil {
 		return nil, runtime.Errorf("failed to mount snapshot: %v", err)
 	}
 
-	desc, err := diffSvc.Compare(ctrdCtx, parentMnts, snapMnts)
+	desc, err := diffSvc.Compare(ctx, parentMnts, snapMnts)
 	if err != nil {
 		return nil, runtime.Errorf("failed to create diff between snapshots: %v", err)
 	}
@@ -147,32 +147,32 @@ func commitSnapshot(ctrdRun *containerdRuntime,
 			return nil, runtime.Errorf("no snapshot to amend snapshot %s", snap.Name())
 		}
 
-		amendMnts, err := snapSvc.Prepare(ctrdCtx, amendName+"-amend", amendName)
+		amendMnts, err := snapSvc.Prepare(ctx, amendName+"-amend", amendName)
 		if err != nil {
 			return nil, runtime.Errorf("failed to create temporary snapshot: %v", err)
 		}
 
-		desc, err = diffSvc.Apply(ctrdCtx, desc, amendMnts)
+		desc, err = diffSvc.Apply(ctx, desc, amendMnts)
 		if err != nil {
-			snapSvc.Remove(ctrdCtx, amendName+"-amend")
+			snapSvc.Remove(ctx, amendName+"-amend")
 			return nil, runtime.Errorf("failed to apply snapshot: %v", err)
 		}
 
 		digest = desc.Digest.String()
-		err = snapSvc.Commit(ctrdCtx, digest, amendName+"-amend",
+		err = snapSvc.Commit(ctx, digest, amendName+"-amend",
 			snapshots.WithLabels(labels))
 		if err != nil {
-			snapSvc.Remove(ctrdCtx, amendName+"-amend")
+			snapSvc.Remove(ctx, amendName+"-amend")
 			return nil, runtime.Errorf("failed to commit snapshot: %v", err)
 		}
 
 		// TODO: log a warning on errors for these
-		snapSvc.Remove(ctrdCtx, activeSnapName)
-		snapSvc.Remove(ctrdCtx, parentName)
+		snapSvc.Remove(ctx, activeSnapName)
+		snapSvc.Remove(ctx, parentName)
 
 	} else {
 
-		err = snapSvc.Commit(ctrdCtx, digest, activeSnapName, snapshots.WithLabels(labels))
+		err = snapSvc.Commit(ctx, digest, activeSnapName, snapshots.WithLabels(labels))
 		if err != nil && ctrderr.IsAlreadyExists(err) {
 			return nil, errdefs.AlreadyExists("snapshot", digest)
 		}
@@ -181,21 +181,19 @@ func commitSnapshot(ctrdRun *containerdRuntime,
 		}
 	}
 
-	info, err := snapSvc.Stat(ctrdCtx, digest)
+	info, err := snapSvc.Stat(ctx, digest)
 	return &snapshot{ctrdRuntime: ctrdRun, info: info}, nil
 }
 
-func createSnapshot(ctrdRun *containerdRuntime,
+func createSnapshot(ctx context.Context, ctrdRun *containerdRuntime,
 	snapName, parentName string, mutable bool) ([]mount.Mount, *snapshot, error) {
-
-	ctrdCtx := ctrdRun.context
 
 	var mounts []mount.Mount
 
 	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
 
 	// check if the snapshot already exists, take mutable flag into account
-	info, err := snapSvc.Stat(ctrdCtx, snapName)
+	info, err := snapSvc.Stat(ctx, snapName)
 	if err != nil && ctrderr.IsAlreadyExists(err) {
 		return nil, nil, errdefs.AlreadyExists("snapshot", snapName)
 	}
@@ -204,7 +202,7 @@ func createSnapshot(ctrdRun *containerdRuntime,
 	}
 	if err == nil && (info.Kind == snapshots.KindActive && mutable ||
 		info.Kind == snapshots.KindView && !mutable) {
-		mounts, err = snapSvc.Mounts(ctrdCtx, snapName)
+		mounts, err = snapSvc.Mounts(ctx, snapName)
 		if err != nil {
 			return nil, nil, runtime.Errorf("failed to get snapshot mounts: %v", err)
 		}
@@ -217,10 +215,10 @@ func createSnapshot(ctrdRun *containerdRuntime,
 		labels["containerd.io/gc.root"] = time.Now().UTC().Format(time.RFC3339)
 
 		if mutable {
-			mounts, err = snapSvc.Prepare(ctrdCtx, snapName, parentName,
+			mounts, err = snapSvc.Prepare(ctx, snapName, parentName,
 				snapshots.WithLabels(labels))
 		} else {
-			mounts, err = snapSvc.View(ctrdCtx, snapName, parentName,
+			mounts, err = snapSvc.View(ctx, snapName, parentName,
 				snapshots.WithLabels(labels))
 		}
 		if err != nil {
@@ -228,7 +226,7 @@ func createSnapshot(ctrdRun *containerdRuntime,
 				runtime.Errorf("failed to create snapshot '%s': %v", snapName, err)
 		}
 
-		info, err = snapSvc.Stat(ctrdCtx, snapName)
+		info, err = snapSvc.Stat(ctx, snapName)
 		if err != nil {
 			return nil, nil, runtime.Errorf("failed to create snapshot")
 		}
@@ -247,7 +245,7 @@ func (mounter) Unmount(target string) error {
 	return mount.UnmountAll(target, 0)
 }
 
-func createActiveSnapshot(ctrdRun *containerdRuntime,
+func createActiveSnapshot(ctx context.Context, ctrdRun *containerdRuntime,
 	img *image, domain, id [16]byte, snap runtime.Snapshot) error {
 
 	activeSnapName := activeSnapshotName(domain, id)
@@ -255,18 +253,18 @@ func createActiveSnapshot(ctrdRun *containerdRuntime,
 	if snap != nil {
 		rootFsSnapName = snap.Name()
 	} else {
-		diffIDs, err := img.ctrdImage.RootFS(ctrdRun.context)
+		diffIDs, err := img.ctrdImage.RootFS(ctx)
 		if err != nil {
 			return runtime.Errorf("failed to get rootfs: %v", err)
 		}
 		rootFsSnapName = identity.ChainID(diffIDs).String()
-		_, err = getSnapshot(ctrdRun, rootFsSnapName)
+		_, err = getSnapshot(ctx, ctrdRun, rootFsSnapName)
 
 		// unpack 'image' if root snapshot was removed
 		if err != nil && errors.Is(err, errdefs.ErrNotFound) {
-			img.Unpack()
+			img.Unpack(ctx)
 			digest := identity.ChainID(diffIDs).String()
-			_, _, err = createSnapshot(img.ctrdRuntime, digest, digest, false)
+			_, _, err = createSnapshot(ctx, img.ctrdRuntime, digest, digest, false)
 		}
 		if err != nil {
 			return err
@@ -280,14 +278,14 @@ func createActiveSnapshot(ctrdRun *containerdRuntime,
 
 	snapName := activeSnapName
 	for snapName != rootFsSnapName {
-		snap, err := getSnapshot(ctrdRun, snapName)
+		snap, err := getSnapshot(ctx, ctrdRun, snapName)
 		if err != nil && errors.Is(err, errdefs.ErrNotFound) {
 			break
 		}
 		if err != nil {
 			return err
 		}
-		err = deleteSnapshot(ctrdRun, snapName)
+		err = deleteSnapshot(ctx, ctrdRun, snapName)
 		if err != nil && errors.Is(err, errdefs.ErrNotFound) {
 			break
 		}
@@ -301,7 +299,7 @@ func createActiveSnapshot(ctrdRun *containerdRuntime,
 	}
 
 	// create active snapshot based on the new rootFs
-	_, snap, err := createSnapshot(ctrdRun, activeSnapName, rootFsSnapName, true /* mutable */)
+	_, snap, err := createSnapshot(ctx, ctrdRun, activeSnapName, rootFsSnapName, true /* mutable */)
 	if err != nil {
 		return err
 	}
@@ -309,11 +307,11 @@ func createActiveSnapshot(ctrdRun *containerdRuntime,
 	return nil
 }
 
-func updateSnapshot(ctrdRun *containerdRuntime,
+func updateSnapshot(ctx context.Context, ctrdRun *containerdRuntime,
 	domain, id [16]byte, amend bool) (runtime.Snapshot, error) {
 
 	activeSnapName := activeSnapshotName(domain, id)
-	snap, err := getSnapshot(ctrdRun, activeSnapName)
+	snap, err := getSnapshot(ctx, ctrdRun, activeSnapName)
 	if err != nil && errors.Is(err, errdefs.ErrNotFound) {
 		return nil, nil
 	}
@@ -321,29 +319,30 @@ func updateSnapshot(ctrdRun *containerdRuntime,
 		return nil, err
 	}
 
-	snap, err = commitSnapshot(ctrdRun, snap, false /* amend */)
+	snap, err = commitSnapshot(ctx, ctrdRun, snap, false /* amend */)
 	if err != nil {
 		return nil, err
 	}
 
-	_, _, err = createSnapshot(ctrdRun, activeSnapName, snap.Name(), true /* mutable */)
+	_, _, err = createSnapshot(ctx, ctrdRun, activeSnapName, snap.Name(), true /* mutable */)
 	return snap, err
 }
 
-func getActiveSnapMounts(ctrdRun *containerdRuntime, dom, cid [16]byte) ([]mount.Mount, error) {
+func getActiveSnapMounts(ctx context.Context,
+	ctrdRun *containerdRuntime, dom, cid [16]byte) ([]mount.Mount, error) {
 
 	snapName := activeSnapshotName(dom, cid)
 
 	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
-	return snapSvc.Mounts(ctrdRun.context, snapName)
+	return snapSvc.Mounts(ctx, snapName)
 }
 
 // delete the specified snapshot; return ErrNotFound if the snapshot doesn exist and
 // ErrInUse if it is still in use and referenced.
-func deleteSnapshot(ctrdRun *containerdRuntime, snapName string) error {
+func deleteSnapshot(ctx context.Context, ctrdRun *containerdRuntime, snapName string) error {
 
 	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
-	err := snapSvc.Remove(ctrdRun.context, snapName)
+	err := snapSvc.Remove(ctx, snapName)
 	if err != nil && ctrderr.IsNotFound(err) {
 		return errdefs.NotFound("snapshot", snapName)
 	}
@@ -354,9 +353,9 @@ func deleteSnapshot(ctrdRun *containerdRuntime, snapName string) error {
 	return nil
 }
 
-func deleteActiveSnapshot(ctrdRun *containerdRuntime, domain, id [16]byte) error {
+func deleteActiveSnapshot(ctx context.Context, ctrdRun *containerdRuntime, domain, id [16]byte) error {
 	activeSnapName := activeSnapshotName(domain, id)
-	err := deleteSnapshot(ctrdRun, activeSnapName)
+	err := deleteSnapshot(ctx, ctrdRun, activeSnapName)
 	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 		return err
 	}
@@ -365,14 +364,15 @@ func deleteActiveSnapshot(ctrdRun *containerdRuntime, domain, id [16]byte) error
 }
 
 // delete all unrefeenced containers for the provided container starting with the active snapshot
-func deleteContainerSnapshots(ctrdRun *containerdRuntime, domain, id [16]byte) error {
+func deleteContainerSnapshots(ctx context.Context,
+	ctrdRun *containerdRuntime, domain, id [16]byte) error {
 
 	snapName := activeSnapshotName(domain, id)
 
 	snapMap := make(map[string]*snapshot)
 	snapRefs := make(map[string]int)
 	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
-	err := snapSvc.Walk(ctrdRun.context, func(ctx context.Context, info snapshots.Info) error {
+	err := snapSvc.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
 
 		snapMap[info.Name] = &snapshot{ctrdRuntime: ctrdRun, info: info}
 
@@ -393,7 +393,7 @@ func deleteContainerSnapshots(ctrdRun *containerdRuntime, domain, id [16]byte) e
 
 		parent := snap.info.Parent
 
-		err = snapSvc.Remove(ctrdRun.context, snapName)
+		err = snapSvc.Remove(ctx, snapName)
 		if err != nil && !ctrderr.IsNotFound(err) {
 			return runtime.Errorf("failed to remove snapshot: %v", err)
 		}
@@ -426,26 +426,23 @@ func (snap *snapshot) CreatedAt() time.Time {
 	return snap.info.Created
 }
 
-func (snap *snapshot) Size() (int64, error) {
+func (snap *snapshot) Size(ctx context.Context) (int64, error) {
 
 	ctrdRun := snap.ctrdRuntime
-	ctrdCtx := ctrdRun.context
 
 	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
-	usage, err := snapSvc.Usage(ctrdCtx, snap.Name())
+	usage, err := snapSvc.Usage(ctx, snap.Name())
 	if err != nil {
 		return -1, runtime.Errorf("failed to get snapshot usage: %v", err)
 	}
 	return usage.Size, nil
 }
 
-func (snap *snapshot) Inodes() (int64, error) {
+func (snap *snapshot) Inodes(ctx context.Context) (int64, error) {
 
 	ctrdRun := snap.ctrdRuntime
-	ctrdCtx := ctrdRun.context
-
 	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
-	usage, err := snapSvc.Usage(ctrdCtx, snap.Name())
+	usage, err := snapSvc.Usage(ctx, snap.Name())
 	if err != nil {
 		return -1, runtime.Errorf("failed to get snapshot inodex: %v", err)
 	}

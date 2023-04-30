@@ -4,6 +4,7 @@ package support
 
 import (
 	"bufio"
+	"context"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -47,11 +48,12 @@ func GetImageInfo(img runtime.Image) (*ImageInfo, error) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	err = img.Mount(tmpDir)
+	ctx := context.Background()
+	err = img.Mount(ctx, tmpDir)
 	if err != nil {
 		return nil, err
 	}
-	defer img.Unmount(tmpDir)
+	defer img.Unmount(ctx, tmpDir)
 
 	// scan os-release fields, returns nil if parsing fails
 	f, err := os.Open(tmpDir + "/etc/os-release")

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -28,11 +29,13 @@ var removeAptCmd = &cobra.Command{
 
 func removeAptRunE(cmd *cobra.Command, args []string) error {
 
-	run, err := runtime.Open(conf.Runtime)
+	ctx := context.Background()
+	run, err := runtime.Open(ctx, &conf.Runtime)
 	if err != nil {
 		return err
 	}
 	defer run.Close()
+	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
 
 	prj, err := loadProject()
 	if err != nil {
@@ -49,12 +52,12 @@ func removeAptRunE(cmd *cobra.Command, args []string) error {
 		return errdefs.InvalidArgument("Workspace has no apt layer")
 	}
 
-	ctr, err := getContainer(run, ws)
+	ctr, err := getContainer(ctx, run, ws)
 	if err != nil {
 		return err
 	}
 
-	err = buildLayers(run, ctr, ws, aptLayerIdx+1)
+	err = buildLayers(ctx, run, ctr, ws, aptLayerIdx+1)
 	if err != nil {
 		return err
 	}
@@ -73,21 +76,21 @@ func removeAptRunE(cmd *cobra.Command, args []string) error {
 		Terminal: true,
 	}
 
-	code, err := support.AptRemove(ws, aptLayerIdx, user, ctr, stream, args)
+	code, err := support.AptRemove(ctx, ws, aptLayerIdx, user, ctr, stream, args)
 	if err != nil {
-		ctr.Delete() // delete the container and active snapshot
+		ctr.Delete(ctx) // delete the container and active snapshot
 		return err
 	}
 	if code != 0 {
-		ctr.Delete()
+		ctr.Delete(ctx)
 		con.Reset()
 		run.Close()
 		os.Exit(code)
 	}
 
-	snap, err := ctr.Amend()
+	snap, err := ctr.Amend(ctx)
 	if err != nil {
-		ctr.Delete() // delete the container and active snapshot
+		ctr.Delete(ctx) // delete the container and active snapshot
 		return err
 	}
 	layer := &ws.Environment.Layers[aptLayerIdx]
@@ -95,7 +98,7 @@ func removeAptRunE(cmd *cobra.Command, args []string) error {
 
 	err = prj.Write()
 	if err != nil {
-		ctr.Delete() // delete the container and active snapshot
+		ctr.Delete(ctx) // delete the container and active snapshot
 		return err
 	}
 

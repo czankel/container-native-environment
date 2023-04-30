@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"sync"
 
 	"github.com/spf13/cobra"
@@ -8,7 +9,8 @@ import (
 	"github.com/czankel/cne/runtime"
 )
 
-func pullImage(run runtime.Runtime, imageName string) (runtime.Image, error) {
+func pullImage(ctx context.Context, run runtime.Runtime,
+	imageName string) (runtime.Image, error) {
 
 	var wg sync.WaitGroup
 
@@ -21,7 +23,7 @@ func pullImage(run runtime.Runtime, imageName string) (runtime.Image, error) {
 		showImageProgress(progress)
 	}()
 
-	img, err := run.PullImage(imageName, progress)
+	img, err := run.PullImage(ctx, imageName, progress)
 	wg.Wait()
 
 	return img, err
@@ -41,12 +43,15 @@ registry is used.`,
 
 func pullImageRunE(cmd *cobra.Command, args []string) error {
 
-	run, err := runtime.Open(conf.Runtime)
+	ctx := context.Background()
+	run, err := runtime.Open(ctx, &conf.Runtime)
 	if err != nil {
 		return err
 	}
 	defer run.Close()
-	_, err = pullImage(run, conf.FullImageName(args[0]))
+	ctx = run.WithNamespace(ctx, conf.Runtime.Name)
+
+	_, err = pullImage(ctx, run, conf.FullImageName(args[0]))
 
 	return err
 }
