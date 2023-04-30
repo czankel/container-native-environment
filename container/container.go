@@ -118,13 +118,11 @@ func NewContainer(ctx context.Context, run runtime.Runtime, ws *project.Workspac
 func findRootFs(ctx context.Context, runCtr runtime.Container,
 	ws *project.Workspace, nextLayerIdx int) (int, runtime.Snapshot, error) {
 
-	run := runCtr.Runtime()
-
 	// identify the layer with the topmost existing snapshot
 	bldLayerIdx := 0
 	var snap runtime.Snapshot
 
-	snaps, err := run.Snapshots(ctx)
+	snaps, err := runCtr.Snapshots(ctx)
 	if err != nil {
 		return -1, nil, err
 	}

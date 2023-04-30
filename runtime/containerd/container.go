@@ -312,10 +312,6 @@ func (ctr *container) Name() string {
 		hex.EncodeToString(ctr.generation[:])
 }
 
-func (ctr *container) Runtime() runtime.Runtime {
-	return ctr.ctrdRuntime
-}
-
 func (ctr *container) Domain() [16]byte {
 	return ctr.domain
 }
@@ -340,6 +336,11 @@ func (ctr *container) CreatedAt() time.Time {
 func (ctr *container) UpdatedAt() time.Time {
 	// TODO: Container.updatedAt not yet supported by containerd?
 	return time.Now()
+}
+
+func (ctr *container) Snapshots(ctx context.Context) ([]runtime.Snapshot, error) {
+	// TODO: filter for current container
+	return getSnapshots(ctx, ctr.ctrdRuntime)
 }
 
 func (ctr *container) SetRootFs(ctx context.Context, snap runtime.Snapshot) error {

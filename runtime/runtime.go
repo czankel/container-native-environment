@@ -125,9 +125,6 @@ type Container interface {
 	// of domain, ID, and generation
 	Name() string
 
-	// Runtime returns the runtime for the container
-	Runtime() Runtime
-
 	// CreatedAt returns the date the container was created.
 	CreatedAt() time.Time
 
@@ -146,6 +143,9 @@ type Container interface {
 
 	// Return the User ID
 	UID() uint32
+
+	// Snapshots returns all container snapshots.
+	Snapshots(ctx context.Context) ([]Snapshot, error)
 
 	// SetRootFs sets the rootfs to the provide snapshot.
 	//
