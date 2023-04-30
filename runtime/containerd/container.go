@@ -160,7 +160,7 @@ func getContainers(ctx context.Context,
 			continue
 		}
 
-		img, err := c.Image(ctx)
+		ctrdImg, err := c.Image(ctx)
 		if err != nil {
 			return nil, runtime.Errorf("failed to get image: %v", err)
 		}
@@ -170,7 +170,17 @@ func getContainers(ctx context.Context,
 			return nil, runtime.Errorf("failed to get image spec: %v", err)
 		}
 
-		ctr := newContainer(ctrdRun, c, dom, id, gen, uid, &image{ctrdRun, img}, spec)
+		imgConf, _ := ctrdImg.Config(ctx)
+		size, _ := ctrdImg.Size(ctx)
+
+		img := &image{
+			ctrdRuntime: ctrdRun,
+			ctrdImage:   ctrdImg,
+			digest:      imgConf.Digest,
+			size:        size,
+		}
+
+		ctr := newContainer(ctrdRun, c, dom, id, gen, uid, img, spec)
 		if err != nil {
 			return nil, err
 		}
@@ -236,7 +246,7 @@ func getContainer(ctx context.Context,
 		return nil, err
 	}
 
-	img, err := ctrdCtr.Image(ctx)
+	ctrdImg, err := ctrdCtr.Image(ctx)
 	if err != nil {
 		return nil, runtime.Errorf("failed to get image: %v", err)
 	}
@@ -246,7 +256,17 @@ func getContainer(ctx context.Context,
 		return nil, runtime.Errorf("failed to get image spec: %v", err)
 	}
 
-	ctr := newContainer(ctrdRun, ctrdCtr, domain, id, generation, uid, &image{ctrdRun, img}, spec)
+	imgConf, _ := ctrdImg.Config(ctx)
+	size, _ := ctrdImg.Size(ctx)
+
+	img := &image{
+		ctrdRuntime: ctrdRun,
+		ctrdImage:   ctrdImg,
+		digest:      imgConf.Digest,
+		size:        size,
+	}
+
+	ctr := newContainer(ctrdRun, ctrdCtr, domain, id, generation, uid, img, spec)
 
 	return ctr, nil
 }

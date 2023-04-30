@@ -144,16 +144,19 @@ func listImages(ctx context.Context, run runtime.Runtime) error {
 		CreatedAt string
 		Size      string
 	}, len(images), len(images))
-
 	for i, img := range images {
 		name, tag := splitRepoNameTag(img.Name())
 		imgList[i].Name = name
 		imgList[i].Tag = tag
-		digest := img.Digest(ctx).String()
+		digest := img.Digest().String()
 		dPos := strings.Index(digest, ":")
-		imgList[i].ID = digest[dPos+1 : dPos+1+displayHashLength]
+		if len(digest) >= dPos+1+displayHashLength {
+			imgList[i].ID = digest[dPos+1 : dPos+1+displayHashLength]
+		} else {
+			imgList[i].ID = ""
+		}
 		imgList[i].CreatedAt = timeToAgoString(img.CreatedAt())
-		imgList[i].Size = sizeToSIString(img.Size(ctx))
+		imgList[i].Size = sizeToSIString(img.Size())
 	}
 	printList(imgList, false)
 

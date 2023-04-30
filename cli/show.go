@@ -189,7 +189,7 @@ func showImageRunE(cmd *cobra.Command, args []string) error {
 		RootFS []string
 	}{
 		Name:   img.Name(),
-		Size:   img.Size(ctx),
+		Size:   img.Size(),
 		OS:     fullName,
 		RootFS: rootfs,
 	}

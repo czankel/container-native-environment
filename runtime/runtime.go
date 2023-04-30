@@ -80,8 +80,11 @@ type Image interface {
 	// Name returns the image name.
 	Name() string
 
+	// Size returns the size of the image.
+	Size() int64
+
 	// Digest returns the digest of the image.
-	Digest(ctx context.Context) digest.Digest
+	Digest() digest.Digest
 
 	// CreatedAt returns the data the image was created.
 	CreatedAt() time.Time
@@ -91,9 +94,6 @@ type Image interface {
 
 	// Config returns the configuration of the image.
 	Config(ctx context.Context) (*v1.ImageConfig, error)
-
-	// Size returns the size of the image.
-	Size(ctx context.Context) int64
 
 	// Mount mounts the image to the provide path.
 	Mount(ctx context.Context, path string) error

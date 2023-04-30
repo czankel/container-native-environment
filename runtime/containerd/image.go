@@ -131,6 +131,24 @@ func updateImageStatus(ctx context.Context, start time.Time, cs content.Store,
 type image struct {
 	ctrdRuntime *containerdRuntime
 	ctrdImage   containerd.Image
+	digest      digest.Digest
+	size        int64
+}
+
+func getImage(ctx context.Context,
+	ctrdRun *containerdRuntime, ctrdImg containerd.Image) (*image, error) {
+
+	imgConf, err := ctrdImg.Config(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &image{
+		ctrdRuntime: ctrdRun,
+		ctrdImage:   ctrdImg,
+		digest:      imgConf.Digest,
+		size:        imgConf.Size,
+	}, nil
 }
 
 func (img *image) Config(ctx context.Context) (*ocispec.ImageConfig, error) {
@@ -164,9 +182,8 @@ func (img *image) Config(ctx context.Context) (*ocispec.ImageConfig, error) {
 	return &config, nil
 }
 
-func (img *image) Digest(ctx context.Context) digest.Digest {
-	imgConf, _ := img.ctrdImage.Config(ctx)
-	return imgConf.Digest
+func (img *image) Digest() digest.Digest {
+	return img.digest
 }
 
 func (img *image) RootFS(ctx context.Context) ([]digest.Digest, error) {
@@ -190,9 +207,8 @@ func (img *image) CreatedAt() time.Time {
 	return time.Now()
 }
 
-func (img *image) Size(ctx context.Context) int64 {
-	size, _ := img.ctrdImage.Size(ctx)
-	return size
+func (img *image) Size() int64 {
+	return img.size
 }
 
 func (img *image) Mount(ctx context.Context, path string) error {
