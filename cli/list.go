@@ -205,8 +205,8 @@ func listSnapshots(ctx context.Context, run runtime.Runtime) error {
 		snapList[i].Name = snap.Name()
 		snapList[i].Parent = snap.Parent()
 		snapList[i].CreatedAt = timeToAgoString(snap.CreatedAt())
-		snapList[i].Size, _ = snap.Size(ctx)
-		snapList[i].Inodes, _ = snap.Inodes(ctx)
+		snapList[i].Size = snap.Size()
+		snapList[i].Inodes = snap.Inodes()
 	}
 	printList(snapList, false)
 

@@ -213,10 +213,10 @@ type Snapshot interface {
 	CreatedAt() time.Time
 
 	// Size returns the size of the snapshot.
-	Size(ctx context.Context) (int64, error)
+	Size() int64
 
 	// Inodex returns the number of additional inodes in the snapshot.
-	Inodes(ctx context.Context) (int64, error)
+	Inodes() int64
 }
 
 // Process describes a process running inside a container.

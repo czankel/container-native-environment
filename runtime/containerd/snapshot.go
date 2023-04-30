@@ -20,6 +20,8 @@ import (
 type snapshot struct {
 	ctrdRuntime *containerdRuntime
 	info        snapshots.Info
+	size        int64
+	inodes      int64
 }
 
 // The snapshot name consists of the domain and the containerID
@@ -64,12 +66,24 @@ func getSnapshotDomains(ctx context.Context, ctrdRun *containerdRuntime) ([][16]
 	return domains, err
 }
 
-func getSnapshots(ctx context.Context, ctrdRun *containerdRuntime) ([]runtime.Snapshot, error) {
+func getSnapshots(ctx context.Context,
+	ctrdRun *containerdRuntime) ([]runtime.Snapshot, error) {
 	var snaps []runtime.Snapshot
 
 	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
 	err := snapSvc.Walk(ctx, func(ctx context.Context, info snapshots.Info) error {
-		snaps = append(snaps, &snapshot{ctrdRuntime: ctrdRun, info: info})
+
+		usage, err := snapSvc.Usage(ctx, string(info.Name))
+		if err != nil {
+			return runtime.Errorf("failed to get snapshot usage: %v", err)
+		}
+
+		snaps = append(snaps, &snapshot{
+			ctrdRuntime: ctrdRun,
+			info:        info,
+			size:        usage.Size,
+			inodes:      usage.Inodes})
+
 		return nil
 	})
 	if err != nil {
@@ -91,7 +105,16 @@ func getSnapshot(ctx context.Context,
 		return nil, runtime.Errorf("failed to get snapshot: %v", err)
 	}
 
-	return &snapshot{ctrdRuntime: ctrdRun, info: info}, nil
+	usage, err := snapSvc.Usage(ctx, string(info.Name))
+	if err != nil {
+		return nil, runtime.Errorf("failed to get snapshot usage: %v", err)
+	}
+
+	return &snapshot{
+		ctrdRuntime: ctrdRun,
+		info:        info,
+		size:        usage.Size,
+		inodes:      usage.Inodes}, nil
 }
 
 func getActiveSnapshot(ctx context.Context,
@@ -426,25 +449,10 @@ func (snap *snapshot) CreatedAt() time.Time {
 	return snap.info.Created
 }
 
-func (snap *snapshot) Size(ctx context.Context) (int64, error) {
-
-	ctrdRun := snap.ctrdRuntime
-
-	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
-	usage, err := snapSvc.Usage(ctx, snap.Name())
-	if err != nil {
-		return -1, runtime.Errorf("failed to get snapshot usage: %v", err)
-	}
-	return usage.Size, nil
+func (snap *snapshot) Size() int64 {
+	return snap.size
 }
 
-func (snap *snapshot) Inodes(ctx context.Context) (int64, error) {
-
-	ctrdRun := snap.ctrdRuntime
-	snapSvc := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
-	usage, err := snapSvc.Usage(ctx, snap.Name())
-	if err != nil {
-		return -1, runtime.Errorf("failed to get snapshot inodex: %v", err)
-	}
-	return usage.Inodes, nil
+func (snap *snapshot) Inodes() int64 {
+	return snap.inodes
 }
