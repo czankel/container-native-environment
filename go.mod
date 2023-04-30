@@ -5,7 +5,7 @@ go 1.13
 require (
 	github.com/BurntSushi/toml v0.4.1
 	github.com/containerd/console v1.0.3
-	github.com/containerd/containerd v1.6.10
+	github.com/containerd/containerd v1.6.18
 	github.com/containerd/typeurl v1.0.2
 	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/google/uuid v1.3.0
