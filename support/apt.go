@@ -116,8 +116,7 @@ func AptInstall(ctx context.Context, ws *project.Workspace, aptLayerIdx int, use
 	}
 
 	args := append([]string{"apt", "install", "-y"}, aptNames...)
-	code, err := container.BuildExec(ctx, runCtr,
-		&user, stream, args, []string{"DEBIAN_FRONTEND=noninteractive"})
+	code, err := container.BuildExec(ctx, runCtr, &user, stream, args, []string{"DEBIAN_FRONTEND=noninteractive"})
 
 	if err != nil {
 		return 0, err
@@ -166,8 +165,8 @@ func AptRemove(ctx context.Context, ws *project.Workspace, aptLayerIdx int, user
 	}
 
 	args := append([]string{"apt", "purge", "-y"}, delNames...)
-	code, err := container.BuildExec(ctx, runCtr,
-		&user, stream, args, []string{"DEBIAN_FRONTEND=noninteractive"})
+	code, err := container.BuildExec(ctx, runCtr, &user, stream, args,
+		[]string{"DEBIAN_FRONTEND=noninteractive"})
 	if err != nil {
 		return 0, err
 	}

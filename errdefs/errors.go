@@ -28,6 +28,8 @@ var (
 	ErrInternalError = errors.New("internal error")
 	// error: internal error: <description>
 	ErrInUse = errors.New("in use")
+	// error: not connected
+	ErrNotConnected = errors.New("not connected")
 
 	// pass-through errors
 	ErrCommandFailed   = errors.New("cmd failed")
@@ -37,6 +39,7 @@ var (
 type cneError struct {
 	cause    error
 	resource string
+	name     string
 	msg      string
 }
 
@@ -49,12 +52,16 @@ func New(cause error, resource, msg string) error {
 	}
 }
 
-func (err *cneError) Error() string {
-	return err.msg
+func (cerr *cneError) Error() string {
+	return cerr.msg
 }
 
 func (cerr *cneError) Is(other error) bool {
 	return cerr.cause == other
+}
+
+func IsError(err error, other error) bool {
+	return err.(*cneError).Is(other)
 }
 
 func IsCneError(err interface{}) bool {
@@ -66,11 +73,32 @@ func IsCneError(err interface{}) bool {
 	}
 }
 
+func Cause(err interface{}) string {
+	if !IsCneError(err) {
+		return ""
+	}
+	return err.(*cneError).cause.Error()
+}
+
 func Resource(err interface{}) string {
 	if !IsCneError(err) {
 		return ""
 	}
 	return err.(*cneError).resource
+}
+
+func Name(err interface{}) string {
+	if !IsCneError(err) {
+		return ""
+	}
+	return err.(*cneError).name
+}
+
+func Message(err interface{}) string {
+	if !IsCneError(err) {
+		return ""
+	}
+	return err.(*cneError).msg
 }
 
 func InvalidArgument(format string, args ...interface{}) error {
@@ -82,8 +110,10 @@ func InvalidArgument(format string, args ...interface{}) error {
 
 func AlreadyExists(resource, name string) error {
 	return &cneError{
-		cause: ErrAlreadyExists,
-		msg:   fmt.Sprintf("%s '%s' already exist", resource, name),
+		cause:    ErrAlreadyExists,
+		resource: resource,
+		name:     name,
+		msg:      fmt.Sprintf("%s '%s' already exist", resource, name),
 	}
 }
 
@@ -91,6 +121,7 @@ func NotFound(resource, name string) error {
 	return &cneError{
 		cause:    ErrNotFound,
 		resource: resource,
+		name:     name,
 		msg:      fmt.Sprintf("%s '%s' not found", resource, name),
 	}
 }
@@ -115,16 +146,10 @@ func NotImplemented() error {
 	}
 
 	return &cneError{
-		cause: ErrNotImplemented,
-		msg:   fmt.Sprintf("function '%s' has not been implemented", fnName),
-	}
-}
-
-func InUse(resource, name string) error {
-	return &cneError{
-		cause:    ErrInUse,
-		resource: resource,
-		msg:      fmt.Sprintf("%s '%s' is in use", resource, name),
+		cause:    ErrNotImplemented,
+		resource: "function",
+		name:     fnName,
+		msg:      fmt.Sprintf("function '%s' has not been implemented", fnName),
 	}
 }
 
@@ -135,7 +160,25 @@ func InternalError(format string, args ...interface{}) error {
 	}
 }
 
+func InUse(resource, name string) error {
+	return &cneError{
+		cause:    ErrInUse,
+		resource: resource,
+		name:     name,
+		msg:      fmt.Sprintf("%s '%s' is in use", resource, name),
+	}
+}
+
+func NotConnected() error {
+	return &cneError{
+		cause: ErrNotConnected,
+		msg:   "",
+	}
+}
+
 // 'Pass-through' errors
+
+// FIXME are these even used??
 
 type execError struct {
 	cause error

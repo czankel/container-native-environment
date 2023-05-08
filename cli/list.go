@@ -67,7 +67,7 @@ var listRuntimeCmd = &cobra.Command{
 }
 
 func listRuntimeRunE(cmd *cobra.Command, args []string) error {
-	printList(runtime.Runtimes(), false)
+	printValue("index", "runtime", "", runtime.Runtimes())
 	return nil
 }
 
@@ -293,6 +293,76 @@ func listContainersRunE(cmd *cobra.Command, args []string) error {
 	return listContainers(ctx, run, prj)
 }
 
+var listContextCmd = &cobra.Command{
+	Use:   "contexts",
+	Short: "List contexts",
+	Long:  `List available contexts for the user or current project.`,
+	RunE:  listContextRunE,
+	Args:  cobra.NoArgs,
+}
+
+func listContextRunE(cmd *cobra.Command, args []string) error {
+
+	conf, err := getConfig()
+	if err != nil {
+		return err
+	}
+
+	printList(conf.Context, true)
+	return nil
+}
+
+// FIXME support list processes
+/*
+var listProcessesCmd = &cobra.Command{
+	Use:     "all",
+	Aliases: []string{"c"},
+	Short:   "list processes",
+	Args:    cobra.NoArgs,
+	RunE:    listProcessesRunE,
+}
+
+func listProcesses(ctx context.Context, run runtime.Runtime) error {
+
+	processes, err := run.Processes(ctx)
+	if err != nil {
+		return err
+	}
+
+	procList := make([]struct {
+		Name      string
+	}, len(processes), len(processes))
+
+	for i, proc := range processes {
+		procList[i].Name = proc.Name()
+	}
+	printList(procList, false)
+
+	return nil
+}
+
+func listProcessesRunE(cmd *cobra.Command, args []string) error {
+
+	var prj *project.Project
+
+	runCfg, err := conf.GetRuntime()
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background)
+
+	run, err := runtime.Open(ctx, runCfg)
+	if err != nil {
+		return err
+	}
+	defer run.Close()
+	ctx = run.WithNamespace(ctx, runCfg.Namespace)
+
+	return listProcesses(ctx, run, prj)
+}
+*/
+
 var listResourcesCmd = &cobra.Command{
 	Use:     "all",
 	Aliases: []string{"c"},
@@ -362,6 +432,8 @@ func init() {
 	listCommandsCmd.Flags().StringVarP(
 		&listCommandsLayer, "layer", "l", "", "Name or index of the layer")
 	listCmd.AddCommand(listResourcesCmd)
+	// FIXME support listCmd.AddCommand(listProcesses)
 	listResourcesCmd.Flags().BoolVarP(
 		&listResourcesAll, "all", "A", false, "list resources from all projects")
+	listCmd.AddCommand(listContextCmd)
 }

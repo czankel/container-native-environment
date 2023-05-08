@@ -48,6 +48,9 @@ type Runtime interface {
 	// Snapshots returns all snapshots.
 	Snapshots(ctx context.Context) ([]Snapshot, error)
 
+	// GetSnapshot returns the snapshot by name
+	GetSnapshot(ctx context.Context, name string) (Snapshot, error)
+
 	// DeleteSnapshot deletes the snapshot
 	DeleteSnapshot(ctx context.Context, name string) error
 
@@ -62,8 +65,7 @@ type Runtime interface {
 	GetContainer(ctx context.Context, domain, id, generation [16]byte) (Container, error)
 
 	// NewContainer defines a new Container without creating it.
-	NewContainer(ctx context.Context,
-		domain, id, generation [16]byte, uid uint32, image Image) (Container, error)
+	NewContainer(ctx context.Context, domain, id, generation [16]byte, uid uint32, image Image) (Container, error)
 
 	// DeleteContainer deletes the specified container. It returns ErrNotFound if the container
 	// doesn't exist.
@@ -77,7 +79,7 @@ type Runtime interface {
 // Image describes an image that consists of a file system and configuration options.
 type Image interface {
 
-	// Name returns the image name.
+	// Name returns the image name. // FIXME unique?? or use UUID?? Maybe common? No error return optioN/
 	Name() string
 
 	// Size returns the size of the image.
@@ -125,6 +127,10 @@ type Container interface {
 	// of domain, ID, and generation
 	Name() string
 
+	// FIXME: would be good to not need it, but hard...
+	// Runtime returns the runtime for the container
+	Runtime() Runtime
+
 	// CreatedAt returns the date the container was created.
 	CreatedAt() time.Time
 
@@ -144,13 +150,10 @@ type Container interface {
 	// Return the User ID
 	UID() uint32
 
-	// Snapshots returns all container snapshots.
-	Snapshots(ctx context.Context) ([]Snapshot, error)
-
-	// SetRootFs sets the rootfs to the provide snapshot.
+	// SetRootFS the rootfs to the provide snapshot.
 	//
 	// The root filesystem can only be set when the container has not been created.
-	SetRootFs(ctx context.Context, snapshot Snapshot) error
+	SetRootFS(ctx context.Context, snapshot Snapshot) error
 
 	// Create creates the container.
 	Create(ctx context.Context) error
@@ -181,6 +184,9 @@ type Container interface {
 	// Exec starts the provided command in the process spec and returns immediately.
 	// The container must be started before calling Exec.
 	Exec(ctx context.Context, stream Stream, procSpec *ProcessSpec) (Process, error)
+
+	// Processes returns a list of processes
+	Processes(ctx context.Context) ([]Process, error)
 }
 
 // Stream describes the IO channels to a process that is running in a container.
@@ -222,11 +228,19 @@ type Snapshot interface {
 // Process describes a process running inside a container.
 type Process interface {
 
-	// Signal sends a signal to the process.
-	Signal(ctx context.Context, sig os.Signal) error
+	// FIXME: add attach? detach?
 
-	// Wait waits asynchronously for the process to exit and sends the exit code to the channel.
-	Wait(ctx context.Context) (<-chan ExitStatus, error)
+	// SigInt sends SigInt to the process.
+	SigInt(ctx context.Context) error
+
+	// Wait waits for the process to exit and sends the exit code to the channel.
+	Wait(ctx context.Context) error
+
+	// ExitCode returns the exit code when a process exited.
+	ExitCode() uint32
+
+	// ExitTime returns the time the process exited
+	ExitTime() time.Time
 }
 
 // Progress status values.
@@ -250,6 +264,8 @@ type ProgressStatus struct {
 	StartedAt time.Time // Time the job was started.
 	UpdatedAt time.Time // Time the job was last updated (or when it was completed).
 }
+
+// FIXME: remove, use context instead and function to get exit time and code
 
 // ExitStatus describes the exit status of a background operation.
 type ExitStatus struct {

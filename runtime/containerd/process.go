@@ -1,10 +1,12 @@
-// Package containerd implements the runtime interface for the ContainerD Dameon containerd.io
+//go:build linux
+
 package containerd
 
 import (
 	"context"
 	"os"
 	"syscall"
+	"time"
 
 	"github.com/containerd/containerd"
 	ctrderr "github.com/containerd/containerd/errdefs"
@@ -15,38 +17,39 @@ import (
 type process struct {
 	container *container
 	ctrdProc  containerd.Process
+	code      uint32
+	exitedAt  time.Time
 }
 
 // Wait waits for the process to complete and returns the result or
 // the error for any context operation.
-func (proc *process) Wait(ctx context.Context) (<-chan runtime.ExitStatus, error) {
+func (proc *process) Wait(ctx context.Context) error {
 
 	ctrdExitStatus, err := proc.ctrdProc.Wait(ctx)
-	runExitStatus := make(chan runtime.ExitStatus)
 	if err != nil && ctrderr.IsNotFound(err) {
-		runExitStatus <- runtime.ExitStatus{}
-		return runExitStatus, nil
+		return nil
 	}
 	if err != nil {
-		return nil, runtime.Errorf("wait failed: %v", err)
+		return runtime.Errorf("wait failed: %v", err)
 	}
 
-	go func() {
-		defer close(runExitStatus)
-
-		exitStatus := <-ctrdExitStatus
-		code, exitedAt, err := exitStatus.Result()
-		runExitStatus <- runtime.ExitStatus{
-			ExitTime: exitedAt,
-			Error:    err,
-			Code:     code,
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case exitStatus := <-ctrdExitStatus:
+			code, exitedAt, _err := exitStatus.Result()
+			proc.code = code
+			proc.exitedAt = exitedAt
+			err = _err
+			return nil
 		}
-	}()
+	}
 
-	return runExitStatus, nil
+	return err
 }
 
-func (proc *process) Signal(ctx context.Context, sig os.Signal) error {
+func (proc *process) SigInt(ctx context.Context) error {
 
 	s := sig.(syscall.Signal)
 	err := proc.ctrdProc.Kill(ctx, s)
@@ -54,4 +57,12 @@ func (proc *process) Signal(ctx context.Context, sig os.Signal) error {
 		return runtime.Errorf("kill failed: %v", err)
 	}
 	return nil
+}
+
+func (proc *process) ExitCode() uint32 {
+	return proc.code
+}
+
+func (proc *process) ExitTime() time.Time {
+	return proc.exitedAt
 }

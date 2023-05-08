@@ -39,26 +39,7 @@ var showProjectConfig bool
 
 func showConfigRunE(cmd *cobra.Command, args []string) error {
 
-	var err error
-
-	if showSystemConfig {
-		conf, err = config.LoadSystemConfig()
-	} else if showUserConfig {
-		conf, err = config.LoadUserConfig()
-	} else if showProjectConfig {
-		prj, err := loadProject()
-		if err != nil {
-			return err
-		}
-		conf, err = config.LoadProjectConfig(filepath.Dir(prj.Path))
-	} else {
-		conf, err = config.Load()
-		prj, err := loadProject()
-		if err == nil {
-			err = conf.UpdateProjectConfig(filepath.Dir(prj.Path))
-		}
-	}
-
+	conf, err := getConfig()
 	if err != nil {
 		return err
 	}
@@ -73,8 +54,34 @@ func showConfigRunE(cmd *cobra.Command, args []string) error {
 		}
 		printValue("Configuration", "Value", prefix, val)
 	}
+	// FIXME: if type is slice, print as table?
 
 	return nil
+}
+
+func getConfig() (*config.Config, error) {
+
+	var err error
+
+	if showSystemConfig {
+		conf, err = config.LoadSystemConfig()
+	} else if showUserConfig {
+		conf, err = config.LoadUserConfig()
+	} else if showProjectConfig {
+		prj, err := loadProject()
+		if err != nil {
+			return nil, err
+		}
+		conf, err = config.LoadProjectConfig(filepath.Dir(prj.Path))
+	} else {
+		conf, err = config.Load()
+		prj, err := loadProject()
+		if err == nil {
+			err = conf.UpdateProjectConfig(filepath.Dir(prj.Path))
+		}
+	}
+
+	return conf, err
 }
 
 var showProjectCmd = &cobra.Command{

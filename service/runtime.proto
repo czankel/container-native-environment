@@ -1,0 +1,171 @@
+syntax = "proto3";
+
+package cne;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/czankel/cne/service";
+
+// FIXME: rename to Runtime or RemoteRuntime or RuntimeService?
+service Remote {
+
+  // image
+  rpc OnImages (Namespace) returns (Images);
+  rpc OnGetImage (Name) returns (Image);
+  rpc OnPullImage (Name) returns (Image);
+  rpc OnDeleteImage (Name) returns (google.protobuf.Empty);
+
+  // snapshot
+  rpc OnSnapshots (Namespace) returns (Snapshots);
+  rpc OnGetSnapshot (Name) returns (Snapshot);
+  rpc OnDeleteSnapshot (Name) returns (google.protobuf.Empty);
+
+  // container
+  rpc OnContainers (Filter) returns (Containers);
+  rpc OnGetContainer (Container) returns (ContainerInfo);
+  rpc OnCreateContainer (Container) returns (google.protobuf.Empty);
+  rpc OnContainerSnapshot (Container) returns (Snapshot);
+  rpc OnDeleteContainer (Container) returns (google.protobuf.Empty);
+  rpc OnPurgeContainer (Container) returns (google.protobuf.Empty);
+
+  rpc OnSetRootFS (RootFS) returns (google.protobuf.Empty);
+  rpc OnAmend (Container) returns (Snapshot);
+  rpc OnCommit (Container) returns (google.protobuf.Empty);
+
+  rpc OnExec (stream Session) returns (stream Session);
+
+  // process
+  /*
+  rpc OnProcessSignal()
+  rpc OnProcessWait()
+  */
+}
+
+message CneError {
+  string cause = 1;
+  string resource = 2;
+  string name = 3;
+  string msg = 4;
+}
+
+message Namespace {
+  string namespace = 1;
+}
+
+message Name {
+  string namespace = 1;
+  string value = 2;
+}
+
+message Image {
+  string name = 1;
+  string digest = 2;
+  int64 size = 5;
+  google.protobuf.Timestamp created = 4;
+  repeated string rootfs = 3;
+}
+
+message Images {
+  repeated Image images = 1;
+}
+
+message Snapshot {
+  string name = 1;
+  string parent = 2;
+  google.protobuf.Timestamp created = 3;
+  int64 size = 4;
+  int64 inodes = 5;
+}
+
+message Snapshots {
+  repeated Snapshot snapshots = 1;
+}
+
+message Filter {
+  enum TYPE{
+    NONE = 0;
+    DOMAIN = 1;
+  };
+
+  string namespace = 1;
+  TYPE type = 2;
+  bytes domain = 3;
+}
+
+message Filters {
+  string namespace = 1;
+  repeated Filter filters = 2;
+}
+
+message ContainerID {
+  bytes domain = 1;
+  bytes id = 2;
+  bytes generation = 3;
+  uint32 uid = 4;
+}
+
+message Container {
+  string namespace = 1;
+  ContainerID id = 2;
+  string image = 3;
+}
+
+message ContainerInfo {
+  ContainerID id = 1;
+  google.protobuf.Timestamp created = 2;
+  google.protobuf.Timestamp updated = 3;
+}
+
+message Containers {
+  repeated ContainerInfo containers = 2;
+}
+
+message RootFS {
+  string namespace = 1;
+  ContainerID container = 2;
+  string snapshot = 3;
+}
+
+message Session {
+  enum COMMAND {
+    EXEC = 0;
+    EXIT = 2;
+    STDIN = 3;
+    STDOUT = 4;
+    STDERR = 5;
+    SIGINT = 10;
+    SIGKILL = 11;
+  };
+
+  string namespace = 1;
+  COMMAND command = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  uint32 code = 4;	// signal or exit code
+  uint32 UID = 5;
+  uint32 GID = 6;
+  repeated string args = 7;
+  repeated string envs = 8;
+  string error = 9;
+  bytes data = 10;
+}
+
+message Volume {
+  enum COMMAND{
+    ATTACH = 0;
+  }
+
+  string namespace = 1;
+  COMMAND command = 2;
+  string mountpoint = 3;
+  bytes data = 4;
+}
+
+message Process {
+
+}
+
+message Processes {
+  string namespace = 1;
+  repeated Process processes = 2;
+}

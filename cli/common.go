@@ -127,8 +127,10 @@ func timeToAgoString(t time.Time) string {
 
 // printValueElem prints the provided value as two columns for name and value content.
 // Struct  Each element is printed as a single row with the provided prefix for the name field
-//         For nested structures, the field names of each substructure are concatenated by '.'
-//         Use the output:"-" tag to omit a field.
+//
+//	For nested structures, the field names of each substructure are concatenated by '.'
+//	Use the output:"-" tag to omit a field.
+//
 // Map     Similar to Struct, but using the keys as the prefix instead of the structure elements.
 // <other> Printed as two columns using the prefix as the name for the value content.
 // flat outputs a slice in the [ ... ] format. It will only flatten the final slice ([][])
@@ -189,10 +191,11 @@ func printValueElem(w *tabwriter.Writer, prefix string, elem reflect.Value, flat
 }
 
 // printValue prints the content of the provided value in two columns.
-//  struct: field name, value
-//  map:    key, value
-//  slice:  index, value
-//  <type>: prefix, value
+//
+//	struct: field name, value
+//	map:    key, value
+//	slice:  index, value
+//	<type>: prefix, value
 func printValue(fieldHdr string, valueHdr string, prefix string, value interface{}) {
 
 	w := new(tabwriter.Writer)
@@ -203,13 +206,18 @@ func printValue(fieldHdr string, valueHdr string, prefix string, value interface
 	printValueElem(w, prefix, reflect.ValueOf(value), false)
 }
 
-// printList prints a slice of structures using the field names as the header
+// printList prints a slice of structures or single elements using the field names as the header
 func printList(list interface{}, withIndex bool) {
 
 	if reflect.TypeOf(list).Kind() != reflect.Slice {
 		panic("provided argument must be of the type: slice")
 	}
-	if reflect.TypeOf(list).Elem().Kind() != reflect.Struct {
+	elem := reflect.TypeOf(list).Elem()
+	isRef := elem.Kind() == reflect.Pointer
+	if isRef {
+		elem = elem.Elem()
+	}
+	if elem.Kind() != reflect.Struct {
 		panic("provided argument must be of the type: slice of structures")
 	}
 
@@ -223,6 +231,9 @@ func printList(list interface{}, withIndex bool) {
 
 	format := "%s"
 	hdr := reflect.TypeOf(list).Elem()
+	if isRef {
+		hdr = hdr.Elem()
+	}
 	for i := 0; i < hdr.NumField(); i++ {
 		if hdr.Field(i).Tag.Get("output") != "-" {
 			fmt.Fprintf(w, format, strings.ToUpper(hdr.Field(i).Name))
@@ -239,6 +250,9 @@ func printList(list interface{}, withIndex bool) {
 		}
 		format = "%v"
 		item := items.Index(i)
+		if isRef {
+			item = item.Elem()
+		}
 		for j := 0; j < item.NumField(); j++ {
 			if hdr.Field(j).Tag.Get("output") == "-" {
 				continue

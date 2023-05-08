@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 
@@ -53,6 +54,8 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 	defer run.Close()
 	ctx = run.WithNamespace(ctx, runCfg.Namespace)
 
+	// FIXME: should move a lot of container so it can be used from service
+
 	prj, err := loadProject()
 	if err != nil {
 		return 0, err
@@ -87,14 +90,17 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 			return 0, err
 		}
 		if errors.Is(err, errdefs.ErrNotFound) {
+			fmt.Println("build container")
 			ctr, err = buildContainer(ctx, run, ws, -1)
+			fmt.Printf("ERR %v\n", err)
 			if err != nil {
 				return 0, err
 			}
 			prj.Write()
 		}
-
+		fmt.Println("exec")
 		code, err := container.Exec(ctx, ctr, &user, stream, args)
+		fmt.Printf("returned %v\n", err)
 		if err != nil && errors.Is(err, errdefs.ErrNotFound) && errdefs.Resource(err) == "command" {
 			return 0, errors.New(args[0] + ": no such command")
 		}

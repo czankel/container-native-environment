@@ -138,6 +138,25 @@ func updateProjectRunE(cmd *cobra.Command, args []string) error {
 	return prj.Write()
 }
 
+var updateContextCmd = &cobra.Command{
+	Use:   "context",
+	Short: "Update the context",
+	Long: `Update the context for the user or project.
+By default, the context is changed for the user.`,
+	RunE: updateContextRunE,
+	Args: cobra.ExactArgs(1),
+}
+
+func updateContextRunE(cmd *cobra.Command, args []string) error {
+
+	cfgArgs := []string{
+		"settings/context",
+		args[1],
+	}
+
+	return updateConfigRunE(cmd, cfgArgs)
+}
+
 func init() {
 	rootCmd.AddCommand(updateCmd)
 	updateCmd.AddCommand(updateWorkspaceCmd)
@@ -153,4 +172,7 @@ func init() {
 	updateProjectCmd.Flags().StringVar(
 		&updateProjectWorkspace, "ws", "", "Update current workspace")
 	updateCmd.AddCommand(updateProjectCmd)
+	updateCmd.AddCommand(updateContextCmd)
+	updateContextCmd.Flags().BoolVarP(
+		&updateProjectConfig, "project", "", false, "Update project configuration")
 }

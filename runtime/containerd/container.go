@@ -1,4 +1,5 @@
-// Package containerd implements the runtime interface for the ContainerD Dameon containerd.io
+//go:build linux
+
 package containerd
 
 import (
@@ -119,7 +120,6 @@ func getContainers(ctx context.Context,
 	ctrdRun *containerdRuntime, filters ...interface{}) ([]runtime.Container, error) {
 
 	var runCtrs []runtime.Container
-
 	hasDomain := false
 	var domain [16]byte
 
@@ -275,6 +275,7 @@ func getContainer(ctx context.Context,
 func createTask(ctx context.Context, ctr *container) (containerd.Task, error) {
 
 	ctrdRun := ctr.ctrdRuntime
+
 	mounts, err := getActiveSnapMounts(ctx, ctrdRun, ctr.domain, ctr.id)
 	if err != nil {
 		return nil, err
@@ -332,6 +333,10 @@ func (ctr *container) Name() string {
 		hex.EncodeToString(ctr.generation[:])
 }
 
+func (ctr *container) Runtime() runtime.Runtime {
+	return ctr.ctrdRuntime
+}
+
 func (ctr *container) Domain() [16]byte {
 	return ctr.domain
 }
@@ -358,12 +363,7 @@ func (ctr *container) UpdatedAt() time.Time {
 	return time.Now()
 }
 
-func (ctr *container) Snapshots(ctx context.Context) ([]runtime.Snapshot, error) {
-	// TODO: filter for current container
-	return getSnapshots(ctx, ctr.ctrdRuntime)
-}
-
-func (ctr *container) SetRootFs(ctx context.Context, snap runtime.Snapshot) error {
+func (ctr *container) SetRootFS(ctx context.Context, snap runtime.Snapshot) error {
 	return createActiveSnapshot(ctx, ctr.ctrdRuntime, ctr.image, ctr.domain, ctr.id, snap)
 }
 
@@ -479,7 +479,8 @@ func (ctr *container) UpdateSpec(ctx context.Context, newSpec *runspecs.Spec) er
 
 func (ctr *container) Mount(ctx context.Context, destination string, source string) error {
 
-	spec, err := runtime.DefaultSpec(ctx)
+	ns, _ := namespaces.Namespace(ctx)
+	spec, err := runtime.DefaultSpec(ns)
 	if err != nil {
 		return err
 	}
@@ -531,6 +532,7 @@ func (ctr *container) Exec(ctx context.Context, stream runtime.Stream,
 	runProcSpec *runtime.ProcessSpec) (runtime.Process, error) {
 
 	ctrdCtr := ctr.ctrdContainer
+
 	ctrdTask, err := ctrdCtr.Task(ctx, nil)
 	if err != nil && ctrderr.IsNotFound(err) {
 		ctrdTask, err = createTask(ctx, ctr)

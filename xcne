@@ -1,0 +1,11 @@
+#!/bin/bash
+
+./cne server --context default &
+PID=$!
+echo PID: $PID
+sleep 0.1
+./cne exec -- "$@"
+RET=$?
+
+kill $PID
+exit $RET

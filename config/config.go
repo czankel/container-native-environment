@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/user"
 	"reflect"
-	"strconv"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -24,7 +23,7 @@ type Settings struct {
 }
 
 type Runtime struct {
-	Name       string `toml:"Name,omitempty"`
+	Name       string `toml:"Name,omitempty"` // FIXME: this is duplication? Hide when written??
 	SocketName string `toml:"SocketName,omitempty"`
 	Namespace  string `cne:"ReadOnly" toml:"Namespace,omitempty"`
 }
@@ -67,47 +66,45 @@ func (conf *Config) GetContext() (*Context, error) {
 	return nil, errdefs.InvalidArgument("invalid context '%s'", name)
 }
 
-// GetRuntime returns the context-specific runtime.
 func (conf *Config) GetRuntime() (*Runtime, error) {
 
-	cfgCtx, err := conf.GetContext()
+	ctx, err := conf.GetContext()
 	if err != nil {
 		return nil, err
 	}
 
 	for _, r := range conf.Runtime {
-		if r.Name == cfgCtx.Runtime {
+		if r.Name == ctx.Runtime {
 			return r, nil
 		}
 	}
 
 	return nil, errdefs.InvalidArgument("invalid runtime '%s' for context '%s'",
-		cfgCtx.Runtime, cfgCtx.Name)
+		ctx.Runtime, ctx.Name)
 }
 
-// GetRegistry returns the context-specific registry.
 func (conf *Config) GetRegistry() (*Registry, error) {
 
-	cfgCtx, err := conf.GetContext()
+	ctx, err := conf.GetContext()
 	if err != nil {
 		return nil, err
 	}
 
 	for _, r := range conf.Registry {
-		if r.Name == cfgCtx.Registry {
+		if r.Name == ctx.Registry {
 			return r, nil
 		}
 	}
 
 	return nil, errdefs.InvalidArgument("invalid registry '%s' for context '%s'",
-		cfgCtx.Runtime, cfgCtx.Name)
+		ctx.Runtime, ctx.Name)
 }
 
 // update updates the configuration with the values from the specified configuration file
 func (conf *Config) update(path string) error {
 	_, err := toml.DecodeFile(path, conf)
 	if err != nil && !os.IsNotExist(err) {
-		return errdefs.InvalidArgument("config file '%s' corrupt", path)
+		return errdefs.InvalidArgument("config file '%s' corrupt: %v", path, err)
 	}
 	return nil
 }
@@ -188,17 +185,13 @@ func (conf *Config) UpdateProjectConfig(path string) error {
 }
 
 // getValue returns the reflect.Value for the element in the nested structure by the
-// concatenated filter (using '/' as the separator). The filter is case-insensitive.
-// For arrays, both, the index and the name can be used, if a "Name" field exists.
+// concatenated filter (using '.' as the separator). The filter is case-insensitive.
 // This function also returns the actual path using the correctly capitalized letters
-// and converts arrays selected by name to the array index.
-// Note that an invalid value returned indicates an error.
-func (conf *Config) getValue(filter string, create bool) (string, reflect.Value, string) {
+func (conf *Config) getValue(filter string, makeMap bool) (string, reflect.Value, string) {
 	var realPath string
 	var tag string
 
 	elem := reflect.ValueOf(conf).Elem()
-	filter = strings.TrimRight(filter, "/")
 	path := strings.Split(filter, "/")
 
 	for i, fieldName := range path {
@@ -214,7 +207,7 @@ func (conf *Config) getValue(filter string, create bool) (string, reflect.Value,
 		} else if elem.Kind() == reflect.Map {
 			elem = elem.MapIndex(reflect.ValueOf(fieldName))
 			if !elem.IsValid() {
-				if !create {
+				if !makeMap {
 					return realPath, elem, ""
 				}
 
@@ -225,42 +218,9 @@ func (conf *Config) getValue(filter string, create bool) (string, reflect.Value,
 				curElem.SetMapIndex(reflect.ValueOf(fieldName), elem)
 			}
 			elem = elem.Elem()
-
-		} else if elem.Kind() == reflect.Slice {
-
-			idx, err := strconv.Atoi(fieldName)
-			if err != nil {
-
-				idx = -1
-				fn := strings.ToLower(fieldName)
-				for i := 0; i < curElem.Len(); i++ {
-
-					e := curElem.Index(i).Elem()
-					v := e.FieldByNameFunc(func(n string) bool {
-						return strings.ToLower(n) == "name"
-					})
-					if v.IsValid() && strings.ToLower(v.String()) == fn {
-						idx = i
-						fieldName = strconv.Itoa(i)
-						break
-					}
-				}
-			}
-
-			if idx >= 0 && idx < curElem.Len() {
-				elem = curElem.Index(idx)
-			} else if create {
-				elem = reflect.New(curElem.Type().Elem().Elem()).Elem().Addr()
-				reflect.Append(curElem, elem)
-			} else {
-				return "", reflect.ValueOf(nil), ""
-			}
-			elem = elem.Elem()
-
 		} else {
 			return realPath, elem, ""
 		}
-
 		realPath = realPath + fieldName
 
 		if !elem.IsValid() {

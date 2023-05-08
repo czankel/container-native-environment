@@ -1,9 +1,12 @@
+//go:build linux
+
 // Package containerd implements the runtime interface for the ContainerD Dameon containerd.io
 package containerd
 
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
@@ -38,8 +41,6 @@ const contextName = "cne"
 func init() {
 	runtime.Register("containerd", &containerdRuntimeType{})
 }
-
-// Runtime Interface
 
 func (ctrdRun *containerdRuntime) WithNamespace(ctx context.Context, ns string) context.Context {
 	return namespaces.WithNamespace(ctx, ns)
@@ -81,11 +82,10 @@ func (ctrdRun *containerdRuntime) Images(ctx context.Context) ([]runtime.Image, 
 
 	runImgs := make([]runtime.Image, len(ctrdImgs))
 	for i, ctrdImg := range ctrdImgs {
-		runImg, err := getImage(ctx, ctrdRun, ctrdImg)
-		if err != nil {
-			return nil, err
+		runImgs[i] = &image{
+			ctrdRuntime: ctrdRun,
+			ctrdImage:   ctrdImg,
 		}
-		runImgs[i] = runImg
 	}
 
 	return runImgs, nil
@@ -93,7 +93,7 @@ func (ctrdRun *containerdRuntime) Images(ctx context.Context) ([]runtime.Image, 
 
 func (ctrdRun *containerdRuntime) GetImage(ctx context.Context,
 	name string) (runtime.Image, error) {
-
+	fmt.Printf("CTRD GET IMAGE: %s\n", name)
 	ctrdImg, err := ctrdRun.client.GetImage(ctx, name)
 	if errors.Is(err, ctrderr.ErrNotFound) {
 		return nil, errdefs.NotFound("image", name)
@@ -101,7 +101,10 @@ func (ctrdRun *containerdRuntime) GetImage(ctx context.Context,
 		return nil, err
 	}
 
-	return getImage(ctx, ctrdRun, ctrdImg)
+	return &image{
+		ctrdRuntime: ctrdRun,
+		ctrdImage:   ctrdImg,
+	}, nil
 }
 
 // TODO: ContainerD is not really stable when interrupting an image pull (e.g. using CTRL-C)
@@ -164,7 +167,10 @@ func (ctrdRun *containerdRuntime) PullImage(ctx context.Context, name string,
 		return nil, runtime.Errorf("pull image '%s' failed: %v", name, err)
 	}
 
-	return getImage(ctx, ctrdRun, ctrdImg)
+	return &image{
+		ctrdRuntime: ctrdRun,
+		ctrdImage:   ctrdImg,
+	}, nil
 }
 
 func (ctrdRun *containerdRuntime) DeleteImage(ctx context.Context, name string) error {
@@ -204,12 +210,14 @@ func (ctrdRun *containerdRuntime) GetContainer(ctx context.Context,
 	return getContainer(ctx, ctrdRun, domain, id, generation)
 }
 
-func (ctrdRun *containerdRuntime) NewContainer(ctx context.Context,
+func (ctrdRun *containerdRuntime) NewContainer(
+	ctx context.Context,
 	domain, id, generation [16]byte, uid uint32,
 	img runtime.Image) (runtime.Container, error) {
 
 	// start with a base container
-	spec, err := runtime.DefaultSpec(ctx)
+	ns, _ := namespaces.Namespace(ctx)
+	spec, err := runtime.DefaultSpec(ns)
 	if err != nil {
 		return nil, err
 	}

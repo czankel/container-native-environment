@@ -1,4 +1,5 @@
-// Package containerd implements the runtime interface for the ContainerD Dameon containerd.io
+//go:build linux
+
 package containerd
 
 import (
@@ -135,22 +136,6 @@ type image struct {
 	size        int64
 }
 
-func getImage(ctx context.Context,
-	ctrdRun *containerdRuntime, ctrdImg containerd.Image) (*image, error) {
-
-	imgConf, err := ctrdImg.Config(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return &image{
-		ctrdRuntime: ctrdRun,
-		ctrdImage:   ctrdImg,
-		digest:      imgConf.Digest,
-		size:        imgConf.Size,
-	}, nil
-}
-
 func (img *image) Config(ctx context.Context) (*ocispec.ImageConfig, error) {
 
 	ociDesc, err := img.ctrdImage.Config(ctx)
@@ -183,6 +168,8 @@ func (img *image) Config(ctx context.Context) (*ocispec.ImageConfig, error) {
 }
 
 func (img *image) Digest() digest.Digest {
+	// FIXME imgConf, _ := img.ctrdImage.Config(ctx)
+	//return imgConf.Digest
 	return img.digest
 }
 
@@ -209,6 +196,7 @@ func (img *image) CreatedAt() time.Time {
 
 func (img *image) Size() int64 {
 	return img.size
+	// FIXME size, _ := img.ctrdImage.Size(ctx)
 }
 
 func (img *image) Mount(ctx context.Context, path string) error {

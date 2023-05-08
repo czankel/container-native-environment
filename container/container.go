@@ -5,6 +5,7 @@ package container
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/signal"
 	"strings"
@@ -25,8 +26,9 @@ var baseEnv = []string{
 }
 
 // Containers returns all active containers in the project.
-func Containers(ctx context.Context, run runtime.Runtime,
-	prj *project.Project, user *config.User) ([]runtime.Container, error) {
+func Containers(ctx context.Context,
+	run runtime.Runtime, prj *project.Project,
+	user *config.User) ([]runtime.Container, error) {
 
 	var domain [16]byte
 	var err error
@@ -81,7 +83,8 @@ func Get(ctx context.Context,
 
 // NewContainer defines a new Container with a default generation value for the Workspace without
 // the Layer configuration. The generation value will be updated through Commit().
-func NewContainer(ctx context.Context, run runtime.Runtime, ws *project.Workspace,
+func NewContainer(ctx context.Context,
+	run runtime.Runtime, ws *project.Workspace,
 	user *config.User, img runtime.Image) (runtime.Container, error) {
 
 	dom, err := uuid.Parse(ws.ProjectUUID)
@@ -106,23 +109,28 @@ func NewContainer(ctx context.Context, run runtime.Runtime, ws *project.Workspac
 		err = runCtr.Create(ctx)
 	}
 	if err != nil {
+		fmt.Printf("returning from NewContainer with error %v\n", err)
 		return nil, err
 	}
 
-	return runCtr, err
+	fmt.Printf("returning from newContainer without error")
+	return runCtr, nil
 }
 
 // find an existing top-most snapshot up to but excluding nextLayerIdx
 // and return it with the layer index.
 // Layer index 0 and snaphost nil means that there is no snapshot that matches
-func findRootFs(ctx context.Context, runCtr runtime.Container,
+func findRootFs(ctx context.Context,
+	runCtr runtime.Container,
 	ws *project.Workspace, nextLayerIdx int) (int, runtime.Snapshot, error) {
+
+	run := runCtr.Runtime()
 
 	// identify the layer with the topmost existing snapshot
 	bldLayerIdx := 0
 	var snap runtime.Snapshot
 
-	snaps, err := runCtr.Snapshots(ctx)
+	snaps, err := run.Snapshots(ctx)
 	if err != nil {
 		return -1, nil, err
 	}
@@ -149,7 +157,8 @@ func findRootFs(ctx context.Context, runCtr runtime.Container,
 // A container may already be partially built. In that case, Build() will continue the build
 // process.
 // The progress argument is optional for outputting status updates during the build process.
-func Build(ctx context.Context, runCtr runtime.Container, ws *project.Workspace, nextLayerIdx int,
+func Build(ctx context.Context,
+	runCtr runtime.Container, ws *project.Workspace, nextLayerIdx int,
 	user *config.User, params *config.Parameters,
 	progress chan []runtime.ProgressStatus, stream runtime.Stream) error {
 
@@ -187,8 +196,8 @@ func Build(ctx context.Context, runCtr runtime.Container, ws *project.Workspace,
 		copy(stat, layerStatus)
 		progress <- stat
 	}
-
-	err = runCtr.SetRootFs(ctx, rootFsSnap)
+	fmt.Printf("SETROOTFS %v\n", rootFsSnap)
+	err = runCtr.SetRootFS(ctx, rootFsSnap)
 	if err != nil {
 		return err
 	}
@@ -303,15 +312,13 @@ func BuildExec(ctx context.Context, runCtr runtime.Container,
 	return commonExec(ctx, runCtr, &procSpec, stream)
 }
 
+// TODO: if remote is not responsive query use to force exit of cne on second SIGINT
 func commonExec(ctx context.Context, runCtr runtime.Container,
 	procSpec *runtime.ProcessSpec, stream runtime.Stream) (uint32, error) {
 
-	proc, err := runCtr.Exec(ctx, stream, procSpec)
-	if err != nil {
-		return 0, err
-	}
+	ctx, cancel := context.WithCancel(ctx)
 
-	ch, err := proc.Wait(ctx)
+	proc, err := runCtr.Exec(ctx, stream, procSpec)
 	if err != nil {
 		return 0, err
 	}
@@ -319,17 +326,29 @@ func commonExec(ctx context.Context, runCtr runtime.Container,
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc)
 	go func() {
+		last := time.Now()
+		hit := 0
 		for {
 			s, more := <-sigc
+			fmt.Printf("XX commonExec SIGNAL!\n")
 			if !more {
 				return
 			}
-			proc.Signal(ctx, s)
+
+			now := time.Now()
+			diff := now.Sub(last)
+			if hit > 0 && diff.Seconds() > 2 { // FIXME sec..
+				cancel.CancelWith(errdefs.Interrupted)
+			} else {
+				proc.Signal(ctx, s)
+			}
+			last = now
 		}
 	}()
 
-	exitStat := <-ch
+	err = proc.Wait(ctx)
 	signal.Stop(sigc)
 	close(sigc)
-	return exitStat.Code, exitStat.Error
+
+	return proc.ExitCode(), err
 }

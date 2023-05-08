@@ -22,6 +22,20 @@ var createCmd = &cobra.Command{
 	Args:    cobra.MinimumNArgs(1),
 }
 
+var createContextCmd = &cobra.Command{
+	Use:   "context",
+	Short: "Create a new context",
+	RunE:  createContextRunE,
+	Args:  cobra.ExactArgs(1),
+}
+
+var createContextRuntime string
+var createContextRegistry string
+
+func createContextRunE(cmd *cobra.Command, args []string) error {
+	return nil
+}
+
 var createWorkspaceCmd = &cobra.Command{
 	Use:     "workspace [NAME]",
 	Short:   "Create a new workspace",
