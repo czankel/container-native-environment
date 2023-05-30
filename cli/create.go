@@ -50,7 +50,10 @@ func createWorkspaceRunE(cmd *cobra.Command, args []string) error {
 
 func initWorkspace(prj *project.Project, wsName, insert, imgName string) error {
 
-	imgName = conf.FullImageName(imgName)
+	imgName, err := conf.FullImageName(imgName)
+	if err != nil {
+		return err
+	}
 
 	ws, err := prj.CreateWorkspace(wsName, imgName, insert)
 	if err != nil {
@@ -76,7 +79,7 @@ func initWorkspace(prj *project.Project, wsName, insert, imgName string) error {
 			return err
 		}
 
-		err = support.SetupWorkspace(ws, img)
+		err = support.SetupWorkspace(ctx, ws, img)
 		if err != nil {
 			return err
 		}

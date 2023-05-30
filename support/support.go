@@ -20,9 +20,9 @@ type ImageInfo struct {
 	Version  string
 }
 
-func SetupWorkspace(ws *project.Workspace, img runtime.Image) error {
+func SetupWorkspace(ctx context.Context, ws *project.Workspace, img runtime.Image) error {
 
-	info, err := GetImageInfo(img)
+	info, err := GetImageInfo(ctx, img)
 	if err != nil {
 		return err
 	}
@@ -40,7 +40,7 @@ func SetupWorkspace(ws *project.Workspace, img runtime.Image) error {
 
 // Try to identify the OS from the image.
 // Returns nil if the OS couldn't be identified.
-func GetImageInfo(img runtime.Image) (*ImageInfo, error) {
+func GetImageInfo(ctx context.Context, img runtime.Image) (*ImageInfo, error) {
 
 	tmpDir, err := ioutil.TempDir("/tmp", "cne-mount")
 	if err != nil {
@@ -48,7 +48,6 @@ func GetImageInfo(img runtime.Image) (*ImageInfo, error) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	ctx := context.Background()
 	err = img.Mount(ctx, tmpDir)
 	if err != nil {
 		return nil, err

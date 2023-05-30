@@ -13,6 +13,8 @@ import (
 
 	"github.com/BurntSushi/toml"
 
+	refdocker "github.com/containerd/containerd/reference/docker"
+
 	"github.com/czankel/cne/errdefs"
 )
 
@@ -402,14 +404,15 @@ func (conf *Config) WriteProjectConfig(path string) error {
 	return nil
 }
 
-func (conf *Config) FullImageName(name string) string {
+func (conf *Config) FullImageName(name string) (string, error) {
 
 	reg, err := conf.GetRegistry()
-	foundReg := err != nil
+	haveReg := err == nil
 
 	domEnd := strings.Index(name, "/") + 1
 	if domEnd > 1 {
 		regName := name[:domEnd-1]
+		foundReg := false
 		for _, r := range conf.Registry {
 			if regName == r.Name {
 				reg = r
@@ -417,10 +420,23 @@ func (conf *Config) FullImageName(name string) string {
 				break
 			}
 		}
+		if foundReg {
+			haveReg = foundReg
+		} else {
+			domEnd = 0
+		}
 	}
 
-	if foundReg {
-		name = reg.Domain + "/" + reg.RepoName + "/" + name[domEnd:]
+	if haveReg {
+		if reg.Name == "docker.io" {
+			named, err := refdocker.ParseDockerRef(name)
+			if err != nil {
+				return "", err
+			}
+			name = named.String()
+		} else {
+			name = reg.Domain + "/" + reg.RepoName + "/" + name[domEnd:]
+		}
 	}
 
 	v := strings.LastIndex(name, ":")
@@ -428,7 +444,7 @@ func (conf *Config) FullImageName(name string) string {
 		name = name + ":" + DefaultPackageVersion
 	}
 
-	return name
+	return name, nil
 }
 
 // GetUser returns the details and credentials of the current user

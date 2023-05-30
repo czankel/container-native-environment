@@ -157,7 +157,11 @@ func showImageRunE(cmd *cobra.Command, args []string) error {
 	defer run.Close()
 	ctx = run.WithNamespace(ctx, runCfg.Namespace)
 
-	imgName := conf.FullImageName(args[0])
+	imgName, err := conf.FullImageName(args[0])
+	if err != nil {
+		return err
+	}
+
 	img, err := run.GetImage(ctx, imgName)
 	if err != nil && errors.Is(err, errdefs.ErrNotFound) {
 		img, err = pullImage(ctx, run, imgName)
@@ -167,7 +171,7 @@ func showImageRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	fullName := "<unknown>"
-	info, err := support.GetImageInfo(img)
+	info, err := support.GetImageInfo(ctx, img)
 	if info != nil {
 		fullName = info.FullName
 	}
