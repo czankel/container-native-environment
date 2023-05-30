@@ -20,7 +20,7 @@ func pullImage(ctx context.Context, run runtime.Runtime,
 
 	go func() {
 		defer wg.Done()
-		showImageProgress(progress)
+		showProgress(progress)
 	}()
 
 	img, err := run.PullImage(ctx, imageName, progress)
