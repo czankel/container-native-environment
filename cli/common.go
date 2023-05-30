@@ -250,9 +250,9 @@ func printList(list interface{}, withIndex bool) {
 	}
 }
 
-// showImageProgress displays the progress of sequential or parallel jobs
+// showProgress displays the progress of sequential or parallel jobs
 // Use this as a callback function in calls that provide a progress feedback
-func showImageProgress(progress <-chan []runtime.ProgressStatus) {
+func showProgress(progress <-chan []runtime.ProgressStatus) {
 
 	lines := 0
 	ticks := 0
@@ -265,16 +265,25 @@ func showImageProgress(progress <-chan []runtime.ProgressStatus) {
 	defer w.Flush()
 
 	for statUpdate := range progress {
+		statValid := make(map[string]bool)
 		for _, status := range statUpdate {
 			if _, ok := statCached[status.Reference]; !ok {
 				statRefs = append(statRefs, status.Reference)
 			}
 			statCached[status.Reference] = status
+			statValid[status.Reference] = true
 		}
+		for i, ref := range statRefs {
+			if _, f := statValid[ref]; !f {
+				statRefs = append(statRefs[:i], statRefs[i:]...)
+			}
+		}
+
 		for ; lines > 0; lines = lines - 1 {
 			fmt.Fprintf(w, "\033[1A\033[2K")
 		}
 		lines = len(statRefs)
+
 		for _, ref := range statRefs {
 
 			status := statCached[ref]
@@ -283,71 +292,41 @@ func showImageProgress(progress <-chan []runtime.ProgressStatus) {
 			if decoded > 0 {
 				ref = ref[decoded+1:]
 			}
-			if status.Status == runtime.StatusRunning {
-				if status.Offset == status.Total {
-					fmt.Fprintf(w, "%s: Extracting %c\n",
-						ref[:12],
-						"-\\|/"[ticks&3])
-				} else {
-					fmt.Fprintf(w, "%s: Downloading (%s / %s)\n",
-						ref[:12],
-						sizeToSIString(status.Offset),
-						sizeToSIString(status.Total))
-				}
-			} else {
-				fmt.Fprintf(w, "%s: %s\n", ref[:12], strings.Title(status.Status))
-			}
-		}
-		w.Flush()
-		ticks = ticks + 1
-	}
-}
 
-// showBuildProgress displays the progress of sequential or parallel jobs
-// Use this as a callback function in calls that provide a progress feedback
-func showBuildProgress(progress <-chan []runtime.ProgressStatus) {
-
-	lines := 0
-	ticks := 0
-
-	statCached := make(map[string]runtime.ProgressStatus)
-	statRefs := []string{}
-
-	w := new(tabwriter.Writer)
-	w.Init(os.Stdout, 8, 0, 1, ' ', 0)
-	defer w.Flush()
-
-	for statUpdate := range progress {
-		for _, status := range statUpdate {
-			if _, ok := statCached[status.Reference]; !ok {
-				statRefs = append(statRefs, status.Reference)
-			}
-			statCached[status.Reference] = status
-		}
-		for ; lines > 0; lines = lines - 1 {
-			fmt.Fprintf(w, "\033[1A\033[2K")
-		}
-		lines = len(statRefs)
-		for _, ref := range statRefs {
-
-			status := statCached[ref]
-
-			decoded := strings.Index(ref, ":")
-			if decoded > 0 {
-				ref = ref[decoded+1:]
-			}
 			reflen := len(ref)
 			if reflen > 12 {
 				reflen = 12
 			}
-			if status.Status == runtime.StatusRunning {
+
+			if status.Status == runtime.StatusLoading {
+				if status.Offset == status.Total {
+					fmt.Fprintf(w, "[%s] Extracting %c\n",
+						ref[:12], "-\\|/"[ticks&3])
+				} else {
+					fmt.Fprintf(w, "[%s] Downloading (%s / %s)\n",
+						ref[:12],
+						sizeToSIString(status.Offset),
+						sizeToSIString(status.Total))
+				}
+			} else if status.Status == runtime.StatusUnpacking {
+				fmt.Fprintf(w, "[%s] Unpacking %c\n",
+					ref[:reflen], "-\\|/"[ticks&3])
+			} else if status.Status == runtime.StatusRunning {
 				fmt.Fprintf(w, "[%s] %s\n",
 					ref[:reflen],
 					status.Details)
 			} else {
-				fmt.Fprintf(w, "[%s] %s\n", ref[:reflen], strings.Title(status.Status))
+				// runtime.StatusUnknown:
+				// runtime.StatusPending:
+				// runtime.StatusCached:
+				// runtime.StatusComplete:
+				// runtime.Error
+
+				fmt.Fprintf(w, "[%s] %c%s\n",
+					ref[:reflen], strings.Title(status.Status))
 			}
 		}
+
 		w.Flush()
 		ticks = ticks + 1
 	}

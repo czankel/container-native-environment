@@ -69,7 +69,7 @@ func buildLayers(ctx context.Context, run runtime.Runtime, ctr runtime.Container
 	progress := make(chan []runtime.ProgressStatus)
 	go func() {
 		defer wg.Done()
-		showBuildProgress(progress)
+		showProgress(progress)
 	}()
 
 	rb := NewRingBuffer(outputLineCount, outputLineLength)
