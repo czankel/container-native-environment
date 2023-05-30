@@ -43,11 +43,6 @@ registry is used.`,
 
 func pullImageRunE(cmd *cobra.Command, args []string) error {
 
-	imgName, err := conf.FullImageName(args[0])
-	if err != nil {
-		return err
-	}
-
 	runCfg, err := conf.GetRuntime()
 	if err != nil {
 		return err
@@ -61,7 +56,7 @@ func pullImageRunE(cmd *cobra.Command, args []string) error {
 	defer run.Close()
 	ctx = run.WithNamespace(ctx, runCfg.Namespace)
 
-	_, err = pullImage(ctx, run, imgName)
+	_, err = pullImage(ctx, run, conf.FullImageName(args[0]))
 
 	return err
 }

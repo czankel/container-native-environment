@@ -65,6 +65,7 @@ The system option modifies the system-wide configuration file stored in
 	Args: cobra.ExactArgs(2),
 }
 
+// FIXME: allow only specific updates and not use /slashes?
 func updateConfigRunE(cmd *cobra.Command, args []string) error {
 
 	var err error

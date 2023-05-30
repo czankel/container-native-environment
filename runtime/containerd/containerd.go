@@ -1,3 +1,5 @@
+//go:build linux
+
 // Package containerd implements the runtime interface for the ContainerD Dameon containerd.io
 package containerd
 
@@ -5,16 +7,12 @@ import (
 	"context"
 	"errors"
 	"os"
-	"os/signal"
 	"sync"
 
 	"github.com/containerd/containerd"
 	ctrderr "github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/reference"
-
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/errdefs"
@@ -110,61 +108,35 @@ func (ctrdRun *containerdRuntime) GetImage(ctx context.Context,
 func (ctrdRun *containerdRuntime) PullImage(ctx context.Context, name string,
 	progress chan<- []runtime.ProgressStatus) (runtime.Image, error) {
 
-	var mutex sync.Mutex
-	descs := []ocispec.Descriptor{}
+	var img runtime.Image
+	var err error
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	h := images.HandlerFunc(func(ctx context.Context,
-		desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-
-		if desc.MediaType != images.MediaTypeDockerSchema1Manifest {
-			mutex.Lock()
-			found := false
-			for _, d := range descs {
-				if desc.Digest == d.Digest {
-					found = true
-					break
-				}
-			}
-			if !found {
-				descs = append(descs, desc)
-			}
-			mutex.Unlock()
-		}
-		return nil, nil
-	})
-
-	pctx, stopProgress := context.WithCancel(ctx)
 	if progress != nil {
+		var wg sync.WaitGroup
+		wg.Add(1)
+
+		pullProgress := make(chan []runtime.ProgressStatus)
 		go func() {
 			defer wg.Done()
-			defer close(progress)
-			updateImageProgress(pctx, ctrdRun, &mutex, &descs, progress)
+			for p := range pullProgress {
+				progress <- p
+			}
 		}()
-	}
 
-	// ignore signals while pulling - see comment above
-	signal.Ignore()
-
-	ctrdImg, err := ctrdRun.client.Pull(ctx, name,
-		containerd.WithPullUnpack, containerd.WithImageHandler(h))
-
-	signal.Reset()
-
-	if progress != nil {
-		stopProgress()
+		img, err = pullImage(ctx, ctrdRun, name, pullProgress)
+		if err != nil {
+			return nil, err
+		}
 		wg.Wait()
+	} else {
+		img, err = pullImage(ctx, ctrdRun, name, nil)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	if err == reference.ErrObjectRequired {
-		return nil, runtime.Errorf("invalid image name '%s': %v", name, err)
-	} else if err != nil {
-		return nil, runtime.Errorf("pull image '%s' failed: %v", name, err)
-	}
-
-	return getImage(ctx, ctrdRun, ctrdImg)
+	_, err = img.Unpack(ctx, progress)
+	return img, err
 }
 
 func (ctrdRun *containerdRuntime) DeleteImage(ctx context.Context, name string) error {
@@ -208,13 +180,7 @@ func (ctrdRun *containerdRuntime) NewContainer(ctx context.Context,
 	domain, id, generation [16]byte, uid uint32,
 	img runtime.Image) (runtime.Container, error) {
 
-	// start with a base container
-	spec, err := runtime.DefaultSpec(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return newContainer(ctrdRun, nil, domain, id, generation, uid, img.(*image), &spec), nil
+	return newContainer(ctrdRun, nil, domain, id, generation, uid, img.(*image)), nil
 }
 
 func (ctrdRun *containerdRuntime) DeleteContainer(ctx context.Context,

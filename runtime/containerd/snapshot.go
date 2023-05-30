@@ -1,3 +1,5 @@
+//go:build linux
+
 package containerd
 
 import (
@@ -11,7 +13,6 @@ import (
 	ctrderr "github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshots"
-	"github.com/opencontainers/image-spec/identity"
 
 	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/runtime"
@@ -268,31 +269,45 @@ func (mounter) Unmount(target string) error {
 	return mount.UnmountAll(target, 0)
 }
 
+// FIXME: maybe move the unpack out??
+// FIXME: container.Snapshots is the only user of this func...
+// FIXME: could pass rootFsSNapName ...
 func createActiveSnapshot(ctx context.Context, ctrdRun *containerdRuntime,
 	img *image, domain, id [16]byte, snap runtime.Snapshot) error {
 
 	activeSnapName := activeSnapshotName(domain, id)
 	var rootFsSnapName string
-	if snap != nil {
-		rootFsSnapName = snap.Name()
-	} else {
-		diffIDs, err := img.ctrdImage.RootFS(ctx)
-		if err != nil {
-			return runtime.Errorf("failed to get rootfs: %v", err)
-		}
-		rootFsSnapName = identity.ChainID(diffIDs).String()
-		_, err = getSnapshot(ctx, ctrdRun, rootFsSnapName)
+	//if snap != nil {
+	rootFsSnapName = snap.Name()
+	/*
+		} else {
 
-		// unpack 'image' if root snapshot was removed
-		if err != nil && errors.Is(err, errdefs.ErrNotFound) {
-			img.Unpack(ctx)
-			digest := identity.ChainID(diffIDs).String()
-			_, _, err = createSnapshot(ctx, img.ctrdRuntime, digest, digest, false)
+			///  FIXME this should be an error, image must already be unpacked
+
+			// FIXME: v
+			diffIDs, err := img.ctrdImage.RootFS(ctx)
+			if err != nil {
+				return runtime.Errorf("failed to get rootfs: %v", err)
+			}
+			rootFsSnapName = identity.ChainID(diffIDs).String()
+			snap, err = getSnapshot(ctx, ctrdRun, rootFsSnapName)
+
+			// unpack 'image' if root snapshot was removed
+			if err != nil && errors.Is(err, errdefs.ErrNotFound) {
+				// FIXME: need to provide progress
+				err = img.Unpack(ctx, progress)
+				// FIXME: unpack already creates a snapshot
+				/*
+					digest := identity.ChainID(diffIDs).String()
+					_, _, err = createSnapshot(ctx, img.ctrdRuntime, digest, digest, false)
+	*/ /*
+			}
+			if err != nil {
+				return err
+			}
+			// FIXME: isn't snap nil here?
 		}
-		if err != nil {
-			return err
-		}
-	}
+	*/
 
 	// delete all 'old' snapshots down to the new rootfs or the image
 	if rootFsSnapName == activeSnapName {

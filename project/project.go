@@ -78,6 +78,7 @@ type Workspace struct {
 //   - "auto"   -  packages will be updated whenever the package layer(s) are rebuild
 //
 // Note that the image needs to be pulled manually to cause an update (using 'pull')
+// TODO: Environments will let users add an environment (e.g. debugger) into the workspace in future
 type Environment struct {
 	Origin string // Name or link of the base image
 	Update string // Update package strategy: One of "never", "manual", "auto"
@@ -230,6 +231,7 @@ func Load(path string) (*Project, error) {
 	for i := 0; i < len(prj.Workspaces); i++ {
 		prj.Workspaces[i].ProjectUUID = prj.UUID
 	}
+	// FIXME: no need to close?
 
 	return &prj, nil
 }

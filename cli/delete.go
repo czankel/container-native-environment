@@ -30,11 +30,6 @@ var deleteImageCmd = &cobra.Command{
 
 func deleteImageRunE(cmd *cobra.Command, args []string) error {
 
-	imgName, err := conf.FullImageName(args[0])
-	if err != nil {
-		return err
-	}
-
 	runCfg, err := conf.GetRuntime()
 	if err != nil {
 		return err
@@ -48,7 +43,7 @@ func deleteImageRunE(cmd *cobra.Command, args []string) error {
 	defer run.Close()
 	ctx = run.WithNamespace(ctx, runCfg.Namespace)
 
-	return run.DeleteImage(ctx, imgName)
+	return run.DeleteImage(ctx, conf.FullImageName(args[0]))
 }
 
 var deleteWorkspaceCmd = &cobra.Command{

@@ -5,9 +5,11 @@ package container
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -39,6 +41,7 @@ func Containers(ctx context.Context, run runtime.Runtime,
 
 	var ctrs []runtime.Container
 	runCtrs, err := run.Containers(ctx)
+	fmt.Printf("container/continaer %v %v\n", runCtrs, err)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +85,7 @@ func Get(ctx context.Context,
 // NewContainer defines a new Container with a default generation value for the Workspace without
 // the Layer configuration. The generation value will be updated through Commit().
 func NewContainer(ctx context.Context, run runtime.Runtime, ws *project.Workspace,
-	user *config.User, img runtime.Image) (runtime.Container, error) {
+	user *config.User, img runtime.Image, options map[string]string) (runtime.Container, error) {
 
 	dom, err := uuid.Parse(ws.ProjectUUID)
 	if err != nil {
@@ -100,10 +103,10 @@ func NewContainer(ctx context.Context, run runtime.Runtime, ws *project.Workspac
 		return nil, err
 	}
 
-	err = runCtr.Create(ctx)
+	err = runCtr.Create(ctx, options)
 	if err != nil && errors.Is(err, errdefs.ErrAlreadyExists) {
 		runCtr.Delete(ctx)
-		err = runCtr.Create(ctx)
+		err = runCtr.Create(ctx, options)
 	}
 	if err != nil {
 		return nil, err
@@ -168,6 +171,35 @@ func Build(ctx context.Context, runCtr runtime.Container, ws *project.Workspace,
 			close(progress)
 		}
 	}()
+
+	if rootFsSnap == nil {
+		img := runCtr.Image()
+
+		if progress != nil {
+			var wg sync.WaitGroup
+			wg.Add(1)
+
+			unpackProgress := make(chan []runtime.ProgressStatus)
+			go func() {
+				defer wg.Done()
+				for p := range unpackProgress {
+					progress <- p
+				}
+			}()
+
+			rootFsSnap, err = img.Unpack(ctx, unpackProgress)
+			if err != nil {
+				return err
+			}
+			wg.Wait()
+		} else {
+			rootFsSnap, err = img.Unpack(ctx, nil)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	layerStatus := make([]runtime.ProgressStatus, len(ws.Environment.Layers))
 	if progress != nil {
 		for i, l := range ws.Environment.Layers {

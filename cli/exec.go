@@ -26,6 +26,7 @@ var execCmd = &cobra.Command{
 var execShell bool
 var execLayerName string
 var execTestOnly bool
+var execGpus string
 
 // execCommandsInShell executes the provided commands in a shell.
 func execCommandsInShell(wsName, layerName string, args []string) (int, error) {
@@ -175,5 +176,8 @@ func init() {
 		"Execute a command in this layer to rebuild the layer and amend the project")
 	execCmd.Flags().BoolVar(&execTestOnly, "test-only", false,
 		"Don't amend the layer")
+	// FIXME this is persistent..
+	execCmd.Flags().StringVar(&execGpus, "gpus", "",
+		"Assign 'all' or specific '1-3 4' GPUs persistently to the container")
 	rootCmd.AddCommand(execCmd)
 }

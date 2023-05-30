@@ -5,6 +5,7 @@ package config
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"os/user"
 	"reflect"
@@ -41,6 +42,7 @@ type Context struct {
 	Name     string
 	Runtime  string
 	Registry string
+	Options  map[string]string `cne:"inline"`
 }
 
 type Config struct {
@@ -404,7 +406,8 @@ func (conf *Config) WriteProjectConfig(path string) error {
 	return nil
 }
 
-func (conf *Config) FullImageName(name string) (string, error) {
+// Support also a/b containers... FIXME
+func (conf *Config) FullImageName(name string) string {
 
 	reg, err := conf.GetRegistry()
 	haveReg := err == nil
@@ -427,11 +430,12 @@ func (conf *Config) FullImageName(name string) (string, error) {
 		}
 	}
 
+	// FIXME: what to do if not haveReg?
 	if haveReg {
 		if reg.Name == "docker.io" {
 			named, err := refdocker.ParseDockerRef(name)
 			if err != nil {
-				return "", err
+				return "" // FIXME support returning an error
 			}
 			name = named.String()
 		} else {
@@ -443,8 +447,9 @@ func (conf *Config) FullImageName(name string) (string, error) {
 	if v == -1 || v < domEnd {
 		name = name + ":" + DefaultPackageVersion
 	}
+	fmt.Printf("NAME %v\n", name)
 
-	return name, nil
+	return name
 }
 
 // GetUser returns the details and credentials of the current user

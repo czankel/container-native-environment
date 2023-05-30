@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -294,14 +295,11 @@ func listContainersRunE(cmd *cobra.Command, args []string) error {
 }
 
 var listResourcesCmd = &cobra.Command{
-	Use:     "all",
-	Aliases: []string{"c"},
-	Short:   "list all resources (containers, snapshots, images)",
-	Args:    cobra.NoArgs,
-	RunE:    listResourcesRunE,
+	Use:   "resources",
+	Short: "list all system resources",
+	Args:  cobra.NoArgs,
+	RunE:  listResourcesRunE,
 }
-
-var listResourcesAll bool
 
 func listResourcesRunE(cmd *cobra.Command, args []string) error {
 
@@ -320,31 +318,51 @@ func listResourcesRunE(cmd *cobra.Command, args []string) error {
 	defer run.Close()
 	ctx = run.WithNamespace(ctx, runCfg.Namespace)
 
-	if !listResourcesAll {
-		prj, err = loadProject()
+	prj, err = loadProject()
+	if err != nil {
+		return err
+	}
+
+	var ws *project.Workspace
+	//if wsName == "" {
+	ws, err = prj.CurrentWorkspace()
+	if err != nil {
+		return err
+	}
+
+	ctr, err := container.Get(ctx, run, ws)
+	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
+		return err
+	} else if err != nil {
+		// not found
+	} else {
+		res, err := ctr.Resources(ctx)
 		if err != nil {
 			return err
 		}
+		fmt.Printf("RES %v\n", res)
 	}
 
-	fmt.Printf("\nIMAGES\n------\n")
-	err = listImages(ctx, run)
-	if err != nil {
-		return err
-	}
+	return nil
+}
 
-	fmt.Printf("\nCONTAINERS\n----------\n")
-	err = listContainers(ctx, run, prj)
-	if err != nil {
-		return err
-	}
+var listConfigCmd = &cobra.Command{
+	Use:   "config",
+	Short: "list configurations",
+}
 
-	fmt.Printf("\nSNAPSHOTS\n---------\n")
-	err = listSnapshots(ctx, run)
-	if err != nil {
-		return err
-	}
+var listConfigContextCmd = &cobra.Command{
+	Use:   "context",
+	Short: "list available contexts",
+	Args:  cobra.NoArgs,
+	RunE:  listConfigContextRunE,
+}
 
+var listConfigRuntimeCmd = &cobra.Command{}
+var listConfigRegistryCmd = &cobra.Command{}
+
+func listConfigContextRunE(cmd *cobra.Command, args []string) error {
+	printList(conf.Context, false)
 	return nil
 }
 
@@ -362,6 +380,8 @@ func init() {
 	listCommandsCmd.Flags().StringVarP(
 		&listCommandsLayer, "layer", "l", "", "Name or index of the layer")
 	listCmd.AddCommand(listResourcesCmd)
-	listResourcesCmd.Flags().BoolVarP(
-		&listResourcesAll, "all", "A", false, "list resources from all projects")
+	listCmd.AddCommand(listConfigCmd)
+	listConfigCmd.AddCommand(listConfigContextCmd)
+	listConfigCmd.AddCommand(listConfigRuntimeCmd)
+	listConfigCmd.AddCommand(listConfigRegistryCmd)
 }

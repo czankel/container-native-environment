@@ -46,7 +46,12 @@ func getContainer(ctx context.Context,
 		return nil, err
 	}
 
-	return container.NewContainer(ctx, run, ws, &user, img)
+	cfgCtx, err := conf.GetContext()
+	if err != nil {
+		return nil, err
+	}
+
+	return container.NewContainer(ctx, run, ws, &user, img, cfgCtx.Options)
 }
 
 // buildLayers builds the layers of a container and outputs progress status.
@@ -58,12 +63,12 @@ func getContainer(ctx context.Context,
 func buildLayers(ctx context.Context, run runtime.Runtime, ctr runtime.Container,
 	ws *project.Workspace, layerCount int) error {
 
+	// FIXME: why and does this interfere with e.g. cli/exec?
 	con := console.Current()
 	defer con.Reset()
 
 	// build the container and provide progress output
 	var wg sync.WaitGroup
-
 	wg.Add(1)
 
 	progress := make(chan []runtime.ProgressStatus)
@@ -86,7 +91,7 @@ func buildLayers(ctx context.Context, run runtime.Runtime, ctr runtime.Container
 		return err
 	}
 	if err != nil {
-		wg.Wait()
+		wg.Wait() // FIXME: just clear??
 		return err
 	}
 	wg.Wait()

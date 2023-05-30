@@ -11,6 +11,7 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+	"unicode"
 
 	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/project"
@@ -127,8 +128,10 @@ func timeToAgoString(t time.Time) string {
 
 // printValueElem prints the provided value as two columns for name and value content.
 // Struct  Each element is printed as a single row with the provided prefix for the name field
-//         For nested structures, the field names of each substructure are concatenated by '.'
-//         Use the output:"-" tag to omit a field.
+//
+//	For nested structures, the field names of each substructure are concatenated by '.'
+//	Use the output:"-" tag to omit a field.
+//
 // Map     Similar to Struct, but using the keys as the prefix instead of the structure elements.
 // <other> Printed as two columns using the prefix as the name for the value content.
 // flat outputs a slice in the [ ... ] format. It will only flatten the final slice ([][])
@@ -189,10 +192,11 @@ func printValueElem(w *tabwriter.Writer, prefix string, elem reflect.Value, flat
 }
 
 // printValue prints the content of the provided value in two columns.
-//  struct: field name, value
-//  map:    key, value
-//  slice:  index, value
-//  <type>: prefix, value
+//
+//	struct: field name, value
+//	map:    key, value
+//	slice:  index, value
+//	<type>: prefix, value
 func printValue(fieldHdr string, valueHdr string, prefix string, value interface{}) {
 
 	w := new(tabwriter.Writer)
@@ -206,10 +210,17 @@ func printValue(fieldHdr string, valueHdr string, prefix string, value interface
 // printList prints a slice of structures using the field names as the header
 func printList(list interface{}, withIndex bool) {
 
+	fmt.Printf("type %v\n", reflect.TypeOf(list))
+
 	if reflect.TypeOf(list).Kind() != reflect.Slice {
 		panic("provided argument must be of the type: slice")
 	}
-	if reflect.TypeOf(list).Elem().Kind() != reflect.Struct {
+	t := reflect.TypeOf(list).Elem().Kind()
+	isPtr := t == reflect.Pointer
+	if isPtr {
+		t = reflect.TypeOf(list).Elem().Elem().Kind()
+	}
+	if t != reflect.Struct {
 		panic("provided argument must be of the type: slice of structures")
 	}
 
@@ -223,6 +234,9 @@ func printList(list interface{}, withIndex bool) {
 
 	format := "%s"
 	hdr := reflect.TypeOf(list).Elem()
+	if isPtr {
+		hdr = hdr.Elem()
+	}
 	for i := 0; i < hdr.NumField(); i++ {
 		if hdr.Field(i).Tag.Get("output") != "-" {
 			fmt.Fprintf(w, format, strings.ToUpper(hdr.Field(i).Name))
@@ -239,18 +253,38 @@ func printList(list interface{}, withIndex bool) {
 		}
 		format = "%v"
 		item := items.Index(i)
+		if isPtr {
+			item = item.Elem()
+		}
 		for j := 0; j < item.NumField(); j++ {
 			if hdr.Field(j).Tag.Get("output") == "-" {
 				continue
 			}
-			fmt.Fprintf(w, format, item.Field(j).Interface())
+			val := item.Field(j)
+			if val.Kind() == reflect.Map {
+				var s string
+				for _, k := range val.MapKeys() {
+					s = s + fmt.Sprintf("%v=%v, ",
+						strings.ToLower(k.Interface().(string)),
+						strings.ToLower(val.MapIndex(k).Interface().(string)))
+				}
+				if len(s) > 2 {
+					s = s[:len(s)-2]
+				}
+				fmt.Fprintf(w, format, s)
+			} else {
+				fmt.Fprintf(w, format, val.Interface())
+			}
 			format = "\t%v"
 		}
 		fmt.Fprintf(w, "\n")
 	}
 }
 
-// showProgress displays the progress of sequential or parallel jobs
+// showBuildProgress displays the progress of sequential or parallel jobs
+// Use this as a callback function in calls that provide a progress feedback
+// FIXME: combine both progress outputs
+// showImageProgress displays the progress of sequential or parallel jobs
 // Use this as a callback function in calls that provide a progress feedback
 func showProgress(progress <-chan []runtime.ProgressStatus) {
 
@@ -323,7 +357,9 @@ func showProgress(progress <-chan []runtime.ProgressStatus) {
 				// runtime.Error
 
 				fmt.Fprintf(w, "[%s] %c%s\n",
-					ref[:reflen], strings.Title(status.Status))
+					ref[:reflen],
+					unicode.ToUpper(rune(status.Status[0])),
+					status.Status[1:])
 			}
 		}
 

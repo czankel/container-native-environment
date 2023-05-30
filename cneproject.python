@@ -1,0 +1,11 @@
+version: "1.0"
+name: dev
+uuid: 771a5996-1af1-4277-886a-b779ca7231de
+currentworkspacename: main
+workspaces:
+    - name: main
+      environment:
+        origin: docker.io/library/python:latest
+        update: ""
+        layers: []
+path: /home/aibox/work/cne/container-native-environment/dev/cneproject

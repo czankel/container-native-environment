@@ -89,6 +89,9 @@ type Image interface {
 	// CreatedAt returns the data the image was created.
 	CreatedAt() time.Time
 
+	// Unpack unpacks the image.
+	Unpack(ctx context.Context, progress chan<- []ProgressStatus) (Snapshot, error)
+
 	// RootFS returns the digests of the root fs the image consists of.
 	RootFS(ctx context.Context) ([]digest.Digest, error)
 
@@ -144,16 +147,25 @@ type Container interface {
 	// Return the User ID
 	UID() uint32
 
+	// Image return the image associated to the container
+	Image() Image
+
+	// Returns resources, such as CPU, memory, and other types (GPU)
+	Resources(ctx context.Context) (map[string]Resource, error)
+
 	// Snapshots returns all container snapshots.
 	Snapshots(ctx context.Context) ([]Snapshot, error)
 
 	// SetRootFs sets the rootfs to the provide snapshot.
 	//
 	// The root filesystem can only be set when the container has not been created.
+	// Note that the image must already be unpacked.
 	SetRootFs(ctx context.Context, snapshot Snapshot) error
 
 	// Create creates the container.
-	Create(ctx context.Context) error
+	Create(ctx context.Context, options map[string]string) error
+
+	//Update(ctx context.Context, options map[string]string) error
 
 	// Delete deletes the container.
 	Delete(ctx context.Context) error
@@ -181,6 +193,12 @@ type Container interface {
 	// Exec starts the provided command in the process spec and returns immediately.
 	// The container must be started before calling Exec.
 	Exec(ctx context.Context, stream Stream, procSpec *ProcessSpec) (Process, error)
+}
+
+type Resource struct {
+	Limit float64
+	Value float64
+	// FIXME: type, etc.
 }
 
 // Stream describes the IO channels to a process that is running in a container.

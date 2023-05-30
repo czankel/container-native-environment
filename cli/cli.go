@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/czankel/cne/config"
@@ -21,6 +23,7 @@ var basenamee string
 var rootCneVersion bool
 
 var projectPath string
+var logLevel string
 
 // helper function to load the project
 func loadProject() (*project.Project, error) {
@@ -79,16 +82,6 @@ func rootVersionRun(cmd *cobra.Command, args []string) {
 	os.Exit(0)
 }
 
-func init() {
-	rootCmd.Use = filepath.Base(os.Args[0])
-	rootCmd.Flags().BoolVar(
-		&rootCneVersion, "version", false, "Get version information")
-	rootCmd.PersistentFlags().StringVarP(
-		&projectPath, "project", "P", "", "Projet path")
-	rootCmd.AddCommand(rootVersionCmd)
-	cobra.OnInitialize(initConfig)
-}
-
 // Execute is the main entry point to the CLI. It executes the commands and arguments provided
 // in os.Args[1:]
 func Execute() error {
@@ -116,4 +109,34 @@ func initConfig() {
 		fmt.Printf("%s: %v\n", basenamee, err)
 		os.Exit(1)
 	}
+}
+
+func init() {
+	rootCmd.Use = filepath.Base(os.Args[0])
+	rootCmd.Flags().BoolVar(
+		&rootCneVersion, "version", false, "Get version information")
+	rootCmd.PersistentFlags().StringVarP(
+		&projectPath, "project", "P", "", "Projet path")
+	rootCmd.AddCommand(rootVersionCmd)
+	rootCmd.PersistentFlags().StringVar(
+		&logLevel, "log-level", "info", "Log level")
+	cobra.OnInitialize(initConfig)
+
+	var level logrus.Level
+	switch strings.ToLower(logLevel) {
+	case "trace":
+		level = logrus.TraceLevel
+	case "debug":
+		level = logrus.DebugLevel
+	case "info":
+		level = logrus.InfoLevel
+	case "warn":
+		level = logrus.WarnLevel
+	case "error":
+		level = logrus.ErrorLevel
+	case "fatal":
+		level = logrus.FatalLevel
+	}
+
+	logrus.SetLevel(level)
 }

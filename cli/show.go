@@ -131,7 +131,7 @@ var showImageCmd = &cobra.Command{
 	Use:   "image [NAME]",
 	Short: "Show image details",
 	RunE:  showImageRunE,
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.RangeArgs(0, 1),
 }
 
 type OS struct {
@@ -141,6 +141,7 @@ type OS struct {
 	ID_LIKE string
 }
 
+// TODO hide some details and expose with option
 func showImageRunE(cmd *cobra.Command, args []string) error {
 
 	runCfg, err := conf.GetRuntime()
@@ -157,11 +158,23 @@ func showImageRunE(cmd *cobra.Command, args []string) error {
 	defer run.Close()
 	ctx = run.WithNamespace(ctx, runCfg.Namespace)
 
-	imgName, err := conf.FullImageName(args[0])
-	if err != nil {
-		return err
+	var imgName string
+	if len(args) > 0 {
+		imgName = args[0]
+	} else {
+		prj, err := loadProject()
+		if err != nil {
+			return err
+		}
+		var ws *project.Workspace
+		ws, err = prj.CurrentWorkspace()
+		if err != nil {
+			return err
+		}
+		imgName = ws.Environment.Origin
 	}
 
+	imgName = conf.FullImageName(imgName)
 	img, err := run.GetImage(ctx, imgName)
 	if err != nil && errors.Is(err, errdefs.ErrNotFound) {
 		img, err = pullImage(ctx, run, imgName)

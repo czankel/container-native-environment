@@ -1,3 +1,5 @@
+//go:build linux
+
 // Package containerd implements the runtime interface for the ContainerD Dameon containerd.io
 package containerd
 
@@ -5,15 +7,20 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	digest "github.com/opencontainers/go-digest"
+
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/contrib/nvidia"
 	ctrderr "github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
@@ -32,7 +39,6 @@ type container struct {
 	id            [16]byte
 	generation    [16]byte
 	uid           uint32
-	spec          runspecs.Spec
 	image         *image
 	ctrdRuntime   *containerdRuntime
 	ctrdContainer containerd.Container
@@ -160,30 +166,35 @@ func getContainers(ctx context.Context,
 			continue
 		}
 
+		var digest digest.Digest
+		var size int64
+
+		// FIXME: can have container without image!!
 		ctrdImg, err := c.Image(ctx)
-		if err != nil {
-			return nil, runtime.Errorf("failed to get image: %v", err)
+		/*
+			if err != nil {
+				return nil, runtime.Errorf("failed to get image: %v", err)
+			}
+		*/
+		if err == nil {
+			imgConf, _ := ctrdImg.Config(ctx)
+			digest = imgConf.Digest
+			size, _ = ctrdImg.Size(ctx)
 		}
-
-		spec, err := c.Spec(ctx)
-		if err != nil {
-			return nil, runtime.Errorf("failed to get image spec: %v", err)
-		}
-
-		imgConf, _ := ctrdImg.Config(ctx)
-		size, _ := ctrdImg.Size(ctx)
 
 		img := &image{
 			ctrdRuntime: ctrdRun,
 			ctrdImage:   ctrdImg,
-			digest:      imgConf.Digest,
+			digest:      digest,
 			size:        size,
 		}
 
-		ctr := newContainer(ctrdRun, c, dom, id, gen, uid, img, spec)
-		if err != nil {
-			return nil, err
-		}
+		ctr := newContainer(ctrdRun, c, dom, id, gen, uid, img)
+		/*
+			if err != nil {
+				return nil, err
+			}
+		*/
 
 		runCtrs = append(runCtrs, ctr)
 	}
@@ -192,7 +203,7 @@ func getContainers(ctx context.Context,
 
 // newContainer defines a new container without creating it.
 func newContainer(ctrdRun *containerdRuntime, ctrdCtr containerd.Container,
-	domain, id, generation [16]byte, uid uint32, img *image, spec *runspecs.Spec) *container {
+	domain, id, generation [16]byte, uid uint32, img *image) *container {
 
 	return &container{
 		domain:        domain,
@@ -200,7 +211,6 @@ func newContainer(ctrdRun *containerdRuntime, ctrdCtr containerd.Container,
 		generation:    generation,
 		uid:           uid,
 		image:         img,
-		spec:          *spec,
 		ctrdRuntime:   ctrdRun,
 		ctrdContainer: ctrdCtr,
 	}
@@ -246,11 +256,22 @@ func getContainer(ctx context.Context,
 		return nil, err
 	}
 
+	var digest digest.Digest
+	var size int64
+
 	ctrdImg, err := ctrdCtr.Image(ctx)
-	if err != nil {
-		return nil, runtime.Errorf("failed to get image: %v", err)
+	/*
+		if err != nil {
+			return nil, runtime.Errorf("failed to get image: %v", err)
+		}
+	*/
+	if err == nil {
+		imgConf, _ := ctrdImg.Config(ctx)
+		digest = imgConf.Digest
+		size, _ = ctrdImg.Size(ctx)
 	}
 
+	/* FIXME GET SPEC
 	spec, err := ctrdCtr.Spec(ctx)
 	if err != nil {
 		return nil, runtime.Errorf("failed to get image spec: %v", err)
@@ -258,15 +279,16 @@ func getContainer(ctx context.Context,
 
 	imgConf, _ := ctrdImg.Config(ctx)
 	size, _ := ctrdImg.Size(ctx)
+	*/
 
 	img := &image{
 		ctrdRuntime: ctrdRun,
 		ctrdImage:   ctrdImg,
-		digest:      imgConf.Digest,
+		digest:      digest,
 		size:        size,
 	}
 
-	ctr := newContainer(ctrdRun, ctrdCtr, domain, id, generation, uid, img, spec)
+	ctr := newContainer(ctrdRun, ctrdCtr, domain, id, generation, uid, img)
 
 	return ctr, nil
 }
@@ -358,17 +380,67 @@ func (ctr *container) UpdatedAt() time.Time {
 	return time.Now()
 }
 
+func (ctr *container) Resources(ctx context.Context) (map[string]runtime.Resource, error) {
+
+	ctrdCtr := ctr.ctrdContainer
+	spec, err := ctrdCtr.Spec(ctx)
+	if err != nil {
+		return nil, runtime.Errorf("failed to get image spec: %v", err)
+	}
+
+	fmt.Printf("Type %v\n", reflect.TypeOf(spec.Linux.Resources.Devices))
+	res := spec.Linux.Resources.Devices
+	for a, b := range res {
+		fmt.Printf("%v %v\n", a, b)
+	}
+	//fmt.Printf("Anno %v\n", spec.Linux
+	return map[string]runtime.Resource{}, nil
+}
+
+func (ctr *container) Image() runtime.Image {
+	return ctr.image
+}
+
 func (ctr *container) Snapshots(ctx context.Context) ([]runtime.Snapshot, error) {
 	// TODO: filter for current container
 	return getSnapshots(ctx, ctr.ctrdRuntime)
 }
 
 func (ctr *container) SetRootFs(ctx context.Context, snap runtime.Snapshot) error {
+	// FIXME: check that snap exists?
 	return createActiveSnapshot(ctx, ctr.ctrdRuntime, ctr.image, ctr.domain, ctr.id, snap)
 }
 
+func getSpecOpts(options map[string]string) []oci.SpecOpts {
+
+	var opts []oci.SpecOpts
+	for k, v := range options {
+		switch strings.ToLower(k) {
+		case "gpus": // FIXME: what about a number of devices x??
+			if v == "all" {
+				opts = append(opts, nvidia.WithGPUs(nvidia.WithAllDevices,
+					nvidia.WithAllCapabilities))
+			}
+		case "gpu":
+			arr := strings.Split(v, ", ")
+			var idx []int
+			for i := range arr {
+				x, err := strconv.Atoi(arr[i])
+				// FIXME: return error?
+				if err == nil {
+					idx = append(idx, x)
+				}
+			}
+			opts = append(opts, nvidia.WithGPUs(nvidia.WithDevices(idx...),
+				nvidia.WithAllCapabilities))
+		}
+
+	}
+	return opts
+}
+
 // TODO: CgroupsPath is set to only domain + ID, and not generation as before, is it needed?
-func (ctr *container) Create(ctx context.Context) error {
+func (ctr *container) Create(ctx context.Context, options map[string]string) error {
 
 	ctrdRun := ctr.ctrdRuntime
 	ctrdID := composeCtrdID(ctr.domain, ctr.id)
@@ -395,8 +467,12 @@ func (ctr *container) Create(ctx context.Context) error {
 		}
 	}
 
-	// update any incomplete spec
-	spec := ctr.spec
+	// TODO: support changing the spec before Create
+	// start with a base container
+	spec, err := runtime.DefaultSpec(ctx)
+	if err != nil {
+		return err
+	}
 	if spec.Process == nil {
 		spec.Process = &runspecs.Process{}
 	}
@@ -421,11 +497,12 @@ func (ctr *container) Create(ctx context.Context) error {
 	labels[containerdGenerationLabel] = gen
 	labels[containerdUIDLabel] = strconv.FormatUint(uint64(ctr.uid), 10)
 
+	opts := getSpecOpts(options)
 	ctrdCtr, err = ctrdRun.client.NewContainer(
 		ctx,
 		ctrdID,
 		containerd.WithImage(ctr.image.ctrdImage),
-		containerd.WithSpec(&spec),
+		containerd.WithSpec(&spec, opts...),
 		containerd.WithRuntime(ctrdRun.client.Runtime(), nil),
 		containerd.WithContainerLabels(labels))
 	if err != nil {
@@ -436,29 +513,37 @@ func (ctr *container) Create(ctx context.Context) error {
 	return nil
 }
 
-func (ctr *container) UpdateSpec(ctx context.Context, newSpec *runspecs.Spec) error {
+func (ctr *container) UpdateContainer(ctx context.Context, options map[string]string) error {
 
 	ctrdCtr := ctr.ctrdContainer
-
-	// update incomplete spec
-	ctr.spec = *newSpec
-	spec := &ctr.spec
-	if spec.Process == nil {
-		spec.Process = &runspecs.Process{}
-	}
-
-	config, err := ctr.image.Config(ctx)
+	spec, err := ctrdCtr.Spec(ctx)
 	if err != nil {
-		return runtime.Errorf("failed to get image OCI spec: %v", err)
+		return runtime.Errorf("failed to get container spec: %v", err)
 	}
-	if spec.Linux != nil {
-		spec.Process.Args = append(config.Entrypoint, config.Cmd...)
-		cwd := config.WorkingDir
-		if cwd == "" {
-			cwd = "/"
-		}
-		spec.Process.Cwd = cwd
+
+	opts := getSpecOpts(options)
+	err = ctrdCtr.Update(ctx, containerd.UpdateContainerOpts(containerd.WithSpec(spec, opts...)))
+	if err != nil {
+		return runtime.Errorf("failed to update container: %v", err)
 	}
+
+	return nil
+}
+
+func (ctr *container) Mount(ctx context.Context, destination string, source string) error {
+
+	ctrdCtr := ctr.ctrdContainer
+	spec, err := ctrdCtr.Spec(ctx)
+	if err != nil {
+		return runtime.Errorf("failed to get image spec: %v", err)
+	}
+
+	// FIXME: check if mount already exists
+	spec.Mounts = append(spec.Mounts, runspecs.Mount{
+		Destination: destination,
+		Source:      source,
+		Options:     []string{"rbind"},
+	})
 
 	err = ctrdCtr.Update(ctx,
 		func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
@@ -475,22 +560,6 @@ func (ctr *container) UpdateSpec(ctx context.Context, newSpec *runspecs.Spec) er
 	}
 
 	return nil
-}
-
-func (ctr *container) Mount(ctx context.Context, destination string, source string) error {
-
-	spec, err := runtime.DefaultSpec(ctx)
-	if err != nil {
-		return err
-	}
-
-	spec.Mounts = append(spec.Mounts, runspecs.Mount{
-		Destination: destination,
-		Source:      source,
-		Options:     []string{"rbind"},
-	})
-
-	return ctr.UpdateSpec(ctx, &spec)
 }
 
 // For containerd, we support the snapshots, so nothing to do here, other than setting the new
