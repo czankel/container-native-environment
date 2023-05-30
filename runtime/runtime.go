@@ -229,15 +229,15 @@ type Process interface {
 	Wait(ctx context.Context) (<-chan ExitStatus, error)
 }
 
-// Progress status values.
 const (
-	StatusUnknown  = "unknown"
-	StatusExists   = "exists"
-	StatusPending  = "pending"
-	StatusRunning  = "running"
-	StatusComplete = "complete"
-	StatusAborted  = "aborted"
-	StatusError    = "error"
+	StatusUnknown   = "unknown"
+	StatusPending   = "pending"
+	StatusLoading   = "loading"
+	StatusUnpacking = "unpacking"
+	StatusCached    = "cached"
+	StatusRunning   = "running"
+	StatusComplete  = "complete"
+	StatusError     = "error"
 )
 
 // ProgressStatus provides information about a running or completed image download or processes.

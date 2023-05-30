@@ -116,7 +116,7 @@ func updateImageStatus(ctx context.Context, start time.Time, cs content.Store,
 					stat.Status = runtime.StatusRunning
 				}
 			} else {
-				stat.Status = runtime.StatusExists
+				stat.Status = runtime.StatusCached
 			}
 			stat.Offset = info.Size
 			stat.Total = info.Size

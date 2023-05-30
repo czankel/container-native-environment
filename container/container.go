@@ -176,7 +176,7 @@ func Build(ctx context.Context, runCtr runtime.Container, ws *project.Workspace,
 			layerStatus[i].UpdatedAt = time.Now()
 
 			if i < bldLayerIdx {
-				layerStatus[i].Status = runtime.StatusExists
+				layerStatus[i].Status = runtime.StatusCached
 				layerStatus[i].Offset = layerStatus[i].Total
 			} else {
 				layerStatus[i].Status = runtime.StatusPending
