@@ -32,22 +32,20 @@ type Runtime struct {
 }
 
 type Registry struct {
-	Name     string
 	Domain   string
 	RepoName string
 }
 
 type Context struct {
-	Name     string
 	Runtime  string
 	Registry string
 }
 
 type Config struct {
 	Settings Settings
-	Context  []*Context
-	Runtime  []*Runtime
-	Registry []*Registry
+	Context  map[string]*Context
+	Runtime  map[string]*Runtime
+	Registry map[string]*Registry
 }
 
 var ContextName string
@@ -61,10 +59,8 @@ func (conf *Config) GetContext() (*Context, error) {
 		name = conf.Settings.Context
 	}
 
-	for _, c := range conf.Context {
-		if name == c.Name {
-			return c, nil
-		}
+	if c, found := conf.Context[name]; found {
+		return c, nil
 	}
 	return nil, errdefs.InvalidArgument("invalid context '%s'", name)
 }
@@ -77,16 +73,17 @@ func (conf *Config) GetRuntime() (*Runtime, error) {
 		return nil, err
 	}
 
-	for _, r := range conf.Runtime {
-		if r.Name == cfgCtx.Runtime {
-			return r, nil
+	if r, found := conf.Runtime[cfgCtx.Runtime]; found {
+		if r.Name == "" {
+			r.Name = cfgCtx.Runtime
 		}
+		return r, nil
 	}
-
 	return nil, errdefs.InvalidArgument("invalid runtime '%s' for context '%s'",
-		cfgCtx.Runtime, cfgCtx.Name)
+		cfgCtx.Runtime, ContextName)
 }
 
+/*
 // GetRegistry returns the context-specific registry.
 func (conf *Config) GetRegistry() (*Registry, error) {
 
@@ -95,15 +92,14 @@ func (conf *Config) GetRegistry() (*Registry, error) {
 		return nil, err
 	}
 
-	for _, r := range conf.Registry {
-		if r.Name == cfgCtx.Registry {
-			return r, nil
-		}
+	if r, found := conf.Registry[cfgCtx.Registry]; found {
+		return r, nil
 	}
 
 	return nil, errdefs.InvalidArgument("invalid registry '%s' for context '%s'",
-		cfgCtx.Runtime, cfgCtx.Name)
+		cfgCtx.Runtime, ContextName)
 }
+*/
 
 // update updates the configuration with the values from the specified configuration file
 func (conf *Config) update(path string) error {
@@ -122,21 +118,18 @@ func Load() (*Config, error) {
 		Settings: Settings{
 			Context: DefaultContextName,
 		},
-		Context: []*Context{
-			&Context{
-				Name:     DefaultContextName,
+		Context: map[string]*Context{
+			DefaultContextName: &Context{
 				Runtime:  DefaultRuntimeName,
 				Registry: DefaultRegistryName,
 			}},
-		Runtime: []*Runtime{
-			&Runtime{
-				Name:       DefaultRuntimeName,
+		Runtime: map[string]*Runtime{
+			DefaultRuntimeName: &Runtime{
 				SocketName: DefaultRuntimeSocketName,
 				Namespace:  DefaultRuntimeNamespace,
 			}},
-		Registry: []*Registry{
-			&Registry{
-				Name:     DefaultRegistryName,
+		Registry: map[string]*Registry{
+			DefaultRegistryName: &Registry{
 				Domain:   DefaultRegistryDomain,
 				RepoName: DefaultRegistryRepoName,
 			}},
@@ -148,7 +141,6 @@ func Load() (*Config, error) {
 	if err == nil {
 		err = conf.update(usr.HomeDir + "/" + UserConfigFile)
 	}
-
 	return conf, err
 }
 
@@ -406,29 +398,24 @@ func (conf *Config) WriteProjectConfig(path string) error {
 
 func (conf *Config) FullImageName(name string) (string, error) {
 
-	reg, err := conf.GetRegistry()
-	haveReg := err == nil
+	cfgCtx, err := conf.GetContext()
+	if err != nil {
+		return "", err
+	}
+
+	regName := cfgCtx.Registry
+	reg, haveReg := conf.Registry[regName]
 
 	domEnd := strings.Index(name, "/") + 1
 	if domEnd > 1 {
-		regName := name[:domEnd-1]
-		foundReg := false
-		for _, r := range conf.Registry {
-			if regName == r.Name {
-				reg = r
-				foundReg = true
-				break
-			}
-		}
-		if foundReg {
-			haveReg = foundReg
-		} else {
+		regName = name[:domEnd-1]
+		if reg, haveReg = conf.Registry[regName]; !haveReg {
 			domEnd = 0
 		}
 	}
 
 	if haveReg {
-		if reg.Name == "docker.io" {
+		if regName == "docker.io" {
 			named, err := refdocker.ParseDockerRef(name)
 			if err != nil {
 				return "", err

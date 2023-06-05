@@ -117,12 +117,12 @@ func splitRepoNameTag(name string) (string, string) {
 	tPos := strings.Index(name, ":")
 	dispName := name[:tPos]
 
-	for _, r := range conf.Registry {
+	for n, r := range conf.Registry {
 		p := r.Domain + "/" + r.RepoName
 		if strings.HasPrefix(dispName, p) {
 			dispName = name[len(p)+1 : tPos]
-			if r.Name != config.DefaultRegistryName {
-				dispName = r.Name + "/" + dispName
+			if n != config.DefaultRegistryName {
+				dispName = n + "/" + dispName
 			}
 		}
 	}

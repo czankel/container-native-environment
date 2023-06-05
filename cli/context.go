@@ -18,11 +18,7 @@ configurations, mainly the runtime but also other settings.`,
 func contextRunE(cmd *cobra.Command, args []string) error {
 
 	if len(args) == 0 {
-		ctx, err := conf.GetContext()
-		if err != nil {
-			return err
-		}
-		fmt.Printf("Context: %s\n", ctx.Name)
+		fmt.Printf("Context: %s\n", conf.Settings.Context)
 	} else {
 		// FIXME: check if context exists or error; set context an save config
 
