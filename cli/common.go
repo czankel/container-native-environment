@@ -127,8 +127,10 @@ func timeToAgoString(t time.Time) string {
 
 // printValueElem prints the provided value as two columns for name and value content.
 // Struct  Each element is printed as a single row with the provided prefix for the name field
-//         For nested structures, the field names of each substructure are concatenated by '.'
-//         Use the output:"-" tag to omit a field.
+//
+//	For nested structures, the field names of each substructure are concatenated by '.'
+//	Use the output:"-" tag to omit a field.
+//
 // Map     Similar to Struct, but using the keys as the prefix instead of the structure elements.
 // <other> Printed as two columns using the prefix as the name for the value content.
 // flat outputs a slice in the [ ... ] format. It will only flatten the final slice ([][])
@@ -189,10 +191,11 @@ func printValueElem(w *tabwriter.Writer, prefix string, elem reflect.Value, flat
 }
 
 // printValue prints the content of the provided value in two columns.
-//  struct: field name, value
-//  map:    key, value
-//  slice:  index, value
-//  <type>: prefix, value
+//
+//	struct: field name, value
+//	map:    key, value
+//	slice:  index, value
+//	<type>: prefix, value
 func printValue(fieldHdr string, valueHdr string, prefix string, value interface{}) {
 
 	w := new(tabwriter.Writer)
@@ -203,26 +206,40 @@ func printValue(fieldHdr string, valueHdr string, prefix string, value interface
 	printValueElem(w, prefix, reflect.ValueOf(value), false)
 }
 
-// printList prints a slice of structures using the field names as the header
+// printList prints a slice or map[string] of structures using the field names as the header
+// It uses the keys in map as an additional "Name" column. (withIndex is ignored with maps)
 func printList(list interface{}, withIndex bool) {
 
-	if reflect.TypeOf(list).Kind() != reflect.Slice {
-		panic("provided argument must be of the type: slice")
+	listType := reflect.TypeOf(list).Kind()
+	if listType != reflect.Slice && listType != reflect.Map {
+		panic("provided argument must be of the type slice or map")
 	}
-	if reflect.TypeOf(list).Elem().Kind() != reflect.Struct {
-		panic("provided argument must be of the type: slice of structures")
+
+	t := reflect.TypeOf(list).Elem().Kind()
+	isPtr := t == reflect.Pointer
+	if isPtr {
+		t = reflect.TypeOf(list).Elem().Elem().Kind()
+	}
+	if t != reflect.Struct {
+		panic("provided argument must be of the type: slice or map of structures")
 	}
 
 	w := new(tabwriter.Writer)
 	w.Init(os.Stdout, 8, 0, 1, ' ', 0)
 	defer w.Flush()
 
-	if withIndex {
+	if listType == reflect.Map {
+		fmt.Fprintf(w, "NAME\t")
+	} else if withIndex {
 		fmt.Fprintf(w, "INDEX\t")
 	}
 
-	format := "%s"
 	hdr := reflect.TypeOf(list).Elem()
+	if isPtr {
+		hdr = hdr.Elem()
+	}
+
+	format := "%s"
 	for i := 0; i < hdr.NumField(); i++ {
 		if hdr.Field(i).Tag.Get("output") != "-" {
 			fmt.Fprintf(w, format, strings.ToUpper(hdr.Field(i).Name))
@@ -232,22 +249,58 @@ func printList(list interface{}, withIndex bool) {
 	fmt.Fprintf(w, "\n")
 
 	items := reflect.ValueOf(list)
-	for i := 0; i < items.Len(); i++ {
-
-		if withIndex {
-			fmt.Fprintf(w, "%d\t", i)
-		}
-		format = "%v"
-		item := items.Index(i)
-		for j := 0; j < item.NumField(); j++ {
-			if hdr.Field(j).Tag.Get("output") == "-" {
-				continue
+	if listType == reflect.Slice {
+		for i := 0; i < items.Len(); i++ {
+			if withIndex {
+				fmt.Fprintf(w, "%d\t", i)
 			}
-			fmt.Fprintf(w, format, item.Field(j).Interface())
-			format = "\t%v"
+			printListRow(w, i, items.Index(i), isPtr, hdr)
 		}
-		fmt.Fprintf(w, "\n")
+
+	} else if listType == reflect.Map {
+		m := items.MapKeys()
+		keys := make([]string, len(m))
+		for i := 0; i < len(m); i++ {
+			keys[i] = m[i].String()
+		}
+		sort.Strings(keys)
+		idx := 0
+		for _, k := range keys {
+			fmt.Fprintf(w, "%s\t", reflect.ValueOf(k))
+			printListRow(w, idx, items.MapIndex(reflect.ValueOf(k)), isPtr, hdr)
+		}
 	}
+}
+
+func printListRow(w *tabwriter.Writer, i int, item reflect.Value, isPtr bool, hdr reflect.Type) {
+
+	if isPtr {
+		item = item.Elem()
+	}
+
+	format := "%v"
+	for j := 0; j < item.NumField(); j++ {
+		if hdr.Field(j).Tag.Get("output") == "-" {
+			continue
+		}
+		val := item.Field(j)
+		if val.Kind() == reflect.Map {
+			var s string
+			for _, k := range val.MapKeys() {
+				s = s + fmt.Sprintf("%v=%v, ",
+					strings.ToLower(k.Interface().(string)),
+					strings.ToLower(val.MapIndex(k).Interface().(string)))
+			}
+			if len(s) > 2 {
+				s = s[:len(s)-2]
+			}
+			fmt.Fprintf(w, format, s)
+		} else {
+			fmt.Fprintf(w, format, val.Interface())
+		}
+		format = "\t%v"
+	}
+	fmt.Fprintf(w, "\n")
 }
 
 // showProgress displays the progress of sequential or parallel jobs
