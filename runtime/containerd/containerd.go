@@ -3,21 +3,13 @@ package containerd
 
 import (
 	"context"
-	"errors"
 	"os"
-	"os/signal"
-	"sync"
 
 	"github.com/containerd/containerd"
-	ctrderr "github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
 	"github.com/containerd/containerd/namespaces"
-	"github.com/containerd/containerd/reference"
-
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/czankel/cne/config"
-	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/runtime"
 )
 
@@ -89,80 +81,13 @@ func (ctrdRun *containerdRuntime) Images(ctx context.Context) ([]runtime.Image, 
 	return runImgs, nil
 }
 
-func (ctrdRun *containerdRuntime) GetImage(ctx context.Context,
-	name string) (runtime.Image, error) {
-
-	ctrdImg, err := ctrdRun.client.GetImage(ctx, name)
-	if errors.Is(err, ctrderr.ErrNotFound) {
-		return nil, errdefs.NotFound("image", name)
-	} else if err != nil {
-		return nil, err
-	}
-
-	return newImage(ctx, ctrdRun, ctrdImg)
+func (ctrdRun *containerdRuntime) GetImage(ctx context.Context, name string) (runtime.Image, error) {
+	return getImage(ctx, *ctrdRun, name)
 }
-
-// TODO: ContainerD is not really stable when interrupting an image pull (e.g. using CTRL-C)
-// TODO: Snapshots can stay in extracting stage and never complete.
 
 func (ctrdRun *containerdRuntime) PullImage(ctx context.Context, name string,
 	progress chan<- []runtime.ProgressStatus) (runtime.Image, error) {
-
-	var mutex sync.Mutex
-	descs := []ocispec.Descriptor{}
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	h := images.HandlerFunc(func(ctx context.Context,
-		desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
-
-		if desc.MediaType != images.MediaTypeDockerSchema1Manifest {
-			mutex.Lock()
-			found := false
-			for _, d := range descs {
-				if desc.Digest == d.Digest {
-					found = true
-					break
-				}
-			}
-			if !found {
-				descs = append(descs, desc)
-			}
-			mutex.Unlock()
-		}
-		return nil, nil
-	})
-
-	pctx, stopProgress := context.WithCancel(ctx)
-	if progress != nil {
-		go func() {
-			defer wg.Done()
-			defer close(progress)
-			updateImageProgress(pctx, ctx, ctrdRun, &mutex, &descs, progress)
-		}()
-	}
-
-	// ignore signals while pulling - see comment above
-	signal.Ignore()
-
-	ctrdImg, err := ctrdRun.client.Pull(ctx, name,
-		containerd.WithPullUnpack, containerd.WithImageHandler(h))
-
-	signal.Reset()
-
-	if progress != nil {
-		stopProgress()
-		wg.Wait()
-	}
-
-	if err == reference.ErrObjectRequired {
-		return nil, runtime.Errorf("invalid image name '%s': %v", name, err)
-	} else if err != nil {
-		return nil, runtime.Errorf("pull image '%s' failed: %v", name, err)
-	}
-
-	return newImage(ctx, ctrdRun, ctrdImg)
+	return pullImage(ctx, ctrdRun, name, progress)
 }
 
 func (ctrdRun *containerdRuntime) DeleteImage(ctx context.Context, name string) error {
