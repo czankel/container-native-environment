@@ -48,6 +48,9 @@ type Runtime interface {
 	// Snapshots returns all snapshots.
 	Snapshots(ctx context.Context) ([]Snapshot, error)
 
+	// GetSnapshot returns the specific snapshot
+	GetSnapshot(ctx context.Context, name string) (Snapshot, error)
+
 	// DeleteSnapshot deletes the snapshot
 	DeleteSnapshot(ctx context.Context, name string) error
 
