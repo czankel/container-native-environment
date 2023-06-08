@@ -153,10 +153,10 @@ type Container interface {
 	// Snapshots returns all container snapshots.
 	Snapshots(ctx context.Context) ([]Snapshot, error)
 
-	// SetRootFS sets the rootfs to the provide snapshot.
+	// SetRootFS sets the rootfs to the provided snapshot (by name).
 	//
 	// The root filesystem can only be set when the container has not been created.
-	SetRootFS(ctx context.Context, snapshot Snapshot) error
+	SetRootFS(ctx context.Context, snapName string) error
 
 	// Create creates the container.
 	Create(ctx context.Context) error

@@ -269,19 +269,16 @@ func (mounter) Unmount(target string) error {
 }
 
 func createActiveSnapshot(ctx context.Context, ctrdRun *containerdRuntime,
-	img *image, domain, id [16]byte, snap runtime.Snapshot) error {
+	img *image, domain, id [16]byte, snapName string) error {
 
 	activeSnapName := activeSnapshotName(domain, id)
-	var rootFSSnapName string
-	if snap != nil {
-		rootFSSnapName = snap.Name()
-	} else {
+	if snapName == "" {
 		diffIDs, err := img.ctrdImage.RootFS(ctx)
 		if err != nil {
 			return runtime.Errorf("failed to get rootfs: %v", err)
 		}
-		rootFSSnapName = identity.ChainID(diffIDs).String()
-		_, err = getSnapshot(ctx, ctrdRun, rootFSSnapName)
+		snapName = identity.ChainID(diffIDs).String()
+		_, err = getSnapshot(ctx, ctrdRun, snapName)
 
 		// unpack 'image' if root snapshot was removed
 		if err != nil && errors.Is(err, errdefs.ErrNotFound) {
@@ -295,20 +292,20 @@ func createActiveSnapshot(ctx context.Context, ctrdRun *containerdRuntime,
 	}
 
 	// delete all 'old' snapshots down to the new rootfs or the image
-	if rootFSSnapName == activeSnapName {
+	if snapName == activeSnapName {
 		return errdefs.InternalError("Cannot set rootfs to active layer")
 	}
 
-	snapName := activeSnapName
-	for snapName != rootFSSnapName {
-		snap, err := getSnapshot(ctx, ctrdRun, snapName)
+	name := activeSnapName
+	for name != snapName {
+		snap, err := getSnapshot(ctx, ctrdRun, name)
 		if err != nil && errors.Is(err, errdefs.ErrNotFound) {
 			break
 		}
 		if err != nil {
 			return err
 		}
-		err = deleteSnapshot(ctx, ctrdRun, snapName)
+		err = deleteSnapshot(ctx, ctrdRun, name)
 		if err != nil && errors.Is(err, errdefs.ErrNotFound) {
 			break
 		}
@@ -318,11 +315,11 @@ func createActiveSnapshot(ctx context.Context, ctrdRun *containerdRuntime,
 		if err != nil {
 			break
 		}
-		snapName = snap.Parent()
+		name = snap.Parent()
 	}
 
 	// create active snapshot based on the new rootfs
-	_, snap, err := createSnapshot(ctx, ctrdRun, activeSnapName, rootFSSnapName, true /* mutable */)
+	_, _, err := createSnapshot(ctx, ctrdRun, activeSnapName, snapName, true /* mutable */)
 	if err != nil {
 		return err
 	}

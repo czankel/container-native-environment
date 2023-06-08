@@ -417,8 +417,8 @@ func (ctr *container) Snapshots(ctx context.Context) ([]runtime.Snapshot, error)
 	return getSnapshots(ctx, ctr.ctrdRuntime)
 }
 
-func (ctr *container) SetRootFS(ctx context.Context, snap runtime.Snapshot) error {
-	return createActiveSnapshot(ctx, ctr.ctrdRuntime, ctr.image, ctr.domain, ctr.id, snap)
+func (ctr *container) SetRootFS(ctx context.Context, snapName string) error {
+	return createActiveSnapshot(ctx, ctr.ctrdRuntime, ctr.image, ctr.domain, ctr.id, snapName)
 }
 
 // TODO: CgroupsPath is set to only domain + ID, and not generation as before, is it needed?

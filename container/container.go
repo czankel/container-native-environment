@@ -188,7 +188,12 @@ func Build(ctx context.Context, runCtr runtime.Container, ws *project.Workspace,
 		progress <- stat
 	}
 
-	err = runCtr.SetRootFS(ctx, rootFSSnap)
+	rootSnap := ""
+	if rootFSSnap != nil {
+		rootSnap = rootFSSnap.Name()
+	}
+
+	err = runCtr.SetRootFS(ctx, rootSnap)
 	if err != nil {
 		return err
 	}
