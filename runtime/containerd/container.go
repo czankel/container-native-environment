@@ -500,29 +500,20 @@ func (ctr *container) Purge(ctx context.Context) error {
 		ctr.ctrdContainer, ctr.domain, ctr.id, true /*purge*/)
 }
 
-func (ctr *container) UpdateSpec(ctx context.Context, newSpec *runspecs.Spec) error {
+func (ctr *container) Mount(ctx context.Context, destination string, source string) error {
 
 	ctrdCtr := ctr.ctrdContainer
-
-	// update incomplete spec
-	ctr.spec = *newSpec
-	spec := &ctr.spec
-	if spec.Process == nil {
-		spec.Process = &runspecs.Process{}
-	}
-
-	config, err := ctr.image.Config(ctx)
+	spec, err := ctrdCtr.Spec(ctx)
 	if err != nil {
-		return runtime.Errorf("failed to get image OCI spec: %v", err)
+		return runtime.Errorf("failed to get image spec: %v", err)
 	}
-	if spec.Linux != nil {
-		spec.Process.Args = append(config.Entrypoint, config.Cmd...)
-		cwd := config.WorkingDir
-		if cwd == "" {
-			cwd = "/"
-		}
-		spec.Process.Cwd = cwd
-	}
+
+	// FIXME: check if mount already exists
+	spec.Mounts = append(spec.Mounts, runspecs.Mount{
+		Destination: destination,
+		Source:      source,
+		Options:     []string{"rbind"},
+	})
 
 	err = ctrdCtr.Update(ctx,
 		func(ctx context.Context, client *containerd.Client, c *containers.Container) error {
@@ -572,22 +563,6 @@ func (ctr *container) Snapshot(ctx context.Context) (runtime.Snapshot, error) {
 func (ctr *container) Amend(ctx context.Context) (runtime.Snapshot, error) {
 
 	return updateSnapshot(ctx, ctr.ctrdRuntime, ctr.domain, ctr.id, true /* amend */)
-}
-
-func (ctr *container) Mount(ctx context.Context, destination string, source string) error {
-
-	spec, err := runtime.DefaultSpec(ctx)
-	if err != nil {
-		return err
-	}
-
-	spec.Mounts = append(spec.Mounts, runspecs.Mount{
-		Destination: destination,
-		Source:      source,
-		Options:     []string{"rbind"},
-	})
-
-	return ctr.UpdateSpec(ctx, &spec)
 }
 
 // Exec executes the provided command.
