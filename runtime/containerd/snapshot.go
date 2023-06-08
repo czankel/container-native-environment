@@ -437,6 +437,8 @@ func deleteContainerSnapshots(ctx context.Context,
 	return nil
 }
 
+// Snapshot interface
+
 func (snap *snapshot) Name() string {
 	return snap.info.Name
 }

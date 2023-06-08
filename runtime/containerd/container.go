@@ -271,6 +271,50 @@ func getContainer(ctx context.Context,
 	return ctr, nil
 }
 
+// deleteContainer deletes the container, task, and active snapshot.
+// This function returns not-found if a container was not specified and could not be found.
+
+// TODO: don't delete the image snapshot
+
+func deleteContainer(ctx context.Context, ctrdRun *containerdRuntime, domain, id [16]byte, purge bool) error {
+
+	ctrdID := composeCtrdID(domain, id)
+	ctrdCtr, err := ctrdRun.client.LoadContainer(ctx, ctrdID)
+	if err != nil && ctrderr.IsNotFound(err) {
+		return errdefs.NotFound("container", ctrdID)
+	}
+	if err != nil {
+		return runtime.Errorf("failed to get container: %v", err)
+	}
+
+	return deleteCtrdContainer(ctx, ctrdRun, ctrdCtr, domain, id, purge)
+}
+
+func deleteCtrdContainer(ctx context.Context, ctrdRun *containerdRuntime,
+	ctrdCtr containerd.Container, domain, id [16]byte, purge bool) error {
+
+	if ctrdCtr == nil {
+		return nil
+	}
+
+	err := deleteCtrdTask(ctx, ctrdRun, ctrdCtr)
+	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
+		return err
+	}
+
+	err = ctrdCtr.Delete(ctx, containerd.WithSnapshotCleanup)
+	if err != nil {
+		return err
+	}
+
+	if purge {
+		// ignore error for deleting snapshots
+		deleteContainerSnapshots(ctx, ctrdRun, domain, id)
+	}
+
+	return nil
+}
+
 // createTask creates a new task for the active snapshot
 func createTask(ctx context.Context, ctr *container) (containerd.Task, error) {
 
@@ -324,12 +368,24 @@ func deleteCtrdTask(ctx context.Context,
 	return nil
 }
 
+// Container interface
+
 // Name returns the unique name of a container consisting of the domain,
 // container id, and generation.
 func (ctr *container) Name() string {
 
 	return composeCtrdID(ctr.domain, ctr.id) + "-" +
 		hex.EncodeToString(ctr.generation[:])
+}
+
+func (ctr *container) CreatedAt() time.Time {
+	// TODO: Container.CreatedAt not yet supported by containerd?
+	return time.Now()
+}
+
+func (ctr *container) UpdatedAt() time.Time {
+	// TODO: Container.updatedAt not yet supported by containerd?
+	return time.Now()
 }
 
 func (ctr *container) Domain() [16]byte {
@@ -346,16 +402,6 @@ func (ctr *container) Generation() [16]byte {
 
 func (ctr *container) UID() uint32 {
 	return ctr.uid
-}
-
-func (ctr *container) CreatedAt() time.Time {
-	// TODO: Container.CreatedAt not yet supported by containerd?
-	return time.Now()
-}
-
-func (ctr *container) UpdatedAt() time.Time {
-	// TODO: Container.updatedAt not yet supported by containerd?
-	return time.Now()
 }
 
 func (ctr *container) Snapshots(ctx context.Context) ([]runtime.Snapshot, error) {
@@ -436,6 +482,16 @@ func (ctr *container) Create(ctx context.Context) error {
 	return nil
 }
 
+func (ctr *container) Delete(ctx context.Context) error {
+	return deleteCtrdContainer(ctx, ctr.ctrdRuntime,
+		ctr.ctrdContainer, ctr.domain, ctr.id, false /*purge*/)
+}
+
+func (ctr *container) Purge(ctx context.Context) error {
+	return deleteCtrdContainer(ctx, ctr.ctrdRuntime,
+		ctr.ctrdContainer, ctr.domain, ctr.id, true /*purge*/)
+}
+
 func (ctr *container) UpdateSpec(ctx context.Context, newSpec *runspecs.Spec) error {
 
 	ctrdCtr := ctr.ctrdContainer
@@ -477,22 +533,6 @@ func (ctr *container) UpdateSpec(ctx context.Context, newSpec *runspecs.Spec) er
 	return nil
 }
 
-func (ctr *container) Mount(ctx context.Context, destination string, source string) error {
-
-	spec, err := runtime.DefaultSpec(ctx)
-	if err != nil {
-		return err
-	}
-
-	spec.Mounts = append(spec.Mounts, runspecs.Mount{
-		Destination: destination,
-		Source:      source,
-		Options:     []string{"rbind"},
-	})
-
-	return ctr.UpdateSpec(ctx, &spec)
-}
-
 // For containerd, we support the snapshots, so nothing to do here, other than setting the new
 // generation value.
 func (ctr *container) Commit(ctx context.Context, gen [16]byte) error {
@@ -524,6 +564,22 @@ func (ctr *container) Snapshot(ctx context.Context) (runtime.Snapshot, error) {
 func (ctr *container) Amend(ctx context.Context) (runtime.Snapshot, error) {
 
 	return updateSnapshot(ctx, ctr.ctrdRuntime, ctr.domain, ctr.id, true /* amend */)
+}
+
+func (ctr *container) Mount(ctx context.Context, destination string, source string) error {
+
+	spec, err := runtime.DefaultSpec(ctx)
+	if err != nil {
+		return err
+	}
+
+	spec.Mounts = append(spec.Mounts, runspecs.Mount{
+		Destination: destination,
+		Source:      source,
+		Options:     []string{"rbind"},
+	})
+
+	return ctr.UpdateSpec(ctx, &spec)
 }
 
 // Exec executes the provided command.
@@ -580,58 +636,4 @@ func (ctr *container) Exec(ctx context.Context, stream runtime.Stream,
 // This is not supported on the containerd runtime
 func (ctr *container) Processes(ctx context.Context) ([]runtime.Process, error) {
 	return nil, errdefs.NotImplemented()
-}
-
-// deleteContainer deletes the container, task, and active snapshot.
-// This function returns not-found if a container was not specified and could not be found.
-
-// TODO: don't delete the image snapshot
-
-func deleteContainer(ctx context.Context, ctrdRun *containerdRuntime, domain, id [16]byte, purge bool) error {
-
-	ctrdID := composeCtrdID(domain, id)
-	ctrdCtr, err := ctrdRun.client.LoadContainer(ctx, ctrdID)
-	if err != nil && ctrderr.IsNotFound(err) {
-		return errdefs.NotFound("container", ctrdID)
-	}
-	if err != nil {
-		return runtime.Errorf("failed to get container: %v", err)
-	}
-
-	return deleteCtrdContainer(ctx, ctrdRun, ctrdCtr, domain, id, purge)
-}
-
-func deleteCtrdContainer(ctx context.Context, ctrdRun *containerdRuntime,
-	ctrdCtr containerd.Container, domain, id [16]byte, purge bool) error {
-
-	if ctrdCtr == nil {
-		return nil
-	}
-
-	err := deleteCtrdTask(ctx, ctrdRun, ctrdCtr)
-	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
-		return err
-	}
-
-	err = ctrdCtr.Delete(ctx, containerd.WithSnapshotCleanup)
-	if err != nil {
-		return err
-	}
-
-	if purge {
-		// ignore error for deleting snapshots
-		deleteContainerSnapshots(ctx, ctrdRun, domain, id)
-	}
-
-	return nil
-}
-
-func (ctr *container) Delete(ctx context.Context) error {
-	return deleteCtrdContainer(ctx, ctr.ctrdRuntime,
-		ctr.ctrdContainer, ctr.domain, ctr.id, false /*purge*/)
-}
-
-func (ctr *container) Purge(ctx context.Context) error {
-	return deleteCtrdContainer(ctx, ctr.ctrdRuntime,
-		ctr.ctrdContainer, ctr.domain, ctr.id, true /*purge*/)
 }

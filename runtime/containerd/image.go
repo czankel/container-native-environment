@@ -151,6 +151,27 @@ func newImage(ctx context.Context,
 	}, nil
 }
 
+// Image interface
+
+func (img *image) Name() string {
+	return img.ctrdImage.Name()
+}
+
+func (img *image) Size() int64 {
+	return img.size
+}
+
+func (img *image) Digest() digest.Digest {
+	return img.digest
+}
+
+func (img *image) CreatedAt() time.Time {
+	/* TODO: Image.Metadata()Is supposed to be available in containerd 1.3.3
+	   return img.ctrdImage.Metadata().CreatedAt
+	*/
+	return time.Now()
+}
+
 func (img *image) Config(ctx context.Context) (*ocispec.ImageConfig, error) {
 
 	ociDesc, err := img.ctrdImage.Config(ctx)
@@ -182,8 +203,8 @@ func (img *image) Config(ctx context.Context) (*ocispec.ImageConfig, error) {
 	return &config, nil
 }
 
-func (img *image) Digest() digest.Digest {
-	return img.digest
+func (img *image) Unpack(ctx context.Context) error {
+	return img.ctrdImage.Unpack(ctx, containerd.DefaultSnapshotter)
 }
 
 func (img *image) RootFS(ctx context.Context) ([]digest.Digest, error) {
@@ -194,21 +215,6 @@ func (img *image) RootFS(ctx context.Context) ([]digest.Digest, error) {
 	}
 
 	return rootFS, nil
-}
-
-func (img *image) Name() string {
-	return img.ctrdImage.Name()
-}
-
-func (img *image) CreatedAt() time.Time {
-	/* TODO: Image.Metadata()Is supposed to be available in containerd 1.3.3
-	   return img.ctrdImage.Metadata().CreatedAt
-	*/
-	return time.Now()
-}
-
-func (img *image) Size() int64 {
-	return img.size
 }
 
 func (img *image) Mount(ctx context.Context, path string) error {
@@ -251,8 +257,4 @@ func (img *image) Unmount(ctx context.Context, path string) error {
 	digest := identity.ChainID(diffIDs).String()
 	snapName := digest + "-image"
 	return deleteSnapshot(ctx, img.ctrdRuntime, snapName)
-}
-
-func (img *image) Unpack(ctx context.Context) error {
-	return img.ctrdImage.Unpack(ctx, containerd.DefaultSnapshotter)
 }

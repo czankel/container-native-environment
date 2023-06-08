@@ -39,14 +39,6 @@ func init() {
 	runtime.Register("containerd", &containerdRuntimeType{})
 }
 
-// Runtime Interface
-
-func (ctrdRun *containerdRuntime) WithNamespace(ctx context.Context, ns string) context.Context {
-	return namespaces.WithNamespace(ctx, ns)
-}
-
-// Runtime Interface
-// FIXME: context should not be saved???
 func (r *containerdRuntimeType) Open(ctx context.Context,
 	confRun *config.Runtime) (runtime.Runtime, error) {
 
@@ -66,6 +58,12 @@ func (r *containerdRuntimeType) Open(ctx context.Context,
 	return &containerdRuntime{
 		client: client,
 	}, nil
+}
+
+// Runtime Interface
+
+func (ctrdRun *containerdRuntime) WithNamespace(ctx context.Context, ns string) context.Context {
+	return namespaces.WithNamespace(ctx, ns)
 }
 
 func (ctrdRun *containerdRuntime) Close() {

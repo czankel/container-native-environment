@@ -92,11 +92,11 @@ type Image interface {
 	// CreatedAt returns the data the image was created.
 	CreatedAt() time.Time
 
-	// RootFS returns the digests of the root fs the image consists of.
-	RootFS(ctx context.Context) ([]digest.Digest, error)
-
 	// Config returns the configuration of the image.
 	Config(ctx context.Context) (*v1.ImageConfig, error)
+
+	// RootFS returns the digests of the root fs the image consists of.
+	RootFS(ctx context.Context) ([]digest.Digest, error)
 
 	// Mount mounts the image to the provide path.
 	Mount(ctx context.Context, path string) error
