@@ -135,7 +135,7 @@ type image struct {
 	size        int64
 }
 
-func getImage(ctx context.Context,
+func newImage(ctx context.Context,
 	ctrdRun *containerdRuntime, ctrdImg containerd.Image) (*image, error) {
 
 	imgConf, err := ctrdImg.Config(ctx)

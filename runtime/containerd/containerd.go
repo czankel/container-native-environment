@@ -81,7 +81,7 @@ func (ctrdRun *containerdRuntime) Images(ctx context.Context) ([]runtime.Image, 
 
 	runImgs := make([]runtime.Image, len(ctrdImgs))
 	for i, ctrdImg := range ctrdImgs {
-		runImg, err := getImage(ctx, ctrdRun, ctrdImg)
+		runImg, err := newImage(ctx, ctrdRun, ctrdImg)
 		if err != nil {
 			return nil, err
 		}
@@ -101,7 +101,7 @@ func (ctrdRun *containerdRuntime) GetImage(ctx context.Context,
 		return nil, err
 	}
 
-	return getImage(ctx, ctrdRun, ctrdImg)
+	return newImage(ctx, ctrdRun, ctrdImg)
 }
 
 // TODO: ContainerD is not really stable when interrupting an image pull (e.g. using CTRL-C)
@@ -164,7 +164,7 @@ func (ctrdRun *containerdRuntime) PullImage(ctx context.Context, name string,
 		return nil, runtime.Errorf("pull image '%s' failed: %v", name, err)
 	}
 
-	return getImage(ctx, ctrdRun, ctrdImg)
+	return newImage(ctx, ctrdRun, ctrdImg)
 }
 
 func (ctrdRun *containerdRuntime) DeleteImage(ctx context.Context, name string) error {
