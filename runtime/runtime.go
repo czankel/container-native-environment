@@ -147,6 +147,9 @@ type Container interface {
 	// Return the User ID
 	UID() uint32
 
+	// Image return the image associated to the container
+	Image(ctx context.Context) (Image, error)
+
 	// Snapshots returns all container snapshots.
 	Snapshots(ctx context.Context) ([]Snapshot, error)
 

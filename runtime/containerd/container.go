@@ -404,6 +404,14 @@ func (ctr *container) UID() uint32 {
 	return ctr.uid
 }
 
+func (ctr *container) Image(ctx context.Context) (runtime.Image, error) {
+	img, err := ctr.ctrdContainer.Image(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return newImage(ctx, ctr.ctrdRuntime, img)
+}
+
 func (ctr *container) Snapshots(ctx context.Context) ([]runtime.Snapshot, error) {
 	// TODO: filter for current container
 	return getSnapshots(ctx, ctr.ctrdRuntime)
