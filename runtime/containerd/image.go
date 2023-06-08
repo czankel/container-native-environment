@@ -4,6 +4,7 @@ package containerd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"sync"
 	"time"
@@ -26,7 +27,7 @@ const updateIntervalMsecs = 100
 
 // updateImageProgress sends the current image download status in a regular 100ms interval
 // to the provided progress channel.
-func updateImageProgress(ctx context.Context,
+func updateImageProgress(cctx context.Context, ctx context.Context,
 	ctrdRun *containerdRuntime, mutex *sync.Mutex, descs *[]ocispec.Descriptor,
 	progress chan<- []runtime.ProgressStatus) {
 
@@ -44,9 +45,9 @@ func updateImageProgress(ctx context.Context,
 
 		select {
 		case <-ticker.C:
-			statuses, err = updateImageStatus(ctx, start, cs, mutex, descs)
+			statuses, err = updateImageStatus(cctx, start, cs, mutex, descs)
 
-		case <-ctx.Done():
+		case <-cctx.Done():
 			statuses, err = updateImageStatus(ctx, start, cs, mutex, descs)
 			loop = false
 		}
@@ -203,7 +204,43 @@ func (img *image) Config(ctx context.Context) (*ocispec.ImageConfig, error) {
 	return &config, nil
 }
 
-func (img *image) Unpack(ctx context.Context) error {
+func (img *image) Unpack(ctx context.Context, progress chan<- []runtime.ProgressStatus) error {
+
+	diffIDs, err := img.ctrdImage.RootFS(ctx)
+	if err != nil {
+		return err
+	}
+
+	cs := img.ctrdImage.ContentStore()
+	manifest, _ := images.Manifest(ctx, cs, img.ctrdImage.Target(), img.ctrdImage.Platform())
+	if len(diffIDs) != len(manifest.Layers) {
+		return errors.New("mismatched image rootfs and manifest layers")
+	}
+
+	descs := make([]ocispec.Descriptor, len(diffIDs))
+	for i := range diffIDs {
+		descs[i] = ocispec.Descriptor{
+			MediaType: ocispec.MediaTypeImageLayer,
+			Digest:    manifest.Layers[i].Digest,
+		}
+	}
+
+	if progress != nil {
+		var wg sync.WaitGroup
+
+		cctx, stopProgress := context.WithCancel(ctx)
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+			// TODO: is the mutex still necessary?
+			var mutex sync.Mutex
+			updateImageProgress(cctx, ctx, img.ctrdRuntime, &mutex, &descs, progress)
+		}()
+		defer stopProgress()
+		defer wg.Wait()
+	}
+
 	return img.ctrdImage.Unpack(ctx, containerd.DefaultSnapshotter)
 }
 

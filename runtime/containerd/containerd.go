@@ -139,7 +139,7 @@ func (ctrdRun *containerdRuntime) PullImage(ctx context.Context, name string,
 		go func() {
 			defer wg.Done()
 			defer close(progress)
-			updateImageProgress(pctx, ctrdRun, &mutex, &descs, progress)
+			updateImageProgress(pctx, ctx, ctrdRun, &mutex, &descs, progress)
 		}()
 	}
 

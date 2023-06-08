@@ -92,6 +92,9 @@ type Image interface {
 	// CreatedAt returns the data the image was created.
 	CreatedAt() time.Time
 
+	// Unpack unpacks the image.
+	Unpack(ctx context.Context, progress chan<- []ProgressStatus) error
+
 	// Config returns the configuration of the image.
 	Config(ctx context.Context) (*v1.ImageConfig, error)
 

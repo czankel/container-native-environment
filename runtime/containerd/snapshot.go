@@ -282,7 +282,7 @@ func createActiveSnapshot(ctx context.Context, ctrdRun *containerdRuntime,
 
 		// unpack 'image' if root snapshot was removed
 		if err != nil && errors.Is(err, errdefs.ErrNotFound) {
-			img.Unpack(ctx)
+			img.Unpack(ctx, nil) // TODO: should be moved outside this structure
 			digest := identity.ChainID(diffIDs).String()
 			_, _, err = createSnapshot(ctx, img.ctrdRuntime, digest, digest, false)
 		}
