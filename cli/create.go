@@ -127,7 +127,7 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	oldCtr, err := container.Get(ctx, run, ws)
+	oldCtr, err := container.GetContainer(ctx, run, ws)
 	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 		return err
 	}

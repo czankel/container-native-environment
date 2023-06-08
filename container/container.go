@@ -60,7 +60,7 @@ func Containers(ctx context.Context, run runtime.Runtime,
 }
 
 // Get looks up the current active Container for the specified Workspace.
-func Get(ctx context.Context,
+func GetContainer(ctx context.Context,
 	run runtime.Runtime, ws *project.Workspace) (runtime.Container, error) {
 
 	dom, err := uuid.Parse(ws.ProjectUUID)

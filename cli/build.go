@@ -27,7 +27,7 @@ func getContainer(ctx context.Context,
 	run runtime.Runtime, ws *project.Workspace) (runtime.Container, error) {
 
 	// check if container already exists
-	ctr, err := container.Get(ctx, run, ws)
+	ctr, err := container.GetContainer(ctx, run, ws)
 	if err == nil {
 		return ctr, nil
 	}
@@ -168,7 +168,7 @@ func buildWorkspaceRunE(cmd *cobra.Command, args []string) error {
 	ctx = run.WithNamespace(ctx, runCfg.Namespace)
 
 	// only allow a single build container at a time
-	ctr, err := container.Get(ctx, run, ws)
+	ctr, err := container.GetContainer(ctx, run, ws)
 	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 		return err
 	}

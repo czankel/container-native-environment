@@ -82,7 +82,7 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 	con.Resize(winSz)
 
 	if execLayerName == "" {
-		ctr, err := container.Get(ctx, run, ws)
+		ctr, err := container.GetContainer(ctx, run, ws)
 		if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 			return 0, err
 		}
