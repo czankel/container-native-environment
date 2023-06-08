@@ -115,7 +115,7 @@ func NewContainer(ctx context.Context, run runtime.Runtime, ws *project.Workspac
 // find an existing top-most snapshot up to but excluding nextLayerIdx
 // and return it with the layer index.
 // Layer index 0 and snaphost nil means that there is no snapshot that matches
-func findRootFs(ctx context.Context, runCtr runtime.Container,
+func findRootFS(ctx context.Context, runCtr runtime.Container,
 	ws *project.Workspace, nextLayerIdx int) (int, runtime.Snapshot, error) {
 
 	// identify the layer with the topmost existing snapshot
@@ -157,7 +157,7 @@ func Build(ctx context.Context, runCtr runtime.Container, ws *project.Workspace,
 		nextLayerIdx = len(ws.Environment.Layers)
 	}
 
-	bldLayerIdx, rootFsSnap, err := findRootFs(ctx, runCtr, ws, nextLayerIdx)
+	bldLayerIdx, rootFSSnap, err := findRootFS(ctx, runCtr, ws, nextLayerIdx)
 	if err != nil {
 		return err
 	}
@@ -188,7 +188,7 @@ func Build(ctx context.Context, runCtr runtime.Container, ws *project.Workspace,
 		progress <- stat
 	}
 
-	err = runCtr.SetRootFs(ctx, rootFsSnap)
+	err = runCtr.SetRootFS(ctx, rootFSSnap)
 	if err != nil {
 		return err
 	}

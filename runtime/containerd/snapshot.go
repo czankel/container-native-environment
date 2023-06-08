@@ -272,16 +272,16 @@ func createActiveSnapshot(ctx context.Context, ctrdRun *containerdRuntime,
 	img *image, domain, id [16]byte, snap runtime.Snapshot) error {
 
 	activeSnapName := activeSnapshotName(domain, id)
-	var rootFsSnapName string
+	var rootFSSnapName string
 	if snap != nil {
-		rootFsSnapName = snap.Name()
+		rootFSSnapName = snap.Name()
 	} else {
 		diffIDs, err := img.ctrdImage.RootFS(ctx)
 		if err != nil {
 			return runtime.Errorf("failed to get rootfs: %v", err)
 		}
-		rootFsSnapName = identity.ChainID(diffIDs).String()
-		_, err = getSnapshot(ctx, ctrdRun, rootFsSnapName)
+		rootFSSnapName = identity.ChainID(diffIDs).String()
+		_, err = getSnapshot(ctx, ctrdRun, rootFSSnapName)
 
 		// unpack 'image' if root snapshot was removed
 		if err != nil && errors.Is(err, errdefs.ErrNotFound) {
@@ -295,12 +295,12 @@ func createActiveSnapshot(ctx context.Context, ctrdRun *containerdRuntime,
 	}
 
 	// delete all 'old' snapshots down to the new rootfs or the image
-	if rootFsSnapName == activeSnapName {
+	if rootFSSnapName == activeSnapName {
 		return errdefs.InternalError("Cannot set rootfs to active layer")
 	}
 
 	snapName := activeSnapName
-	for snapName != rootFsSnapName {
+	for snapName != rootFSSnapName {
 		snap, err := getSnapshot(ctx, ctrdRun, snapName)
 		if err != nil && errors.Is(err, errdefs.ErrNotFound) {
 			break
@@ -321,8 +321,8 @@ func createActiveSnapshot(ctx context.Context, ctrdRun *containerdRuntime,
 		snapName = snap.Parent()
 	}
 
-	// create active snapshot based on the new rootFs
-	_, snap, err := createSnapshot(ctx, ctrdRun, activeSnapName, rootFsSnapName, true /* mutable */)
+	// create active snapshot based on the new rootfs
+	_, snap, err := createSnapshot(ctx, ctrdRun, activeSnapName, rootFSSnapName, true /* mutable */)
 	if err != nil {
 		return err
 	}

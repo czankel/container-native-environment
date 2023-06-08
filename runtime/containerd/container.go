@@ -363,7 +363,7 @@ func (ctr *container) Snapshots(ctx context.Context) ([]runtime.Snapshot, error)
 	return getSnapshots(ctx, ctr.ctrdRuntime)
 }
 
-func (ctr *container) SetRootFs(ctx context.Context, snap runtime.Snapshot) error {
+func (ctr *container) SetRootFS(ctx context.Context, snap runtime.Snapshot) error {
 	return createActiveSnapshot(ctx, ctr.ctrdRuntime, ctr.image, ctr.domain, ctr.id, snap)
 }
 

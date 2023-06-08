@@ -12,7 +12,7 @@ import (
 	"time"
 
 	digest "github.com/opencontainers/go-digest"
-	"github.com/opencontainers/image-spec/specs-go/v1"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/errdefs"
@@ -147,10 +147,10 @@ type Container interface {
 	// Snapshots returns all container snapshots.
 	Snapshots(ctx context.Context) ([]Snapshot, error)
 
-	// SetRootFs sets the rootfs to the provide snapshot.
+	// SetRootFS sets the rootfs to the provide snapshot.
 	//
 	// The root filesystem can only be set when the container has not been created.
-	SetRootFs(ctx context.Context, snapshot Snapshot) error
+	SetRootFS(ctx context.Context, snapshot Snapshot) error
 
 	// Create creates the container.
 	Create(ctx context.Context) error
