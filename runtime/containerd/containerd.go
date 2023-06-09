@@ -1,3 +1,5 @@
+//go:build linux
+
 // Package containerd implements the runtime interface for the ContainerD Dameon containerd.io
 package containerd
 
