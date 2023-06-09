@@ -5,6 +5,7 @@ package support
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -30,6 +31,10 @@ func SetupWorkspace(ctx context.Context, ws *project.Workspace, img runtime.Imag
 	switch info.ID {
 	case "ubuntu":
 		err = UbuntuCreateOSLayer(ws, -1)
+	case "debian":
+		err = DebianCreateOSLayer(ws, -1)
+	default:
+		fmt.Printf("Uknown OS: %v\n", info.ID) // FIXME
 	}
 	if err != nil {
 		return err

@@ -31,6 +31,7 @@ const (
 	LayerTypeCustom = ""
 	LayerTypeImage  = "image"
 	LayerTypeUbuntu = "ubuntu"
+	LayerTypeDebian = "debian"
 	LayerTypeApt    = "apt"
 	LayerTypeDnf    = "dnf"
 	LayerTypePip    = "pip"
@@ -42,6 +43,7 @@ const (
 var SystemLayerTypes = [...]string{
 	LayerTypeImage,
 	LayerTypeUbuntu,
+	LayerTypeDebian,
 	LayerTypeApt,
 	LayerTypeDnf,
 	LayerTypePip,
