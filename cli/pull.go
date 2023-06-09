@@ -12,21 +12,16 @@ import (
 func pullImage(ctx context.Context, run runtime.Runtime,
 	imageName string) (runtime.Image, error) {
 
-	var wg sync.WaitGroup
-
-	wg.Add(1)
-
 	progress := make(chan []runtime.ProgressStatus)
-
+	var wg sync.WaitGroup
+	defer wg.Wait()
 	go func() {
 		defer wg.Done()
+		wg.Add(1)
 		showProgress(progress)
 	}()
 
-	img, err := run.PullImage(ctx, imageName, progress)
-	wg.Wait()
-
-	return img, err
+	return run.PullImage(ctx, imageName, progress)
 }
 
 var pullCmd = &cobra.Command{

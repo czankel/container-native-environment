@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"os"
+	"sync"
 
 	"github.com/spf13/cobra"
 
@@ -57,12 +58,26 @@ func removeAptRunE(cmd *cobra.Command, args []string) error {
 		return errdefs.InvalidArgument("Workspace has no apt layer")
 	}
 
-	ctr, err := getContainer(ctx, run, ws)
+	progress := make(chan []runtime.ProgressStatus)
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	go func() {
+		defer wg.Done()
+		wg.Add(1)
+		showProgress(progress)
+	}()
+
+	ctr, err := getContainer(ctx, run, ws, progress)
 	if err != nil {
 		return err
 	}
 
-	err = buildLayers(ctx, run, ctr, ws, aptLayerIdx+1)
+	img, err := ctr.Image(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = buildLayers(ctx, run, ctr, img, ws, aptLayerIdx+1)
 	if err != nil {
 		return err
 	}

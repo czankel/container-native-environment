@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/opencontainers/image-spec/identity"
 
 	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/errdefs"
@@ -91,19 +92,15 @@ func NewContainer(ctx context.Context, run runtime.Runtime, ws *project.Workspac
 
 	cid := ws.ID()
 	gen := ws.BaseHash()
-	runCtr, err := run.NewContainer(ctx, dom, cid, gen, user.UID, img)
+	runCtr, err := run.NewContainer(ctx, dom, cid, gen, user.UID)
 	if err != nil {
 		return nil, err
 	}
 
-	if err != nil {
-		return nil, err
-	}
-
-	err = runCtr.Create(ctx)
+	err = runCtr.Create(ctx, img)
 	if err != nil && errors.Is(err, errdefs.ErrAlreadyExists) {
 		runCtr.Delete(ctx)
-		err = runCtr.Create(ctx)
+		err = runCtr.Create(ctx, img)
 	}
 	if err != nil {
 		return nil, err
@@ -112,62 +109,71 @@ func NewContainer(ctx context.Context, run runtime.Runtime, ws *project.Workspac
 	return runCtr, err
 }
 
-// find an existing top-most snapshot up to but excluding nextLayerIdx
-// and return it with the layer index.
-// Layer index 0 and snaphost nil means that there is no snapshot that matches
+// find RootFS looks up the top-most snapshot up to but excluding nextLayerIdx
+// and returns the digest and layer index. ErrNotFound is returned if no snapshot was found.
 func findRootFS(ctx context.Context, runCtr runtime.Container,
-	ws *project.Workspace, nextLayerIdx int) (int, runtime.Snapshot, error) {
+	ws *project.Workspace, nextLayerIdx int) (int, string, error) {
 
 	// identify the layer with the topmost existing snapshot
-	bldLayerIdx := 0
-	var snap runtime.Snapshot
-
+	layerIdx := 0
 	snaps, err := runCtr.Snapshots(ctx)
 	if err != nil {
-		return -1, nil, err
+		return -1, "", err
 	}
 
+	var snapName string
 	for i := 0; i < nextLayerIdx; i++ {
 		if l := ws.Environment.Layers[i]; l.Digest != "" {
 			for _, s := range snaps {
 				if l.Digest == s.Name() {
-					bldLayerIdx = i + 1
-					snap = s
+					layerIdx = i + 1
+					snapName = l.Digest
 					break
 				}
 			}
 		}
 	}
+	if layerIdx == 0 {
+		return 0, "", errdefs.NotFound("snapshot", snapName)
+	}
 
-	return bldLayerIdx, snap, err
+	return layerIdx, snapName, nil
 }
 
 // Build builds the container.
 //
-// If a nextLayerIdx is provided, the build stops at the specified layer. Use 0 to exclude all
-// layers and -1 or len(layers) to build all layers.
 // A container may already be partially built. In that case, Build() will continue the build
 // process.
+//
+// layerCount determines the number of layers built. Use 0 to only create the image and
+// -1 or len(layers) to build all layers.
 // The progress argument is optional for outputting status updates during the build process.
-func Build(ctx context.Context, runCtr runtime.Container, ws *project.Workspace, nextLayerIdx int,
+func Build(ctx context.Context, run runtime.Runtime, runCtr runtime.Container,
+	img runtime.Image, ws *project.Workspace, layerCount int,
 	user *config.User, params *config.Parameters,
 	progress chan []runtime.ProgressStatus, stream runtime.Stream) error {
 
-	if nextLayerIdx == -1 {
-		nextLayerIdx = len(ws.Environment.Layers)
+	defer close(progress)
+
+	if layerCount == -1 {
+		layerCount = len(ws.Environment.Layers)
 	}
 
-	bldLayerIdx, rootFSSnap, err := findRootFS(ctx, runCtr, ws, nextLayerIdx)
-	if err != nil {
+	layerIdx, name, err := findRootFS(ctx, runCtr, ws, layerCount)
+	if err != nil && errors.Is(err, errdefs.ErrNotFound) {
+		diffIDs, err := img.RootFS(ctx)
+		if err != nil {
+			return runtime.Errorf("failed to get rootfs: %v", err)
+		}
+		name = identity.ChainID(diffIDs).String()
+		_, err = run.GetSnapshot(ctx, name)
+		if err != nil {
+			return err
+		}
+	} else if err != nil {
 		return err
 	}
 
-	// prep the progress status updates
-	defer func() {
-		if progress != nil {
-			close(progress)
-		}
-	}()
 	layerStatus := make([]runtime.ProgressStatus, len(ws.Environment.Layers))
 	if progress != nil {
 		for i, l := range ws.Environment.Layers {
@@ -175,7 +181,7 @@ func Build(ctx context.Context, runCtr runtime.Container, ws *project.Workspace,
 			layerStatus[i].StartedAt = time.Now()
 			layerStatus[i].UpdatedAt = time.Now()
 
-			if i < bldLayerIdx {
+			if i < layerIdx {
 				layerStatus[i].Status = runtime.StatusCached
 				layerStatus[i].Offset = layerStatus[i].Total
 			} else {
@@ -188,12 +194,7 @@ func Build(ctx context.Context, runCtr runtime.Container, ws *project.Workspace,
 		progress <- stat
 	}
 
-	rootSnap := ""
-	if rootFSSnap != nil {
-		rootSnap = rootFSSnap.Name()
-	}
-
-	err = runCtr.SetRootFS(ctx, rootSnap)
+	err = runCtr.SetRootFS(ctx, name)
 	if err != nil {
 		return err
 	}
@@ -209,9 +210,9 @@ func Build(ctx context.Context, runCtr runtime.Container, ws *project.Workspace,
 	}
 
 	// build all remaining layers
-	for ; bldLayerIdx < nextLayerIdx; bldLayerIdx++ {
+	for ; layerIdx < layerCount; layerIdx++ {
 
-		layer := &ws.Environment.Layers[bldLayerIdx]
+		layer := &ws.Environment.Layers[layerIdx]
 		for _, command := range layer.Commands {
 
 			args, err := expandLine(command.Args, vars)
@@ -229,12 +230,11 @@ func Build(ctx context.Context, runCtr runtime.Container, ws *project.Workspace,
 				if len(lineOut) > MaxProgressOutputLength {
 					lineOut = lineOut[:MaxProgressOutputLength-4] + " ..."
 				}
-				layerStatus[bldLayerIdx].Status = runtime.StatusRunning
-				layerStatus[bldLayerIdx].Details = lineOut
-				stat := []runtime.ProgressStatus{layerStatus[bldLayerIdx]}
+				layerStatus[layerIdx].Status = runtime.StatusRunning
+				layerStatus[layerIdx].Details = lineOut
+				stat := []runtime.ProgressStatus{layerStatus[layerIdx]}
 				progress <- stat
 			}
-
 			code, err := BuildExec(ctx, runCtr, user, stream, args, command.Envs)
 			if code != 0 {
 				err = errdefs.CommandFailed(args)
@@ -258,8 +258,8 @@ func Build(ctx context.Context, runCtr runtime.Container, ws *project.Workspace,
 			layer.Digest = snap.Name()
 		}
 		if progress != nil {
-			layerStatus[bldLayerIdx].Status = runtime.StatusComplete
-			stat := []runtime.ProgressStatus{layerStatus[bldLayerIdx]}
+			layerStatus[layerIdx].Status = runtime.StatusComplete
+			stat := []runtime.ProgressStatus{layerStatus[layerIdx]}
 			progress <- stat
 		}
 	}

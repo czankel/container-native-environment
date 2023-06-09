@@ -14,9 +14,11 @@ import (
 	"github.com/containerd/containerd/content"
 	ctrderr "github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/labels"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/reference"
 	"github.com/containerd/containerd/remotes"
+	"github.com/containerd/containerd/snapshots"
 
 	digest "github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/identity"
@@ -30,6 +32,7 @@ const updateIntervalMsecs = 100
 
 // updateImageProgress sends the current image download status in a regular 100ms interval
 // to the provided progress channel.
+// Note that this is the only function closing the progress channel
 func updateImageProgress(cctx context.Context, ctx context.Context,
 	ctrdRun *containerdRuntime, mutex *sync.Mutex, descs *[]ocispec.Descriptor,
 	progress chan<- []runtime.ProgressStatus) {
@@ -40,7 +43,9 @@ func updateImageProgress(cctx context.Context, ctx context.Context,
 	)
 
 	defer ticker.Stop()
+	defer close(progress)
 	cs := ctrdRun.client.ContentStore()
+	sn := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
 
 	for loop := true; loop; {
 		var statuses []runtime.ProgressStatus
@@ -48,10 +53,10 @@ func updateImageProgress(cctx context.Context, ctx context.Context,
 
 		select {
 		case <-ticker.C:
-			statuses, err = updateImageStatus(cctx, start, cs, mutex, descs)
+			statuses, err = updateImageStatus(cctx, start, cs, sn, mutex, descs)
 
 		case <-cctx.Done():
-			statuses, err = updateImageStatus(ctx, start, cs, mutex, descs)
+			statuses, err = updateImageStatus(ctx, start, cs, sn, mutex, descs)
 			loop = false
 		}
 
@@ -64,7 +69,8 @@ func updateImageProgress(cctx context.Context, ctx context.Context,
 }
 
 // updateImageStatus sends the status of the current image download to the progress channel.
-func updateImageStatus(ctx context.Context, start time.Time, cs content.Store,
+func updateImageStatus(ctx context.Context, start time.Time,
+	cs content.Store, sn snapshots.Snapshotter,
 	mutex *sync.Mutex, descs *[]ocispec.Descriptor) ([]runtime.ProgressStatus, error) {
 
 	statuses := []runtime.ProgressStatus{}
@@ -91,40 +97,37 @@ func updateImageStatus(ctx context.Context, start time.Time, cs content.Store,
 	mutex.Lock()
 	defer mutex.Unlock()
 
+	var chain []digest.Digest
 	for _, desc := range *descs {
 
 		ref := remotes.MakeRefKey(ctx, desc)
-		if !strings.HasPrefix(ref, "layer-") {
-			continue
-		}
 		if _, isActive := actStats[ref]; isActive {
 			continue
 		}
-
-		info, err := cs.Info(ctx, desc.Digest)
-		if err != nil && !ctrderr.IsNotFound(err) {
-			continue
-		}
-
 		stat := runtime.ProgressStatus{
 			Reference: ref,
-			Status:    runtime.StatusUnknown,
+			Status:    runtime.StatusPending,
 		}
+
+		info, err := cs.Info(ctx, desc.Digest)
 		if err != nil && ctrderr.IsNotFound(err) {
 			stat.Status = runtime.StatusPending
+
 		} else if err == nil {
-			if info.CreatedAt.After(start) {
-				if _, done := info.Labels["containerd.io/uncompressed"]; done {
+
+			if snapID, f := info.Labels[labels.LabelUncompressed]; f {
+				chain = append(chain, digest.Digest(snapID))
+				chainID := identity.ChainID(chain)
+				if _, err := sn.Stat(ctx, chainID.String()); err == nil {
 					stat.Status = runtime.StatusComplete
-				} else {
-					stat.Status = runtime.StatusRunning
 				}
 			} else {
-				stat.Status = runtime.StatusCached
+				stat.Status = runtime.StatusUnpacking
 			}
-			stat.Offset = info.Size
-			stat.Total = info.Size
 			stat.UpdatedAt = info.CreatedAt
+		} else {
+			// ignore errors
+			continue
 		}
 		statuses = append(statuses, stat)
 	}
@@ -175,9 +178,6 @@ func pullImage(ctx context.Context, ctrdRun *containerdRuntime, name string,
 	var mutex sync.Mutex
 	descs := []ocispec.Descriptor{}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-
 	h := images.HandlerFunc(func(ctx context.Context,
 		desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 
@@ -199,10 +199,11 @@ func pullImage(ctx context.Context, ctrdRun *containerdRuntime, name string,
 	})
 
 	pctx, stopProgress := context.WithCancel(ctx)
+	var wg sync.WaitGroup
+	wg.Add(1)
 	if progress != nil {
 		go func() {
 			defer wg.Done()
-			defer close(progress)
 			updateImageProgress(pctx, ctx, ctrdRun, &mutex, &descs, progress)
 		}()
 	}
@@ -210,8 +211,7 @@ func pullImage(ctx context.Context, ctrdRun *containerdRuntime, name string,
 	// ignore signals while pulling - see comment above
 	signal.Ignore()
 
-	ctrdImg, err := ctrdRun.client.Pull(ctx, name,
-		containerd.WithPullUnpack, containerd.WithImageHandler(h))
+	ctrdImg, err := ctrdRun.client.Pull(ctx, name, containerd.WithImageHandler(h))
 
 	signal.Reset()
 
@@ -314,8 +314,8 @@ func (img *image) Unpack(ctx context.Context, progress chan<- []runtime.Progress
 			var mutex sync.Mutex
 			updateImageProgress(cctx, ctx, img.ctrdRuntime, &mutex, &descs, progress)
 		}()
-		defer stopProgress()
 		defer wg.Wait()
+		defer stopProgress()
 	}
 
 	return img.ctrdImage.Unpack(ctx, containerd.DefaultSnapshotter)

@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"os"
+	"sync"
 
+	"github.com/opencontainers/image-spec/identity"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
@@ -75,6 +77,28 @@ func initWorkspace(prj *project.Project, wsName, insert, imgName string) error {
 		ctx = run.WithNamespace(ctx, runCfg.Namespace)
 
 		img, err := pullImage(ctx, run, imgName)
+		if err != nil {
+			return err
+		}
+
+		diffIDs, err := img.RootFS(ctx)
+		if err != nil {
+			return err
+		}
+
+		rootName := identity.ChainID(diffIDs).String()
+		_, err = run.GetSnapshot(ctx, rootName)
+		if err != nil && errors.Is(err, errdefs.ErrNotFound) {
+			progress := make(chan []runtime.ProgressStatus)
+			var wg sync.WaitGroup
+			defer wg.Wait()
+			go func() {
+				defer wg.Done()
+				wg.Add(1)
+				showProgress(progress)
+			}()
+			err = img.Unpack(ctx, progress)
+		}
 		if err != nil {
 			return err
 		}

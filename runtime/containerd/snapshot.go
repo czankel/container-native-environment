@@ -11,7 +11,6 @@ import (
 	ctrderr "github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/mount"
 	"github.com/containerd/containerd/snapshots"
-	"github.com/opencontainers/image-spec/identity"
 
 	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/runtime"
@@ -269,27 +268,9 @@ func (mounter) Unmount(target string) error {
 }
 
 func createActiveSnapshot(ctx context.Context, ctrdRun *containerdRuntime,
-	img *image, domain, id [16]byte, snapName string) error {
+	domain, id [16]byte, snapName string) error {
 
 	activeSnapName := activeSnapshotName(domain, id)
-	if snapName == "" {
-		diffIDs, err := img.ctrdImage.RootFS(ctx)
-		if err != nil {
-			return runtime.Errorf("failed to get rootfs: %v", err)
-		}
-		snapName = identity.ChainID(diffIDs).String()
-		_, err = getSnapshot(ctx, ctrdRun, snapName)
-
-		// unpack 'image' if root snapshot was removed
-		if err != nil && errors.Is(err, errdefs.ErrNotFound) {
-			img.Unpack(ctx, nil) // TODO: should be moved outside this structure
-			digest := identity.ChainID(diffIDs).String()
-			_, _, err = createSnapshot(ctx, img.ctrdRuntime, digest, digest, false)
-		}
-		if err != nil {
-			return err
-		}
-	}
 
 	// delete all 'old' snapshots down to the new rootfs or the image
 	if snapName == activeSnapName {

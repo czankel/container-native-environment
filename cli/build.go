@@ -7,6 +7,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/opencontainers/image-spec/identity"
 	"github.com/spf13/cobra"
 
 	"github.com/containerd/console"
@@ -24,20 +25,14 @@ const outputLineCount = 100
 // creates the container and outputs progress status.
 // Note that in an error case, it will keep any residual container and snapshots.
 func getContainer(ctx context.Context,
-	run runtime.Runtime, ws *project.Workspace) (runtime.Container, error) {
-
-	// check if container already exists
-	ctr, err := container.GetContainer(ctx, run, ws)
-	if err == nil {
-		return ctr, nil
-	}
+	run runtime.Runtime, ws *project.Workspace,
+	progress chan<- []runtime.ProgressStatus) (runtime.Container, error) {
 
 	// check and pull the image, if required, for building the container
 	if ws.Environment.Origin == "" {
 		return nil, errdefs.InvalidArgument("Workspace has no image defined")
 	}
 
-	// check and pull the image, if required, for building the container
 	img, err := run.GetImage(ctx, ws.Environment.Origin)
 	if err != nil && errors.Is(err, errdefs.ErrNotFound) {
 		img, err = pullImage(ctx, run, ws.Environment.Origin)
@@ -46,52 +41,66 @@ func getContainer(ctx context.Context,
 		return nil, err
 	}
 
+	diffIDs, err := img.RootFS(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rootName := identity.ChainID(diffIDs).String()
+	_, err = run.GetSnapshot(ctx, rootName)
+	if err != nil && errors.Is(err, errdefs.ErrNotFound) {
+		err = img.Unpack(ctx, progress)
+	} else if progress != nil {
+		close(progress)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// check and return the container if it already exists
+	ctr, err := container.GetContainer(ctx, run, ws)
+	if err == nil {
+		return ctr, nil
+	}
+
 	return container.NewContainer(ctx, run, ws, &user, img)
 }
 
 // buildLayers builds the layers of a container and outputs progress status.
+//
 // The layerCount argument defines the number of layers that should have been built.
 // with 0 meaning no layer should be built.  Use -1 or len(layers) to build all layers.
 // This function is idempotent and can be called again to continue the build, for example,
 // for a higher layer.
 // Note that in an error case, it will keep any residual container and snapshots.
 func buildLayers(ctx context.Context, run runtime.Runtime, ctr runtime.Container,
-	ws *project.Workspace, layerCount int) error {
+	img runtime.Image, ws *project.Workspace, layerCount int) error {
 
 	con := console.Current()
 	defer con.Reset()
 
 	// build the container and provide progress output
-	var wg sync.WaitGroup
-
-	wg.Add(1)
-
 	progress := make(chan []runtime.ProgressStatus)
+	var wg sync.WaitGroup
+	defer wg.Wait()
 	go func() {
 		defer wg.Done()
+		wg.Add(1)
 		showProgress(progress)
 	}()
 
 	rb := NewRingBuffer(outputLineCount, outputLineLength)
 	stream := rb.StreamWriter()
 
-	err := container.Build(ctx, ctr, ws, layerCount, &user, &params, progress, stream)
+	err := container.Build(ctx, run, ctr, img, ws, layerCount, &user, &params, progress, stream)
 	if err != nil && errors.Is(err, errdefs.ErrCommandFailed) {
 		line := make([]byte, 100)
 		fmt.Printf("Output:\n")
 		for _, err := rb.Read(line); err != io.EOF; _, err = rb.Read(line) {
 			fmt.Printf(" > %v\n", string(line))
 		}
-		wg.Wait()
 		return err
 	}
-	if err != nil {
-		wg.Wait()
-		return err
-	}
-	wg.Wait()
-
-	return nil
+	return err
 }
 
 // buildContainer builds the full container for the provided workspace and
@@ -99,13 +108,27 @@ func buildLayers(ctx context.Context, run runtime.Runtime, ctr runtime.Container
 func buildContainer(ctx context.Context, run runtime.Runtime, ws *project.Workspace,
 	layerCount int) (runtime.Container, error) {
 
+	progress := make(chan []runtime.ProgressStatus)
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	go func() {
+		defer wg.Done()
+		wg.Add(1)
+		showProgress(progress)
+	}()
+
 	params.Upgrade = buildWorkspaceUpgrade
-	ctr, err := getContainer(ctx, run, ws)
+	ctr, err := getContainer(ctx, run, ws, progress)
 	if err != nil {
 		return nil, err
 	}
 
-	err = buildLayers(ctx, run, ctr, ws, layerCount)
+	img, err := ctr.Image(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	err = buildLayers(ctx, run, ctr, img, ws, layerCount)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +204,6 @@ func buildWorkspaceRunE(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	}
-
 	_, err = buildContainer(ctx, run, ws, -1)
 	if err != nil {
 		return err

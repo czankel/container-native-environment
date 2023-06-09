@@ -66,7 +66,7 @@ type Runtime interface {
 
 	// NewContainer defines a new Container without creating it.
 	NewContainer(ctx context.Context,
-		domain, id, generation [16]byte, uid uint32, image Image) (Container, error)
+		domain, id, generation [16]byte, uid uint32) (Container, error)
 
 	// DeleteContainer deletes the specified container. It returns ErrNotFound if the container
 	// doesn't exist.
@@ -162,7 +162,7 @@ type Container interface {
 	SetRootFS(ctx context.Context, snapName string) error
 
 	// Create creates the container.
-	Create(ctx context.Context) error
+	Create(ctx context.Context, img Image) error
 
 	// Delete deletes the container.
 	Delete(ctx context.Context) error

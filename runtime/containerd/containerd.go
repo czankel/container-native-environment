@@ -128,8 +128,7 @@ func (ctrdRun *containerdRuntime) GetContainer(ctx context.Context,
 }
 
 func (ctrdRun *containerdRuntime) NewContainer(ctx context.Context,
-	domain, id, generation [16]byte, uid uint32,
-	img runtime.Image) (runtime.Container, error) {
+	domain, id, generation [16]byte, uid uint32) (runtime.Container, error) {
 
 	// start with a base container
 	spec, err := runtime.DefaultSpec(ctx)
@@ -137,7 +136,7 @@ func (ctrdRun *containerdRuntime) NewContainer(ctx context.Context,
 		return nil, err
 	}
 
-	return newContainer(ctrdRun, nil, domain, id, generation, uid, img.(*image), &spec), nil
+	return newContainer(ctrdRun, nil, domain, id, generation, uid, &spec), nil
 }
 
 func (ctrdRun *containerdRuntime) DeleteContainer(ctx context.Context,

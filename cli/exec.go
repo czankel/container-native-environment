@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/spf13/cobra"
 
@@ -109,13 +110,27 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 			return 0, errdefs.InvalidArgument("No such layer: %s", execLayerName)
 		}
 
-		ctr, err := getContainer(ctx, run, ws)
+		progress := make(chan []runtime.ProgressStatus)
+		var wg sync.WaitGroup
+		defer wg.Wait()
+		go func() {
+			defer wg.Done()
+			wg.Add(1)
+			showProgress(progress)
+		}()
+
+		ctr, err := getContainer(ctx, run, ws, progress)
+		if err != nil {
+			return 0, err
+		}
+
+		img, err := ctr.Image(ctx)
 		if err != nil {
 			return 0, err
 		}
 
 		// build all layers including the destinationlayer (i.e. + 1)
-		err = buildLayers(ctx, run, ctr, ws, layerIdx+1)
+		err = buildLayers(ctx, run, ctr, img, ws, layerIdx+1)
 		if err != nil {
 			return 0, err
 		}

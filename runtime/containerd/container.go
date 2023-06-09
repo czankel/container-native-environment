@@ -33,7 +33,6 @@ type container struct {
 	generation    [16]byte
 	uid           uint32
 	spec          runspecs.Spec
-	image         *image
 	ctrdRuntime   *containerdRuntime
 	ctrdContainer containerd.Container
 }
@@ -160,27 +159,12 @@ func getContainers(ctx context.Context,
 			continue
 		}
 
-		ctrdImg, err := c.Image(ctx)
-		if err != nil {
-			return nil, runtime.Errorf("failed to get image: %v", err)
-		}
-
 		spec, err := c.Spec(ctx)
 		if err != nil {
 			return nil, runtime.Errorf("failed to get image spec: %v", err)
 		}
 
-		imgConf, _ := ctrdImg.Config(ctx)
-		size, _ := ctrdImg.Size(ctx)
-
-		img := &image{
-			ctrdRuntime: ctrdRun,
-			ctrdImage:   ctrdImg,
-			digest:      imgConf.Digest,
-			size:        size,
-		}
-
-		ctr := newContainer(ctrdRun, c, dom, id, gen, uid, img, spec)
+		ctr := newContainer(ctrdRun, c, dom, id, gen, uid, spec)
 		if err != nil {
 			return nil, err
 		}
@@ -192,14 +176,13 @@ func getContainers(ctx context.Context,
 
 // newContainer defines a new container without creating it.
 func newContainer(ctrdRun *containerdRuntime, ctrdCtr containerd.Container,
-	domain, id, generation [16]byte, uid uint32, img *image, spec *runspecs.Spec) *container {
+	domain, id, generation [16]byte, uid uint32, spec *runspecs.Spec) *container {
 
 	return &container{
 		domain:        domain,
 		id:            id,
 		generation:    generation,
 		uid:           uid,
-		image:         img,
 		spec:          *spec,
 		ctrdRuntime:   ctrdRun,
 		ctrdContainer: ctrdCtr,
@@ -246,27 +229,12 @@ func getContainer(ctx context.Context,
 		return nil, err
 	}
 
-	ctrdImg, err := ctrdCtr.Image(ctx)
-	if err != nil {
-		return nil, runtime.Errorf("failed to get image: %v", err)
-	}
-
 	spec, err := ctrdCtr.Spec(ctx)
 	if err != nil {
 		return nil, runtime.Errorf("failed to get image spec: %v", err)
 	}
 
-	imgConf, _ := ctrdImg.Config(ctx)
-	size, _ := ctrdImg.Size(ctx)
-
-	img := &image{
-		ctrdRuntime: ctrdRun,
-		ctrdImage:   ctrdImg,
-		digest:      imgConf.Digest,
-		size:        size,
-	}
-
-	ctr := newContainer(ctrdRun, ctrdCtr, domain, id, generation, uid, img, spec)
+	ctr := newContainer(ctrdRun, ctrdCtr, domain, id, generation, uid, spec)
 
 	return ctr, nil
 }
@@ -418,11 +386,11 @@ func (ctr *container) Snapshots(ctx context.Context) ([]runtime.Snapshot, error)
 }
 
 func (ctr *container) SetRootFS(ctx context.Context, snapName string) error {
-	return createActiveSnapshot(ctx, ctr.ctrdRuntime, ctr.image, ctr.domain, ctr.id, snapName)
+	return createActiveSnapshot(ctx, ctr.ctrdRuntime, ctr.domain, ctr.id, snapName)
 }
 
 // TODO: CgroupsPath is set to only domain + ID, and not generation as before, is it needed?
-func (ctr *container) Create(ctx context.Context) error {
+func (ctr *container) Create(ctx context.Context, img runtime.Image) error {
 
 	ctrdRun := ctr.ctrdRuntime
 	ctrdID := composeCtrdID(ctr.domain, ctr.id)
@@ -455,7 +423,7 @@ func (ctr *container) Create(ctx context.Context) error {
 		spec.Process = &runspecs.Process{}
 	}
 
-	config, err := ctr.image.Config(ctx)
+	config, err := img.Config(ctx)
 	if err != nil {
 		return runtime.Errorf("failed to get image OCI spec: %v", err)
 	}
@@ -478,7 +446,7 @@ func (ctr *container) Create(ctx context.Context) error {
 	ctrdCtr, err = ctrdRun.client.NewContainer(
 		ctx,
 		ctrdID,
-		containerd.WithImage(ctr.image.ctrdImage),
+		containerd.WithImage(img.(*image).ctrdImage),
 		containerd.WithSpec(&spec),
 		containerd.WithRuntime(ctrdRun.client.Runtime(), nil),
 		containerd.WithContainerLabels(labels))
