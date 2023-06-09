@@ -80,9 +80,10 @@ func GetContainer(ctx context.Context,
 	return runCtr, nil
 }
 
-// NewContainer defines a new Container with a default generation value for the Workspace without
-// the Layer configuration. The generation value will be updated through Commit().
-func NewContainer(ctx context.Context, run runtime.Runtime, ws *project.Workspace,
+// CreateContainer creates a new container.
+//
+// This function expects that the image has been unpacked and the snapshot for the image to exist.
+func CreateContainer(ctx context.Context, run runtime.Runtime, ws *project.Workspace,
 	user *config.User, img runtime.Image) (runtime.Container, error) {
 
 	dom, err := uuid.Parse(ws.ProjectUUID)
@@ -97,16 +98,7 @@ func NewContainer(ctx context.Context, run runtime.Runtime, ws *project.Workspac
 		return nil, err
 	}
 
-	err = runCtr.Create(ctx, img)
-	if err != nil && errors.Is(err, errdefs.ErrAlreadyExists) {
-		runCtr.Delete(ctx)
-		err = runCtr.Create(ctx, img)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	return runCtr, err
+	return runCtr, runCtr.Create(ctx, img)
 }
 
 // find RootFS looks up the top-most snapshot up to but excluding nextLayerIdx
