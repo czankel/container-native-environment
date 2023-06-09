@@ -4,8 +4,6 @@ import (
 	"github.com/czankel/cne/project"
 )
 
-const OSLayerCmdUser = "ubuntu-user"
-
 // Note that the commands are never executed by CNE for security reasons
 func UbuntuCreateOSLayer(ws *project.Workspace, atIndex int) error {
 
