@@ -17,7 +17,7 @@ var conf *config.Config
 var user config.User
 var params config.Parameters
 
-var basenamee string
+var basename string
 var rootCneVersion bool
 
 var projectPath string
@@ -111,7 +111,7 @@ func rootRun(cmd *cobra.Command, args []string) {
 }
 
 func rootVersionRun(cmd *cobra.Command, args []string) {
-	fmt.Printf("%s version %s\n", basenamee, config.CneVersion)
+	fmt.Printf("%s version %s\n", basename, config.CneVersion)
 	os.Exit(0)
 }
 
@@ -131,7 +131,7 @@ func Execute() error {
 
 	err := rootCmd.Execute()
 	if err != nil && errdefs.IsCneError(err) {
-		err = fmt.Errorf("%s: %v", basenamee, err)
+		err = fmt.Errorf("%s: %v", basename, err)
 	}
 	return err
 }
@@ -139,17 +139,17 @@ func Execute() error {
 func initConfig() {
 
 	var err error
-	basenamee = filepath.Base(os.Args[0])
+	basename = filepath.Base(os.Args[0])
 
 	conf, err = config.Load()
 	if err != nil {
-		fmt.Printf("%s: %v\n", basenamee, err)
+		fmt.Printf("%s: %v\n", basename, err)
 		os.Exit(1)
 	}
 
 	user, err = conf.User()
 	if err != nil {
-		fmt.Printf("%s: %v\n", basenamee, err)
+		fmt.Printf("%s: %v\n", basename, err)
 		os.Exit(1)
 	}
 }
