@@ -62,7 +62,7 @@ func getContainer(ctx context.Context,
 		return ctr, nil
 	}
 
-	return container.CreateContainer(ctx, run, ws, &user, img)
+	return container.CreateContainer(ctx, run, ws, &user, img, nil)
 }
 
 // buildLayers builds the layers of a container and outputs progress status.

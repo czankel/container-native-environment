@@ -15,6 +15,7 @@ import (
 	"github.com/containerd/containerd"
 	"github.com/containerd/containerd/cio"
 	"github.com/containerd/containerd/containers"
+	"github.com/containerd/containerd/contrib/nvidia"
 	ctrderr "github.com/containerd/containerd/errdefs"
 	"github.com/containerd/containerd/namespaces"
 	"github.com/containerd/containerd/oci"
@@ -284,6 +285,34 @@ func deleteCtrdContainer(ctx context.Context, ctrdRun *containerdRuntime,
 	return nil
 }
 
+func updateSpecOpts(spec *runspecs.Spec, options map[string]string) []oci.SpecOpts {
+
+	var opts []oci.SpecOpts
+	for k, v := range options {
+		switch strings.ToLower(k) {
+		case "gpus": // FIXME: what about a number of devices x??
+			if v == "all" {
+				opts = append(opts, nvidia.WithGPUs(nvidia.WithAllDevices,
+					nvidia.WithAllCapabilities))
+			}
+		case "gpu":
+			arr := strings.Split(v, ", ")
+			var idx []int
+			for i := range arr {
+				x, err := strconv.Atoi(arr[i])
+				// FIXME: return error?
+				if err == nil {
+					idx = append(idx, x)
+				}
+			}
+			opts = append(opts, nvidia.WithGPUs(nvidia.WithDevices(idx...),
+				nvidia.WithAllCapabilities))
+		}
+
+	}
+	return opts
+}
+
 // createTask creates a new task for the active snapshot
 func createTask(ctx context.Context, ctr *container) (containerd.Task, error) {
 
@@ -391,7 +420,7 @@ func (ctr *container) SetRootFS(ctx context.Context, snapName string) error {
 }
 
 // TODO: CgroupsPath is set to only domain + ID, and not generation as before, is it needed?
-func (ctr *container) Create(ctx context.Context, img runtime.Image) error {
+func (ctr *container) Create(ctx context.Context, img runtime.Image, options map[string]string) error {
 
 	ctrdRun := ctr.ctrdRuntime
 	ctrdID := composeCtrdID(ctr.domain, ctr.id)
@@ -444,11 +473,12 @@ func (ctr *container) Create(ctx context.Context, img runtime.Image) error {
 	labels[containerdGenerationLabel] = gen
 	labels[containerdUIDLabel] = strconv.FormatUint(uint64(ctr.uid), 10)
 
+	opts := updateSpecOpts(&spec, options)
 	ctrdCtr, err = ctrdRun.client.NewContainer(
 		ctx,
 		ctrdID,
 		containerd.WithImage(img.(*image).ctrdImage),
-		containerd.WithSpec(&spec),
+		containerd.WithSpec(&spec, opts...),
 		containerd.WithRuntime(ctrdRun.client.Runtime(), nil),
 		containerd.WithContainerLabels(labels))
 	if err != nil {
@@ -467,6 +497,24 @@ func (ctr *container) Delete(ctx context.Context) error {
 func (ctr *container) Purge(ctx context.Context) error {
 	return deleteCtrdContainer(ctx, ctr.ctrdRuntime,
 		ctr.ctrdContainer, ctr.domain, ctr.id, true /*purge*/)
+}
+
+// TODO: implement removing options
+func (ctr *container) Update(ctx context.Context, options map[string]string) error {
+
+	ctrdCtr := ctr.ctrdContainer
+	spec, err := ctrdCtr.Spec(ctx)
+	if err != nil {
+		return runtime.Errorf("failed to get container spec: %v", err)
+	}
+
+	opts := updateSpecOpts(spec, options)
+	err = ctrdCtr.Update(ctx, containerd.UpdateContainerOpts(containerd.WithSpec(spec, opts...)))
+	if err != nil {
+		return runtime.Errorf("failed to update container: %v", err)
+	}
+
+	return nil
 }
 
 func (ctr *container) Mount(ctx context.Context, destination string, source string) error {

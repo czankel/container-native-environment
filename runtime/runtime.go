@@ -162,7 +162,7 @@ type Container interface {
 	SetRootFS(ctx context.Context, snapName string) error
 
 	// Create creates the container.
-	Create(ctx context.Context, img Image) error
+	Create(ctx context.Context, img Image, options map[string]string) error
 
 	// Delete deletes the container.
 	Delete(ctx context.Context) error
@@ -181,6 +181,9 @@ type Container interface {
 
 	// Commit commits the container after it has been built with a new generation value.
 	Commit(ctx context.Context, generation [16]byte) error
+
+	// Update the container with additional options. Use an empty value to remove the option.
+	Update(ctx context.Context, options map[string]string) error
 
 	// Mount adds a local mount point to the container.
 	// This must be called before comitting the container, for example, to

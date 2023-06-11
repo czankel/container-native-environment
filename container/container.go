@@ -84,7 +84,7 @@ func GetContainer(ctx context.Context,
 //
 // This function expects that the image has been unpacked and the snapshot for the image to exist.
 func CreateContainer(ctx context.Context, run runtime.Runtime, ws *project.Workspace,
-	user *config.User, img runtime.Image) (runtime.Container, error) {
+	user *config.User, img runtime.Image, options map[string]string) (runtime.Container, error) {
 
 	dom, err := uuid.Parse(ws.ProjectUUID)
 	if err != nil {
@@ -98,7 +98,7 @@ func CreateContainer(ctx context.Context, run runtime.Runtime, ws *project.Works
 		return nil, err
 	}
 
-	return runCtr, runCtr.Create(ctx, img)
+	return runCtr, runCtr.Create(ctx, img, options)
 }
 
 // find RootFS looks up the top-most snapshot up to but excluding nextLayerIdx
