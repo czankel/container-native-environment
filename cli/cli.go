@@ -75,6 +75,7 @@ func loadProject() (*project.Project, error) {
 	if err != nil {
 		return nil, err
 	}
+	projectPath = prj.Path
 
 	return prj, conf.UpdateProjectConfig(filepath.Dir(prj.Path))
 }
