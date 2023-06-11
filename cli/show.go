@@ -30,7 +30,28 @@ By default, this command returns the configuration derived from all
 configuration files. The system option returns only the syste-wide
 configuration and the user option the configuration for the user.`,
 	RunE: showConfigRunE,
-	Args: cobra.RangeArgs(0, 1),
+	Args: cobra.NoArgs,
+}
+
+var showConfigContextCmd = &cobra.Command{
+	Use:   "context [name]",
+	Short: "Show context configurartion",
+	RunE:  showConfigRunE,
+	Args:  cobra.RangeArgs(0, 1),
+}
+
+var showConfigRegistryCmd = &cobra.Command{
+	Use:   "registry [name]",
+	Short: "Show registry configurartion",
+	RunE:  showConfigRunE,
+	Args:  cobra.RangeArgs(0, 1),
+}
+
+var showConfigRuntimeCmd = &cobra.Command{
+	Use:   "runtime [name]",
+	Short: "Show runtime configurartion",
+	RunE:  showConfigRunE,
+	Args:  cobra.RangeArgs(0, 1),
 }
 
 var showSystemConfig bool
@@ -63,18 +84,19 @@ func showConfigRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if len(args) == 0 {
+	entry := cmd.CalledAs()
+	if entry == "config" {
 		printValue("Configuration", "Value", "", conf)
 	} else {
-		name := args[0]
-		prefix, val, err := conf.GetAllByName(name)
-		if err != nil {
-			return err
+		if len(args) > 0 {
+			entry = entry + "/" + args[0]
 		}
-		printValue("Configuration", "Value", prefix, val)
+		_, val, err := conf.GetAllByName(entry)
+		if err == nil {
+			printValue("Configuration2", "Value", "", val)
+		}
 	}
-
-	return nil
+	return err
 }
 
 var showProjectCmd = &cobra.Command{
@@ -98,8 +120,8 @@ func showProjectRunE(cmd *cobra.Command, args []string) error {
 }
 
 var showWorkspaceCmd = &cobra.Command{
-	Use:   "workspace",
-	Short: "Show the current workspace",
+	Use:   "workspace [name]",
+	Short: "Show workspace details",
 	RunE:  showWorkspaceRunE,
 	Args:  cobra.RangeArgs(0, 1),
 }
@@ -131,7 +153,7 @@ var showImageCmd = &cobra.Command{
 	Use:   "image [name]",
 	Short: "Show image details",
 	RunE:  showImageRunE,
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.RangeArgs(0, 1),
 }
 
 type OS struct {
@@ -141,6 +163,7 @@ type OS struct {
 	ID_LIKE string
 }
 
+// TODO hide some details and expose with option
 func showImageRunE(cmd *cobra.Command, args []string) error {
 
 	runCfg, err := conf.GetRuntime()
@@ -157,7 +180,23 @@ func showImageRunE(cmd *cobra.Command, args []string) error {
 	defer run.Close()
 	ctx = run.WithNamespace(ctx, runCfg.Namespace)
 
-	imgName, err := conf.FullImageName(args[0])
+	var imgName string
+	if len(args) > 0 {
+		imgName = args[0]
+	} else {
+		prj, err := loadProject()
+		if err != nil {
+			return err
+		}
+		var ws *project.Workspace
+		ws, err = prj.CurrentWorkspace()
+		if err != nil {
+			return err
+		}
+		imgName = ws.Environment.Origin
+	}
+
+	imgName, err = conf.FullImageName(imgName)
 	if err != nil {
 		return err
 	}
@@ -211,6 +250,10 @@ func init() {
 		&showProjectConfig, "project", "", false, "Show only project configurations")
 	showConfigCmd.Flags().BoolVarP(
 		&showUserConfig, "user", "", false, "Show only user configurations")
+	showConfigCmd.AddCommand(showConfigContextCmd)
+	showConfigCmd.AddCommand(showConfigRegistryCmd)
+	showConfigCmd.AddCommand(showConfigRuntimeCmd)
+
 	showCmd.AddCommand(showProjectCmd)
 	showCmd.AddCommand(showWorkspaceCmd)
 	showCmd.AddCommand(showImageCmd)
