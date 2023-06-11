@@ -105,7 +105,7 @@ func (conf *Config) CreateRuntime(name, runtime string) (*Runtime, error) {
 
 // GetContext returns the context defined in the configuration files or from
 // the --context flag when CNE was started.
-func (conf *Config) GetContext() (*Context, error) {
+func (conf *Config) GetContext() (*Context, string, error) {
 
 	name := contextName
 	if name == "" {
@@ -113,9 +113,9 @@ func (conf *Config) GetContext() (*Context, error) {
 	}
 
 	if c, found := conf.Context[name]; found {
-		return c, nil
+		return c, name, nil
 	}
-	return nil, errdefs.NotFound("context", name)
+	return nil, name, errdefs.NotFound("context", name)
 }
 
 // GetRuntime returns the specified runtime or context-specific runtime if name is empty
@@ -125,7 +125,7 @@ func (conf *Config) GetRuntime(args ...string) (*Runtime, error) {
 	if len(args) > 0 {
 		name = args[0]
 	} else {
-		cfgCtx, err := conf.GetContext()
+		cfgCtx, _, err := conf.GetContext()
 		if err != nil {
 			return nil, err
 		}
@@ -148,7 +148,7 @@ func (conf *Config) GetRegistry(args ...string) (*Registry, error) {
 	if len(args) > 0 {
 		name = args[0]
 	} else {
-		cfgCtx, err := conf.GetContext()
+		cfgCtx, _, err := conf.GetContext()
 		if err != nil {
 			return nil, err
 		}
@@ -228,7 +228,7 @@ func (conf *Config) RemoveRuntime(name string) error {
 		return errdefs.InvalidArgument("no runtime specified")
 	}
 
-	confCtx, err := conf.GetContext()
+	confCtx, _, err := conf.GetContext()
 	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 		return err
 	} else if err == nil {
@@ -251,7 +251,7 @@ func (conf *Config) RemoveRegistry(name string) error {
 	if name == "" {
 		return errdefs.InvalidArgument("no registry specified")
 	}
-	confCtx, err := conf.GetContext()
+	confCtx, _, err := conf.GetContext()
 	if err != nil {
 		return err
 	}
@@ -275,7 +275,7 @@ func (conf *Config) GetEntryValue(entry string) (interface{}, error) {
 	var val interface{} = conf
 	var err error
 
-	confCtx, err := conf.GetContext()
+	confCtx, _, err := conf.GetContext()
 	if err != nil {
 		return nil, err
 	}
@@ -623,7 +623,7 @@ func (conf *Config) WriteProjectConfig(path string) error {
 
 func (conf *Config) FullImageName(name string) (string, error) {
 
-	cfgCtx, err := conf.GetContext()
+	cfgCtx, _, err := conf.GetContext()
 	if err != nil {
 		return "", err
 	}

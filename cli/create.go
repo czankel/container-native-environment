@@ -52,7 +52,7 @@ func createConfigContextRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	// set current runtime and registry as default
-	c, err := conf.GetContext()
+	c, _, err := conf.GetContext()
 	if err != nil {
 		return err
 	}
