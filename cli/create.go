@@ -24,6 +24,177 @@ var createCmd = &cobra.Command{
 	Args:    cobra.MinimumNArgs(1),
 }
 
+var createConfigCmd = &cobra.Command{
+	Use: "config",
+}
+
+var createConfigContextCmd = &cobra.Command{
+	Use:   "context name",
+	Short: "Create a new context",
+	Args:  cobra.ExactArgs(1),
+	RunE:  createConfigContextRunE,
+}
+
+var createConfigContextOptions string
+var createConfigContextRegistry string
+var createConfigContextRuntime string
+
+func createConfigContextRunE(cmd *cobra.Command, args []string) error {
+
+	tempConf, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	confCtx, err := tempConf.CreateContext(args[0])
+	if err != nil {
+		return err
+	}
+
+	// set current runtime and registry as default
+	c, err := conf.GetContext()
+	if err != nil {
+		return err
+	}
+	confCtx.Runtime = c.Runtime
+	confCtx.Registry = c.Registry
+
+	type changeInfo struct {
+		Configuration string
+		Value         string
+	}
+	var changes []changeInfo
+
+	if createConfigContextOptions != "" {
+		err := tempConf.UpdateContextOptions(confCtx, createConfigContextOptions)
+		if err != nil {
+			return err
+		}
+		changes = append(changes, changeInfo{"Options", createConfigContextOptions})
+	}
+
+	if createConfigContextRegistry != "" {
+		if _, ok := tempConf.Registry[createConfigContextRegistry]; !ok {
+			return errdefs.NotFound("runtime", createConfigContextRegistry)
+		}
+		confCtx.Registry = createConfigContextRegistry
+		changes = append(changes, changeInfo{"Registry", createConfigContextRegistry})
+	}
+
+	if createConfigContextRuntime != "" {
+		if _, ok := tempConf.Runtime[createConfigContextRuntime]; !ok {
+			return errdefs.NotFound("runtime", createConfigContextRuntime)
+		}
+		confCtx.Runtime = createConfigContextRuntime
+		changes = append(changes, changeInfo{"Runtime", createConfigContextRuntime})
+	}
+
+	err = writeConfig(tempConf)
+	if err != nil {
+		return err
+	}
+
+	printList(changes, false)
+	return nil
+}
+
+var createConfigRegistryCmd = &cobra.Command{
+	Use:   "registry name",
+	Short: "Create a new registry",
+	Args:  cobra.ExactArgs(1),
+	RunE:  createConfigRegistryRunE,
+}
+
+var createConfigRegistryDomain string
+var createConfigRegistryRepoName string
+
+func createConfigRegistryRunE(cmd *cobra.Command, args []string) error {
+
+	tempConf, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	confReg, err := tempConf.CreateRegistry(args[0])
+	if err != nil {
+		return err
+	}
+
+	type changeInfo struct {
+		Configuration string
+		Value         string
+	}
+	var changes []changeInfo
+
+	if createConfigRegistryDomain != "" {
+		confReg.Domain = createConfigRegistryDomain
+		changes = append(changes, changeInfo{"Domain", createConfigRegistryDomain})
+	}
+	if createConfigRegistryRepoName != "" {
+		confReg.RepoName = createConfigRegistryRepoName
+		changes = append(changes, changeInfo{"RepoName", createConfigRegistryRepoName})
+	}
+
+	err = writeConfig(tempConf)
+	if err != nil {
+		return err
+	}
+
+	printList(changes, false)
+	return nil
+}
+
+var createConfigRuntimeCmd = &cobra.Command{
+	Use:   "runtime name runtime",
+	Short: "Create a new runtime",
+	Args:  cobra.ExactArgs(2),
+	RunE:  createConfigRuntimeRunE,
+}
+
+var createConfigRuntimeRuntime string
+var createConfigRuntimeSocketName string
+var createConfigRuntimeNamespace string
+
+func createConfigRuntimeRunE(cmd *cobra.Command, args []string) error {
+
+	tempConf, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	confRun, err := tempConf.CreateRuntime(args[0], args[1])
+	if err != nil {
+		return err
+	}
+
+	type changeInfo struct {
+		Configuration string
+		Value         string
+	}
+	var changes []changeInfo
+
+	if createConfigRuntimeRuntime != "" {
+		confRun.Runtime = createConfigRuntimeRuntime
+		changes = append(changes, changeInfo{"SocketName", createConfigRuntimeSocketName})
+	}
+	if createConfigRuntimeSocketName != "" {
+		confRun.SocketName = createConfigRuntimeSocketName
+		changes = append(changes, changeInfo{"SocketName", createConfigRuntimeSocketName})
+	}
+	if createConfigRuntimeNamespace != "" {
+		confRun.Namespace = createConfigRuntimeNamespace
+		changes = append(changes, changeInfo{"Namespace", createConfigRuntimeNamespace})
+	}
+
+	err = writeConfig(tempConf)
+	if err != nil {
+		return err
+	}
+
+	printList(changes, false)
+	return nil
+}
+
 var createWorkspaceCmd = &cobra.Command{
 	Use:     "workspace [name]",
 	Short:   "Create a new workspace",
@@ -230,6 +401,34 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 func init() {
 
 	rootCmd.AddCommand(createCmd)
+
+	createCmd.AddCommand(createConfigCmd)
+	createConfigCmd.Flags().BoolVarP(
+		&configSystem, "system", "", false, "Update system configuration")
+	createConfigCmd.Flags().BoolVarP(
+		&configProject, "project", "", false, "Update project configuration")
+
+	createConfigCmd.AddCommand(createConfigContextCmd)
+	createConfigContextCmd.Flags().StringVar(
+		&createConfigContextOptions, "options", "", "Context options")
+	createConfigContextCmd.Flags().StringVar(
+		&createConfigContextRegistry, "registry", "", "Context registry")
+	createConfigContextCmd.Flags().StringVar(
+		&createConfigContextRuntime, "runtime", "", "Context registry")
+
+	createConfigCmd.AddCommand(createConfigRegistryCmd)
+	createConfigRegistryCmd.Flags().StringVar(
+		&createConfigRegistryDomain, "domain", "", "Registry domain")
+	createConfigRegistryCmd.Flags().StringVar(
+		&createConfigRegistryRepoName, "reponame", "", "Registry repooname")
+
+	createConfigCmd.AddCommand(createConfigRuntimeCmd)
+	createConfigRuntimeCmd.Flags().StringVar(
+		&createConfigRuntimeRuntime, "runtime", "", "Container runtime")
+	createConfigRuntimeCmd.Flags().StringVar(
+		&createConfigRuntimeSocketName, "socketname", "", "Socket name")
+	createConfigRuntimeCmd.Flags().StringVar(
+		&createConfigRuntimeNamespace, "namespace", "", "Namespace")
 
 	createCmd.AddCommand(createWorkspaceCmd)
 	createWorkspaceCmd.Flags().StringVar(

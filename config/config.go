@@ -20,9 +20,10 @@ import (
 
 // CneVersion is set in Makefile by a linker option to the git hash/version
 var CneVersion string
+var contextName string
 
 type Settings struct {
-	Context string
+	Context string `toml:",omitempty"`
 }
 
 type Runtime struct {
@@ -49,13 +50,63 @@ type Config struct {
 	Registry map[string]*Registry
 }
 
-var ContextName string
+func SetContextName(name string) {
+	contextName = name
+}
+
+// update updates the configuration with the values from the specified configuration file
+func (conf *Config) update(path string) error {
+	_, err := toml.DecodeFile(path, conf)
+	if err != nil && !os.IsNotExist(err) {
+		return errdefs.InvalidArgument("config file '%s' corrupt", path)
+	}
+	return nil
+}
+
+func (conf *Config) CreateContext(name string) (*Context, error) {
+
+	if _, found := conf.Context[name]; found {
+		return nil, errdefs.AlreadyExists("context", name)
+	}
+	if len(conf.Context) == 0 {
+		conf.Context = make(map[string]*Context, 1)
+	}
+	conf.Context[name] = &Context{}
+	return conf.Context[name], nil
+}
+
+func (conf *Config) CreateRegistry(name string) (*Registry, error) {
+
+	if _, found := conf.Registry[name]; found {
+		return nil, errdefs.AlreadyExists("context", name)
+	}
+	if len(conf.Registry) == 0 {
+		conf.Registry = make(map[string]*Registry, 1)
+	}
+	conf.Registry[name] = &Registry{}
+	return conf.Registry[name], nil
+}
+
+func (conf *Config) CreateRuntime(name, runtime string) (*Runtime, error) {
+
+	if _, found := conf.Runtime[name]; found {
+		return nil, errdefs.AlreadyExists("context", name)
+	}
+	if len(conf.Runtime) == 0 {
+		conf.Runtime = make(map[string]*Runtime, 1)
+	}
+	conf.Runtime[name] = &Runtime{
+		Runtime:   runtime,
+		Namespace: DefaultRuntimeNamespace,
+	}
+	return conf.Runtime[name], nil
+}
 
 // GetContext returns the context defined in the configuration files or from
 // the --context flag when CNE was started.
 func (conf *Config) GetContext() (*Context, error) {
 
-	name := ContextName
+	name := contextName
 	if name == "" {
 		name = conf.Settings.Context
 	}
@@ -69,7 +120,160 @@ func (conf *Config) GetContext() (*Context, error) {
 // GetRuntime returns the context-specific runtime.
 func (conf *Config) GetRuntime() (*Runtime, error) {
 
-	cfgCtx, err := conf.GetContext()
+	var name string
+	if len(args) > 0 {
+		name = args[0]
+	} else {
+		cfgCtx, err := conf.GetContext()
+		if err != nil {
+			return nil, err
+		}
+		name = cfgCtx.Runtime
+	}
+
+	if r, found := conf.Runtime[name]; found {
+		if r.Runtime == "" {
+			r.Runtime = name
+		}
+		return r, nil
+	}
+	return nil, errdefs.InvalidArgument("invalid runtime '%s'", name)
+}
+
+// GetRegistry returns the specified registry or context-specific registry if name is empty
+func (conf *Config) GetRegistry(args ...string) (*Registry, error) {
+
+	var name string
+	if len(args) > 0 {
+		name = args[0]
+	} else {
+		cfgCtx, err := conf.GetContext()
+		if err != nil {
+			return nil, err
+		}
+		name = cfgCtx.Registry
+	}
+
+	if r, found := conf.Registry[name]; found {
+		return r, nil
+	}
+
+	return nil, errdefs.InvalidArgument("invalid registry '%s'", name)
+}
+
+func (conf *Config) RenameContext(from, to string) error {
+
+	if _, ok := conf.Context[to]; ok {
+		return errdefs.InvalidArgument("context with new name already exists")
+	}
+
+	conf.Context[to] = conf.Context[from]
+	delete(conf.Context, from)
+
+	return nil
+}
+
+func (conf *Config) RenameRuntime(from, to string) error {
+
+	if _, ok := conf.Runtime[to]; ok {
+		return errdefs.InvalidArgument("context with new name already exists")
+	}
+
+	conf.Runtime[to] = conf.Runtime[from]
+	delete(conf.Runtime, from)
+
+	for _, cc := range conf.Context {
+		if cc.Runtime == from {
+			cc.Runtime = to
+		}
+	}
+
+	return nil
+}
+
+func (conf *Config) RenameRegistry(from, to string) error {
+
+	if _, ok := conf.Registry[to]; ok {
+		return errdefs.InvalidArgument("context with new name already exists")
+	}
+
+	conf.Registry[to] = conf.Registry[from]
+	delete(conf.Registry, from)
+
+	for _, cc := range conf.Context {
+		if cc.Registry == from {
+			cc.Registry = to
+		}
+	}
+
+	return nil
+}
+
+func (conf *Config) RemoveContext(name string) error {
+
+	if name == "" {
+		return errdefs.InvalidArgument("no context provided")
+	}
+	if name == contextName {
+		return errdefs.InvalidArgument("cannot delete current context")
+	}
+	delete(conf.Context, name)
+	return nil
+}
+
+func (conf *Config) RemoveRuntime(name string) error {
+
+	if name == "" {
+		return errdefs.InvalidArgument("no runtime specified")
+	}
+	confCtx, err := conf.GetContext()
+	if err != nil {
+		return err
+	}
+
+	if name == confCtx.Runtime {
+		return errdefs.InvalidArgument("cannot delete current runtime")
+	}
+	for k, c := range conf.Context {
+		if c.Runtime == name {
+			return errdefs.InvalidArgument("runtime still in use in context: '%s'", k)
+		}
+	}
+
+	delete(conf.Runtime, name)
+	return nil
+}
+
+func (conf *Config) RemoveRegistry(name string) error {
+
+	if name == "" {
+		return errdefs.InvalidArgument("no registry specified")
+	}
+	confCtx, err := conf.GetContext()
+	if err != nil {
+		return err
+	}
+
+	if name == confCtx.Registry {
+		return errdefs.InvalidArgument("cannot delete current registry")
+	}
+	for k, c := range conf.Context {
+		if c.Registry == name {
+			return errdefs.InvalidArgument("registry still in use in context: '%s'", k)
+		}
+	}
+
+	delete(conf.Registry, name)
+	return nil
+
+}
+
+func (conf *Config) GetEntryValue(entry string) (interface{}, error) {
+
+	var val interface{} = conf
+	var err error
+
+	confCtx, err := conf.GetContext()
 	if err != nil {
 		return nil, err
 	}
@@ -81,34 +285,7 @@ func (conf *Config) GetRuntime() (*Runtime, error) {
 		return r, nil
 	}
 	return nil, errdefs.InvalidArgument("invalid runtime '%s' for context '%s'",
-		cfgCtx.Runtime, ContextName)
-}
-
-/*
-// GetRegistry returns the context-specific registry.
-func (conf *Config) GetRegistry() (*Registry, error) {
-
-	cfgCtx, err := conf.GetContext()
-	if err != nil {
-		return nil, err
-	}
-
-	if r, found := conf.Registry[cfgCtx.Registry]; found {
-		return r, nil
-	}
-
-	return nil, errdefs.InvalidArgument("invalid registry '%s' for context '%s'",
-		cfgCtx.Runtime, ContextName)
-}
-*/
-
-// update updates the configuration with the values from the specified configuration file
-func (conf *Config) update(path string) error {
-	_, err := toml.DecodeFile(path, conf)
-	if err != nil && !os.IsNotExist(err) {
-		return errdefs.InvalidArgument("config file '%s' corrupt", path)
-	}
-	return nil
+		cfgCtx.Runtime, contextName)
 }
 
 // Load returns the default configuration amended by the configuration stored in the
