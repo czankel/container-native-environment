@@ -123,15 +123,16 @@ func Load() (*Config, error) {
 				Runtime:  DefaultRuntimeName,
 				Registry: DefaultRegistryName,
 			}},
-		Runtime: map[string]*Runtime{
-			DefaultRuntimeName: &Runtime{
-				SocketName: DefaultRuntimeSocketName,
-				Namespace:  DefaultRuntimeNamespace,
-			}},
 		Registry: map[string]*Registry{
 			DefaultRegistryName: &Registry{
 				Domain:   DefaultRegistryDomain,
 				RepoName: DefaultRegistryRepoName,
+			}},
+		Runtime: map[string]*Runtime{
+			DefaultRuntimeName: &Runtime{
+				Runtime:    DefaultRuntimeName,
+				SocketName: DefaultRuntimeSocketName,
+				Namespace:  DefaultRuntimeNamespace,
 			}},
 	}
 
