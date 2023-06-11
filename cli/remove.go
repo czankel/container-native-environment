@@ -67,12 +67,7 @@ func removeAptRunE(cmd *cobra.Command, args []string) error {
 		showProgress(progress)
 	}()
 
-	ctr, _, err := getContainer(ctx, run, ws, progress)
-	if err != nil {
-		return err
-	}
-
-	img, err := ctr.Image(ctx)
+	ctr, img, err := getContainer(ctx, run, ws, progress)
 	if err != nil {
 		return err
 	}
@@ -125,7 +120,89 @@ func removeAptRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+var removeConfigCmd = &cobra.Command{
+	Use:   "config",
+	Short: "Remove a configuraion entry",
+	Long: `Remove a context, registry, or runtime. Use remove with the --system or
+--project option to remove a system or project configuration.`,
+	Args: cobra.NoArgs,
+}
+
+var removeConfigContextCmd = &cobra.Command{
+	Use:   "context",
+	Short: "Remove a configuration context entry",
+	Args:  cobra.ExactArgs(1),
+	RunE:  removeConfigContextRunE,
+}
+
+func removeConfigContextRunE(cmd *cobra.Command, args []string) error {
+
+	tempConf, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	err = tempConf.RemoveContext(args[0])
+	if err != nil {
+		return err
+	}
+
+	return writeConfig(tempConf)
+}
+
+var removeConfigRegistryCmd = &cobra.Command{
+	Use:   "registry",
+	Short: "Remove a configuration registry entry",
+	Args:  cobra.ExactArgs(1),
+	RunE:  removeConfigRegistryRunE,
+}
+
+func removeConfigRegistryRunE(cmd *cobra.Command, args []string) error {
+
+	tempConf, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	err = tempConf.RemoveRegistry(args[0])
+	if err != nil {
+		return err
+	}
+
+	return writeConfig(tempConf)
+}
+
+var removeConfigRuntimeCmd = &cobra.Command{
+	Use:   "runtime runtime",
+	Short: "Remove a configuration runtime entry",
+	Args:  cobra.ExactArgs(1),
+	RunE:  removeConfigRuntimeRunE,
+}
+
+func removeConfigRuntimeRunE(cmd *cobra.Command, args []string) error {
+
+	tempConf, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	err = tempConf.RemoveRuntime(args[0])
+	if err != nil {
+		return err
+	}
+	return writeConfig(tempConf)
+}
+
 func init() {
 	rootCmd.AddCommand(removeCmd)
 	removeCmd.AddCommand(removeAptCmd)
+
+	removeCmd.AddCommand(removeConfigCmd)
+	removeConfigCmd.Flags().BoolVarP(
+		&configSystem, "system", "", false, "Update system configuration")
+	removeConfigCmd.Flags().BoolVarP(
+		&configProject, "project", "", false, "Update project configuration")
+	removeConfigCmd.AddCommand(removeConfigContextCmd)
+	removeConfigCmd.AddCommand(removeConfigRegistryCmd)
+	removeConfigCmd.AddCommand(removeConfigRuntimeCmd)
 }

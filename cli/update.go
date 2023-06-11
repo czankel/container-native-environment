@@ -78,7 +78,8 @@ func updateConfigContextRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	confCtx, err := tempConf.GetContext()
+	// get context from the merged configuration
+	confCtx, err := conf.GetContext()
 	if err != nil {
 		return err
 	}
@@ -160,7 +161,8 @@ func updateConfigRegistryRunE(cmd *cobra.Command, args []string) error {
 		name = args[0]
 	}
 
-	confReg, err := tempConf.GetRegistry(name)
+	// find registry in merged configuration
+	confReg, err := conf.GetRegistry(name)
 	if err != nil {
 		return err
 	}
@@ -224,7 +226,9 @@ func updateConfigRuntimeRunE(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		name = args[0]
 	}
-	confRun, err := tempConf.GetRuntime(name)
+
+	// find runtime in merged configuration
+	confRun, err := conf.GetRuntime(name)
 	if err != nil {
 		return err
 	}

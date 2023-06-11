@@ -5,6 +5,7 @@ package config
 
 import (
 	"bufio"
+	"errors"
 	"os"
 	"os/user"
 	"reflect"
@@ -114,7 +115,7 @@ func (conf *Config) GetContext() (*Context, error) {
 	if c, found := conf.Context[name]; found {
 		return c, nil
 	}
-	return nil, errdefs.InvalidArgument("invalid context '%s'", name)
+	return nil, errdefs.NotFound("context", name)
 }
 
 // GetRuntime returns the specified runtime or context-specific runtime if name is empty
@@ -226,17 +227,18 @@ func (conf *Config) RemoveRuntime(name string) error {
 	if name == "" {
 		return errdefs.InvalidArgument("no runtime specified")
 	}
-	confCtx, err := conf.GetContext()
-	if err != nil {
-		return err
-	}
 
-	if name == confCtx.Runtime {
-		return errdefs.InvalidArgument("cannot delete current runtime")
-	}
-	for k, c := range conf.Context {
-		if c.Runtime == name {
-			return errdefs.InvalidArgument("runtime still in use in context: '%s'", k)
+	confCtx, err := conf.GetContext()
+	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
+		return err
+	} else if err == nil {
+		if name == confCtx.Runtime {
+			return errdefs.InvalidArgument("cannot delete current runtime")
+		}
+		for k, c := range conf.Context {
+			if c.Runtime == name {
+				return errdefs.InvalidArgument("runtime still in use in context: '%s'", k)
+			}
 		}
 	}
 
@@ -551,7 +553,7 @@ func (conf *Config) WriteUserConfig() error {
 	}
 
 	path := usr.HomeDir + "/" + UserConfigFile
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, ConfigFilePerms)
+	file, err := os.OpenFile(path, os.O_TRUNC|os.O_RDWR|os.O_CREATE, ConfigFilePerms)
 	if err != nil {
 		return errdefs.SystemError(err, "failed to write configuration file '%s'", path)
 	}
@@ -567,7 +569,6 @@ func (conf *Config) WriteUserConfig() error {
 				"failed to update permissions for '%s'", path)
 		}
 	}
-
 	writer := bufio.NewWriter(file)
 	err = toml.NewEncoder(writer).Encode(conf)
 	if err != nil {
