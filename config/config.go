@@ -117,8 +117,8 @@ func (conf *Config) GetContext() (*Context, error) {
 	return nil, errdefs.InvalidArgument("invalid context '%s'", name)
 }
 
-// GetRuntime returns the context-specific runtime.
-func (conf *Config) GetRuntime() (*Runtime, error) {
+// GetRuntime returns the specified runtime or context-specific runtime if name is empty
+func (conf *Config) GetRuntime(args ...string) (*Runtime, error) {
 
 	var name string
 	if len(args) > 0 {
@@ -278,14 +278,30 @@ func (conf *Config) GetEntryValue(entry string) (interface{}, error) {
 		return nil, err
 	}
 
-	if r, found := conf.Runtime[cfgCtx.Runtime]; found {
-		if r.Runtime == "" {
-			r.Runtime = cfgCtx.Runtime
-		}
-		return r, nil
+	switch entry {
+	case "context":
+		entry = "context/" + conf.Settings.Context
+	case "runtime":
+		entry = "runtime/" + confCtx.Runtime
+	case "registry":
+		entry = "registry/" + confCtx.Registry
 	}
-	return nil, errdefs.InvalidArgument("invalid runtime '%s' for context '%s'",
-		cfgCtx.Runtime, contextName)
+
+	return val, err
+}
+
+func (conf *Config) RenameEntry(entry, from, to string) error {
+
+	var err error
+	switch entry {
+	case "context":
+		err = conf.RenameContext(from, to)
+	case "runtime":
+		err = conf.RenameRuntime(from, to)
+	case "registry":
+		err = conf.RenameRegistry(from, to)
+	}
+	return err
 }
 
 // Load returns the default configuration amended by the configuration stored in the
@@ -358,6 +374,10 @@ func LoadProjectConfig(path string) (*Config, error) {
 func (conf *Config) UpdateProjectConfig(path string) error {
 
 	return conf.update(path + "/" + ProjectConfigFile)
+}
+
+func (conf *Config) UpdateContextOptions(confCtx *Context, options string) error {
+	return errdefs.NotImplemented()
 }
 
 // getValue returns the reflect.Value for the element in the nested structure by the
