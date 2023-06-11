@@ -59,7 +59,7 @@ type Project struct {
 	UUID                 string // Universal Unique id for the project
 	CurrentWorkspaceName string
 	Workspaces           []Workspace
-	Path                 string // path to the project file
+	Path                 string `yaml:"-"` // path to the project file
 	instanceID           uint64
 	modifiedAt           time.Time
 }
