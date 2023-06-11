@@ -2,7 +2,6 @@ package cli
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -293,58 +292,41 @@ func listContainersRunE(cmd *cobra.Command, args []string) error {
 	return listContainers(ctx, run, prj)
 }
 
-var listResourcesCmd = &cobra.Command{
-	Use:     "all",
-	Aliases: []string{"c"},
-	Short:   "list all resources (containers, snapshots, images)",
-	Args:    cobra.NoArgs,
-	RunE:    listResourcesRunE,
+var listConfigCmd = &cobra.Command{
+	Use:   "config",
+	Short: "list configurations",
 }
 
-var listResourcesAll bool
+var listConfigContextCmd = &cobra.Command{
+	Use:   "context",
+	Short: "list available contexts",
+	Args:  cobra.NoArgs,
+	RunE:  listConfigContextRunE,
+}
 
-func listResourcesRunE(cmd *cobra.Command, args []string) error {
+var listConfigRuntimeCmd = &cobra.Command{
+	Use:   "registry",
+	Short: "list available registries",
+	Args:  cobra.NoArgs,
+	RunE:  listConfigRegistryRunE,
+}
+var listConfigRegistryCmd = &cobra.Command{
+	Use:   "runtime",
+	Short: "list available runtimes",
+	Args:  cobra.NoArgs,
+	RunE:  listConfigRuntimeRunE,
+}
 
-	var prj *project.Project
-
-	runCfg, err := conf.GetRuntime()
-	if err != nil {
-		return err
-	}
-
-	ctx := context.Background()
-	run, err := runtime.Open(ctx, runCfg)
-	if err != nil {
-		return err
-	}
-	defer run.Close()
-	ctx = run.WithNamespace(ctx, runCfg.Namespace)
-
-	if !listResourcesAll {
-		prj, err = loadProject()
-		if err != nil {
-			return err
-		}
-	}
-
-	fmt.Printf("\nIMAGES\n------\n")
-	err = listImages(ctx, run)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("\nCONTAINERS\n----------\n")
-	err = listContainers(ctx, run, prj)
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("\nSNAPSHOTS\n---------\n")
-	err = listSnapshots(ctx, run)
-	if err != nil {
-		return err
-	}
-
+func listConfigContextRunE(cmd *cobra.Command, args []string) error {
+	printList(conf.Context, false)
+	return nil
+}
+func listConfigRegistryRunE(cmd *cobra.Command, args []string) error {
+	printList(conf.Registry, false)
+	return nil
+}
+func listConfigRuntimeRunE(cmd *cobra.Command, args []string) error {
+	printList(conf.Runtime, false)
 	return nil
 }
 
@@ -361,7 +343,8 @@ func init() {
 		&listCommandsWorkspace, "workspace", "w", "", "Name of the workspace")
 	listCommandsCmd.Flags().StringVarP(
 		&listCommandsLayer, "layer", "l", "", "Name or index of the layer")
-	listCmd.AddCommand(listResourcesCmd)
-	listResourcesCmd.Flags().BoolVarP(
-		&listResourcesAll, "all", "A", false, "list resources from all projects")
+	listCmd.AddCommand(listConfigCmd)
+	listConfigCmd.AddCommand(listConfigContextCmd)
+	listConfigCmd.AddCommand(listConfigRuntimeCmd)
+	listConfigCmd.AddCommand(listConfigRegistryCmd)
 }
