@@ -262,13 +262,97 @@ func deleteCommandRunE(cmd *cobra.Command, args []string) error {
 	return prj.Write()
 }
 
+var deleteConfigCmd = &cobra.Command{
+	Use:   "config",
+	Short: "Remove a configuraion entry",
+	Long: `Remove a context, registry, or runtime. Use delete with the --system or
+--project option to delete a system or project configuration.`,
+	Args: cobra.NoArgs,
+}
+
+var deleteConfigContextCmd = &cobra.Command{
+	Use:   "context",
+	Short: "Remove a configuration context entry",
+	Args:  cobra.ExactArgs(1),
+	RunE:  deleteConfigContextRunE,
+}
+
+func deleteConfigContextRunE(cmd *cobra.Command, args []string) error {
+
+	tempConf, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	err = tempConf.RemoveContext(args[0])
+	if err != nil {
+		return err
+	}
+
+	return writeConfig(tempConf)
+}
+
+var deleteConfigRegistryCmd = &cobra.Command{
+	Use:   "registry",
+	Short: "Remove a configuration registry entry",
+	Args:  cobra.ExactArgs(1),
+	RunE:  deleteConfigRegistryRunE,
+}
+
+func deleteConfigRegistryRunE(cmd *cobra.Command, args []string) error {
+
+	tempConf, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	err = tempConf.RemoveRegistry(args[0])
+	if err != nil {
+		return err
+	}
+
+	return writeConfig(tempConf)
+}
+
+var deleteConfigRuntimeCmd = &cobra.Command{
+	Use:   "runtime runtime",
+	Short: "Remove a configuration runtime entry",
+	Args:  cobra.ExactArgs(1),
+	RunE:  deleteConfigRuntimeRunE,
+}
+
+func deleteConfigRuntimeRunE(cmd *cobra.Command, args []string) error {
+
+	tempConf, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	err = tempConf.RemoveRuntime(args[0])
+	if err != nil {
+		return err
+	}
+	return writeConfig(tempConf)
+}
+
 func init() {
 	rootCmd.AddCommand(deleteCmd)
-	deleteCmd.AddCommand(deleteImageCmd)
-	deleteCmd.AddCommand(deleteWorkspaceCmd)
-	deleteCmd.AddCommand(deleteLayerCmd)
-	deleteCmd.AddCommand(deleteContainerCmd)
 	deleteCmd.AddCommand(deleteCommandCmd)
+
+	deleteCmd.AddCommand(deleteConfigCmd)
+	deleteConfigCmd.Flags().BoolVarP(
+		&configSystem, "system", "", false, "Update system configuration")
+	deleteConfigCmd.Flags().BoolVarP(
+		&configProject, "project", "", false, "Update project configuration")
+	deleteConfigCmd.AddCommand(deleteConfigContextCmd)
+	deleteConfigCmd.AddCommand(deleteConfigRegistryCmd)
+	deleteConfigCmd.AddCommand(deleteConfigRuntimeCmd)
+
+	deleteCmd.AddCommand(deleteContainerCmd)
+	deleteCmd.AddCommand(deleteImageCmd)
+	deleteCmd.AddCommand(deleteLayerCmd)
+
+	deleteCmd.AddCommand(deleteWorkspaceCmd)
 	deleteCommandCmd.Flags().StringVarP(
 		&deleteCommandWorkspace, "workspace", "w", "", "Name of the workspace")
 	deleteCommandCmd.Flags().StringVarP(
