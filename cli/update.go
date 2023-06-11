@@ -78,10 +78,14 @@ func updateConfigContextRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// get context from the merged configuration
-	confCtx, err := conf.GetContext()
-	if err != nil {
-		return err
+	name := conf.Settings.Context
+	if len(args) > 0 {
+		name = args[0]
+	}
+
+	confCtx, found := tempConf.Context[name]
+	if !found {
+		return errdefs.NotFound("context", name)
 	}
 
 	if updateConfigRenameEntry != "" {
@@ -97,7 +101,7 @@ func updateConfigContextRunE(cmd *cobra.Command, args []string) error {
 
 	type changeInfo struct {
 		Configuration string
-		OldValuei     string
+		OldValue      string
 		NewValue      string
 	}
 	var changes []changeInfo
@@ -108,11 +112,15 @@ func updateConfigContextRunE(cmd *cobra.Command, args []string) error {
 			opts = append(opts, k+"="+v)
 		}
 		orig := strings.Join(opts, ",")
-		err := tempConf.UpdateContextOptions(confCtx, updateConfigContextOptions)
+		err := confCtx.UpdateContextOptions(updateConfigContextOptions)
 		if err != nil {
 			return err
 		}
-		changes = append(changes, changeInfo{"Options", orig, updateConfigContextOptions})
+		opts = make([]string, 0, len(confCtx.Options))
+		for k, v := range confCtx.Options {
+			opts = append(opts, k+"="+v)
+		}
+		changes = append(changes, changeInfo{"Options", orig, strings.Join(opts, ",")})
 	}
 	if err == nil && updateConfigContextRegistry != "" {
 		if _, ok := tempConf.Registry[confCtx.Registry]; !ok {
@@ -179,7 +187,7 @@ func updateConfigRegistryRunE(cmd *cobra.Command, args []string) error {
 
 	type changeInfo struct {
 		Configuration string
-		OldValuei     string
+		OldValue      string
 		NewValue      string
 	}
 	var changes []changeInfo
@@ -245,7 +253,7 @@ func updateConfigRuntimeRunE(cmd *cobra.Command, args []string) error {
 
 	type changeInfo struct {
 		Configuration string
-		OldValuei     string
+		OldValue      string
 		NewValue      string
 	}
 	var changes []changeInfo

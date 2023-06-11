@@ -378,8 +378,33 @@ func (conf *Config) UpdateProjectConfig(path string) error {
 	return conf.update(path + "/" + ProjectConfigFile)
 }
 
-func (conf *Config) UpdateContextOptions(confCtx *Context, options string) error {
-	return errdefs.NotImplemented()
+func (confCtx *Context) UpdateContextOptions(line string) error {
+
+	opts := strings.Split(line, ",")
+	for _, o := range opts {
+		kv := strings.Split(strings.TrimSpace(o), "=")
+		if len(kv) != 2 {
+			return errdefs.InvalidArgument("Optiono '%`' must be in the form key=[value]", o)
+		}
+		updated := false
+		for k, _ := range confCtx.Options {
+			if kv[0] == k {
+				if kv[1] == "" {
+					delete(confCtx.Options, k)
+				} else {
+					confCtx.Options[kv[0]] = kv[1]
+				}
+				updated = true
+			}
+		}
+		if !updated {
+			if len(confCtx.Options) == 0 {
+				confCtx.Options = make(map[string]string, 1)
+			}
+			confCtx.Options[kv[0]] = kv[1]
+		}
+	}
+	return nil
 }
 
 // getValue returns the reflect.Value for the element in the nested structure by the

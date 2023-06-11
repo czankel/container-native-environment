@@ -66,7 +66,7 @@ func createConfigContextRunE(cmd *cobra.Command, args []string) error {
 	var changes []changeInfo
 
 	if createConfigContextOptions != "" {
-		err := tempConf.UpdateContextOptions(confCtx, createConfigContextOptions)
+		err := confCtx.UpdateContextOptions(createConfigContextOptions)
 		if err != nil {
 			return err
 		}
