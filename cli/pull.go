@@ -25,7 +25,7 @@ func pullImage(ctx context.Context, run runtime.Runtime,
 }
 
 var pullCmd = &cobra.Command{
-	Use:   "pull [REGISTRY]PACKAGE[:TAG|@DIGEST]",
+	Use:   "pull [registry]package[:tag|@digest]",
 	Short: "Pull an image from a registry",
 	Long: `
 Pull an image from a registry to the local system.

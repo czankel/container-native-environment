@@ -18,7 +18,7 @@ import (
 )
 
 var execCmd = &cobra.Command{
-	Use:   "exec CMD",
+	Use:   "exec cmd",
 	Short: "Execute a command in the container environment",
 	Args:  cobra.MinimumNArgs(1),
 	RunE:  execRunE,

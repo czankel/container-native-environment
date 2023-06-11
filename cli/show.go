@@ -128,7 +128,7 @@ func showWorkspaceRunE(cmd *cobra.Command, args []string) error {
 }
 
 var showImageCmd = &cobra.Command{
-	Use:   "image [NAME]",
+	Use:   "image [name]",
 	Short: "Show image details",
 	RunE:  showImageRunE,
 	Args:  cobra.ExactArgs(1),

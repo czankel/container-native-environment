@@ -25,7 +25,7 @@ var createCmd = &cobra.Command{
 }
 
 var createWorkspaceCmd = &cobra.Command{
-	Use:     "workspace [NAME]",
+	Use:     "workspace [name]",
 	Short:   "Create a new workspace",
 	Aliases: []string{"ws"},
 	Args:    cobra.MaximumNArgs(1),
@@ -118,7 +118,7 @@ var createLayerSystem bool
 var createLayerInsert string
 
 var createLayerCmd = &cobra.Command{
-	Use:     "layer [FLAGS] NAME [CMDLINE]",
+	Use:     "layer [name] [cmdline]",
 	Short:   "Create a new layer",
 	Aliases: []string{"l"},
 	Args:    cobra.MinimumNArgs(1),

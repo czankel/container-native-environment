@@ -151,7 +151,7 @@ var buildCmd = &cobra.Command{
 }
 
 var buildWorkspaceCmd = &cobra.Command{
-	Use:     "workspace [NAME]",
+	Use:     "workspace [name]",
 	Short:   "Manually build or rebuild the current or specified workspace",
 	Aliases: []string{"ws"},
 	Args:    cobra.MaximumNArgs(1),

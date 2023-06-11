@@ -14,7 +14,7 @@ import (
 var initProjectImage string
 
 var initCmd = &cobra.Command{
-	Use:   "init [NAME]",
+	Use:   "init [name]",
 	Short: "Create or initialize a project",
 	Long: `
 The init command creates a new project in the current directory.

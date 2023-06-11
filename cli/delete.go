@@ -21,7 +21,7 @@ var deleteCmd = &cobra.Command{
 }
 
 var deleteImageCmd = &cobra.Command{
-	Use:     "image NAME",
+	Use:     "image name",
 	Aliases: []string{"image", "i"},
 	Short:   "delete image",
 	Args:    cobra.ExactArgs(1),
@@ -52,7 +52,7 @@ func deleteImageRunE(cmd *cobra.Command, args []string) error {
 }
 
 var deleteWorkspaceCmd = &cobra.Command{
-	Use:     "workspace NAME",
+	Use:     "workspace name",
 	Aliases: []string{"workspace", "ws"},
 	Short:   "delete workspace",
 	Args:    cobra.ExactArgs(1),
@@ -99,7 +99,7 @@ func deleteWorkspaceRunE(cmd *cobra.Command, args []string) error {
 }
 
 var deleteLayerCmd = &cobra.Command{
-	Use:     "layer NAME",
+	Use:     "layer name",
 	Aliases: []string{"layer", "l"},
 	Short:   "delete layer",
 	Args:    cobra.ExactArgs(1),
@@ -160,7 +160,7 @@ func deleteLayerRunE(cmd *cobra.Command, args []string) error {
 }
 
 var deleteContainerCmd = &cobra.Command{
-	Use:   "container NAME",
+	Use:   "container name",
 	Short: "delete container",
 	Args:  cobra.ExactArgs(1),
 	RunE:  deleteContainerRunE,
@@ -201,7 +201,7 @@ func deleteContainerRunE(cmd *cobra.Command, args []string) error {
 }
 
 var deleteCommandCmd = &cobra.Command{
-	Use:     "command INDEX|NAME",
+	Use:     "command index|name",
 	Short:   "delete commands",
 	Aliases: []string{"cmd"},
 	Args:    cobra.ExactArgs(1),

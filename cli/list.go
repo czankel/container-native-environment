@@ -72,7 +72,7 @@ func listRuntimeRunE(cmd *cobra.Command, args []string) error {
 }
 
 var listCommandsCmd = &cobra.Command{
-	Use:     "commands [NAME]",
+	Use:     "commands [name]",
 	Short:   "List all commands",
 	Aliases: []string{"command", "cmd"},
 	RunE:    listCommandsRunE,

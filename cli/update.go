@@ -18,7 +18,7 @@ var updateCmd = &cobra.Command{
 }
 
 var updateWorkspaceCmd = &cobra.Command{
-	Use:     "workspace [NAME]",
+	Use:     "workspace [name]",
 	Short:   "Update a workspace resources",
 	Aliases: []string{"ws"},
 	Args:    cobra.ExactArgs(1),
