@@ -22,6 +22,42 @@ var rootCneVersion bool
 
 var projectPath string
 
+var configSystem bool  // use sytem configuration file
+var configProject bool // use project configuration file
+
+// helper function to load a specific configuration file:
+//
+// system configuration, if configSystem is set
+// project configuration, if configProject is set
+// user configuration
+func loadConfig() (*config.Config, error) {
+
+	if configSystem {
+		return config.LoadSystemConfig()
+	} else if configProject {
+		prj, err := loadProject()
+		if err != nil {
+			return nil, err
+		}
+		return config.LoadProjectConfig(filepath.Dir(prj.Path))
+	}
+	return config.LoadUserConfig()
+}
+
+// helper function to write the configuration to a specific file:
+//
+// system configuration if configSystem is set,
+// project configuration if configProject is set
+// user configuration
+func writeConfig(conf *config.Config) error {
+	if configSystem {
+		return conf.WriteSystemConfig()
+	} else if configProject {
+		return conf.WriteProjectConfig(filepath.Dir(projectPath))
+	}
+	return conf.WriteUserConfig()
+}
+
 // helper function to load the project
 func loadProject() (*project.Project, error) {
 

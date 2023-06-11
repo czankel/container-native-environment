@@ -1,13 +1,9 @@
 package cli
 
 import (
-	"path/filepath"
-
 	"github.com/spf13/cobra"
 
-	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/errdefs"
-	"github.com/czankel/cne/project"
 )
 
 var updateCmd = &cobra.Command{
@@ -51,9 +47,6 @@ func updateWorkspaceRunE(cmd *cobra.Command, args []string) error {
 	return err
 }
 
-var updateSystemConfig bool
-var updateProjectConfig bool
-
 var updateConfigCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Update the environment configuration",
@@ -68,20 +61,8 @@ The system option modifies the system-wide configuration file stored in
 func updateConfigRunE(cmd *cobra.Command, args []string) error {
 
 	var err error
-	var prj *project.Project
 
-	if updateSystemConfig {
-		conf, err = config.LoadSystemConfig()
-	} else if updateProjectConfig {
-
-		prj, err = loadProject()
-		if err != nil {
-			return err
-		}
-		conf, err = config.LoadProjectConfig(filepath.Dir(prj.Path))
-	} else {
-		conf, err = config.LoadUserConfig()
-	}
+	conf, err = loadConfig()
 	if err != nil {
 		return err
 	}
@@ -93,14 +74,7 @@ func updateConfigRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if updateSystemConfig {
-		err = conf.WriteSystemConfig()
-	} else if updateProjectConfig {
-		err = conf.WriteProjectConfig(filepath.Dir(prj.Path))
-	} else {
-		err = conf.WriteUserConfig()
-	}
-
+	err = writeConfig()
 	if err != nil {
 		return err
 	}
@@ -145,9 +119,9 @@ func init() {
 		&updateWorkspaceName, "name", "", "", "Rename the workspace")
 	updateCmd.AddCommand(updateConfigCmd)
 	updateConfigCmd.Flags().BoolVarP(
-		&updateSystemConfig, "system", "", false, "Update system configuration")
+		&configSystem, "system", "", false, "Update system configuration")
 	updateConfigCmd.Flags().BoolVarP(
-		&updateProjectConfig, "project", "", false, "Update project configuration")
+		&configProject, "project", "", false, "Update project configuration")
 	updateProjectCmd.Flags().StringVar(
 		&updateProjectWorkspace, "workspace", "", "Update current workspace")
 	updateProjectCmd.Flags().StringVar(
