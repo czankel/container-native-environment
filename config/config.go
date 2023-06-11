@@ -550,7 +550,6 @@ func (conf *Config) GetAllByName(name string) (string, interface{}, error) {
 }
 
 // WriteSystemConfig writes the system configuration to /etc/cneconfig.
-// This
 func (conf *Config) WriteSystemConfig() error {
 
 	file, err := os.OpenFile(SystemConfigFile, os.O_TRUNC|os.O_RDWR|os.O_CREATE, ConfigFilePerms)
@@ -562,7 +561,12 @@ func (conf *Config) WriteSystemConfig() error {
 	defer file.Sync()
 
 	writer := bufio.NewWriter(file)
+
+	// Skip Settings.Context in system
+	oldCtx := conf.Settings.Context
+	conf.Settings.Context = ""
 	err = toml.NewEncoder(writer).Encode(conf)
+	conf.Settings.Context = oldCtx
 	if err != nil {
 		return errdefs.SystemError(err, "failed to write configuration file")
 	}
@@ -606,7 +610,7 @@ func (conf *Config) WriteUserConfig() error {
 func (conf *Config) WriteProjectConfig(path string) error {
 
 	path = path + "/" + ProjectConfigFile
-	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, ConfigFilePerms)
+	file, err := os.OpenFile(path, os.O_TRUNC|os.O_RDWR|os.O_CREATE, ConfigFilePerms)
 	if err != nil {
 		return errdefs.SystemError(err, "failed to write configuration file '%s'", path)
 	}
