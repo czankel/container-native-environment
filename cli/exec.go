@@ -119,12 +119,7 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 			showProgress(progress)
 		}()
 
-		ctr, err := getContainer(ctx, run, ws, progress)
-		if err != nil {
-			return 0, err
-		}
-
-		img, err := ctr.Image(ctx)
+		ctr, img, err := getContainer(ctx, run, ws, progress)
 		if err != nil {
 			return 0, err
 		}

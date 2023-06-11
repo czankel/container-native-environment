@@ -67,7 +67,7 @@ func removeAptRunE(cmd *cobra.Command, args []string) error {
 		showProgress(progress)
 	}()
 
-	ctr, err := getContainer(ctx, run, ws, progress)
+	ctr, _, err := getContainer(ctx, run, ws, progress)
 	if err != nil {
 		return err
 	}

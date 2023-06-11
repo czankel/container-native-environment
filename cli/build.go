@@ -26,11 +26,11 @@ const outputLineCount = 100
 // Note that in an error case, it will keep any residual container and snapshots.
 func getContainer(ctx context.Context,
 	run runtime.Runtime, ws *project.Workspace,
-	progress chan<- []runtime.ProgressStatus) (runtime.Container, error) {
+	progress chan<- []runtime.ProgressStatus) (runtime.Container, runtime.Image, error) {
 
 	// check and pull the image, if required, for building the container
 	if ws.Environment.Origin == "" {
-		return nil, errdefs.InvalidArgument("Workspace has no image defined")
+		return nil, nil, errdefs.InvalidArgument("Workspace has no image defined")
 	}
 
 	img, err := run.GetImage(ctx, ws.Environment.Origin)
@@ -38,12 +38,12 @@ func getContainer(ctx context.Context,
 		img, err = pullImage(ctx, run, ws.Environment.Origin)
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	diffIDs, err := img.RootFS(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	rootName := identity.ChainID(diffIDs).String()
 	_, err = run.GetSnapshot(ctx, rootName)
@@ -53,16 +53,22 @@ func getContainer(ctx context.Context,
 		close(progress)
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// check and return the container if it already exists
 	ctr, err := container.GetContainer(ctx, run, ws)
 	if err == nil {
-		return ctr, nil
+		return ctr, img, nil
 	}
 
-	return container.CreateContainer(ctx, run, ws, &user, img, nil)
+	_, err = conf.GetContext()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = ctr.Create(ctx, img, nil)
+	return ctr, img, err
 }
 
 // buildLayers builds the layers of a container and outputs progress status.
@@ -118,12 +124,7 @@ func buildContainer(ctx context.Context, run runtime.Runtime, ws *project.Worksp
 	}()
 
 	params.Upgrade = buildWorkspaceUpgrade
-	ctr, err := getContainer(ctx, run, ws, progress)
-	if err != nil {
-		return nil, err
-	}
-
-	img, err := ctr.Image(ctx)
+	ctr, img, err := getContainer(ctx, run, ws, progress)
 	if err != nil {
 		return nil, err
 	}
