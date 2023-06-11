@@ -39,6 +39,7 @@ type Registry struct {
 type Context struct {
 	Runtime  string
 	Registry string
+	Options  map[string]string `cne:"inline"`
 }
 
 type Config struct {

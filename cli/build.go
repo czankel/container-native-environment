@@ -62,12 +62,12 @@ func getContainer(ctx context.Context,
 		return ctr, img, nil
 	}
 
-	_, err = conf.GetContext()
+	confCtx, err := conf.GetContext()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	err = ctr.Create(ctx, img, nil)
+	err = ctr.Create(ctx, img, confCtx.Options)
 	return ctr, img, err
 }
 
