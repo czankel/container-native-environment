@@ -303,9 +303,9 @@ func Runtimes() []string {
 
 // Open opens a new runtime for the specified name.
 func Open(ctx context.Context, confRun *config.Runtime) (Runtime, error) {
-	reg, ok := runtimes[confRun.Name]
+	reg, ok := runtimes[confRun.Runtime]
 	if !ok {
-		return nil, errdefs.NotFound("runtime", confRun.Name)
+		return nil, errdefs.NotFound("runtime", confRun.Runtime)
 	}
 	return reg.Open(ctx, confRun)
 }

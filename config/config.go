@@ -26,7 +26,7 @@ type Settings struct {
 }
 
 type Runtime struct {
-	Name       string `toml:"Name,omitempty"`
+	Runtime    string `toml:"Runtime,omitempty"`
 	SocketName string `toml:"SocketName,omitempty"`
 	Namespace  string `cne:"ReadOnly" toml:"Namespace,omitempty"`
 }
@@ -74,8 +74,8 @@ func (conf *Config) GetRuntime() (*Runtime, error) {
 	}
 
 	if r, found := conf.Runtime[cfgCtx.Runtime]; found {
-		if r.Name == "" {
-			r.Name = cfgCtx.Runtime
+		if r.Runtime == "" {
+			r.Runtime = cfgCtx.Runtime
 		}
 		return r, nil
 	}
