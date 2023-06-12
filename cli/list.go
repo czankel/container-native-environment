@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"strings"
 
@@ -284,7 +285,7 @@ func listContainersRunE(cmd *cobra.Command, args []string) error {
 
 	if !listContainersAll {
 		prj, err = loadProject()
-		if err != nil {
+		if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 			return err
 		}
 	}
