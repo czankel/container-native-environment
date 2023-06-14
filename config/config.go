@@ -635,14 +635,17 @@ func (conf *Config) FullImageName(name string) (string, error) {
 	regName := cfgCtx.Registry
 	reg, haveReg := conf.Registry[regName]
 
+	// check if a registry name was given, note that container names can also include a '/'
 	domEnd := strings.Index(name, "/") + 1
 	if domEnd > 1 {
-		regName = name[:domEnd-1]
-		if reg, haveReg = conf.Registry[regName]; !haveReg {
+		if r, ok := conf.Registry[name[:domEnd-1]]; !ok {
 			domEnd = 0
+		} else {
+			regName = name[:domEnd-1]
+			reg = r
+			haveReg = true
 		}
 	}
-
 	if haveReg {
 		if regName == "docker.io" {
 			named, err := refdocker.ParseDockerRef(name)
