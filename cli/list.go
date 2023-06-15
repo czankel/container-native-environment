@@ -109,6 +109,35 @@ var listImagesCmd = &cobra.Command{
 
 const displayHashLength = 8
 
+// getImageName upda
+func getImageName(ctx context.Context, run runtime.Runtime, imgName string) (string, error) {
+
+	if len(imgName) == 0 {
+		return "", errdefs.InvalidArgument("invalid image name")
+	}
+
+	if strings.HasPrefix(imgName, "@") {
+		index, err := strconv.Atoi(imgName[1:])
+		if err != nil {
+			return "", err
+		}
+
+		images, err := run.Images(ctx)
+		if err != nil {
+			return "", err
+		}
+
+		imgName = images[index].Name()
+	} else {
+		var err error
+		imgName, err = conf.FullImageName(imgName)
+		if err != nil {
+			return "", err
+		}
+	}
+	return imgName, nil
+}
+
 // splitRepoNameTag splits the provided full name to the image name and tag
 // and resolves any respository aliases from the registered repositories.
 // The default repository is omitted in the name.

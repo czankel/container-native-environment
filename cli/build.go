@@ -73,7 +73,7 @@ func getContainer(ctx context.Context,
 		return nil, nil, err
 	}
 
-	err = ctr.Create(ctx, img, confCtx.Options)
+	ctr, err = container.CreateContainer(ctx, run, ws, &user, img, confCtx.Options)
 	return ctr, img, err
 }
 

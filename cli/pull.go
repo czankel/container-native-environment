@@ -9,8 +9,12 @@ import (
 	"github.com/czankel/cne/runtime"
 )
 
-func pullImage(ctx context.Context, run runtime.Runtime,
-	imageName string) (runtime.Image, error) {
+func pullImage(ctx context.Context, run runtime.Runtime, imgName string) (runtime.Image, error) {
+
+	imgName, err := conf.FullImageName(imgName)
+	if err != nil {
+		return nil, err
+	}
 
 	progress := make(chan []runtime.ProgressStatus)
 	var wg sync.WaitGroup
@@ -21,7 +25,7 @@ func pullImage(ctx context.Context, run runtime.Runtime,
 		showProgress(progress)
 	}()
 
-	return run.PullImage(ctx, imageName, progress)
+	return run.PullImage(ctx, imgName, progress)
 }
 
 var pullCmd = &cobra.Command{
@@ -38,11 +42,6 @@ registry is used.`,
 
 func pullImageRunE(cmd *cobra.Command, args []string) error {
 
-	imgName, err := conf.FullImageName(args[0])
-	if err != nil {
-		return err
-	}
-
 	runCfg, err := conf.GetRuntime()
 	if err != nil {
 		return err
@@ -56,7 +55,7 @@ func pullImageRunE(cmd *cobra.Command, args []string) error {
 	defer run.Close()
 	ctx = run.WithNamespace(ctx, runCfg.Namespace)
 
-	_, err = pullImage(ctx, run, imgName)
+	_, err = pullImage(ctx, run, args[0])
 
 	return err
 }

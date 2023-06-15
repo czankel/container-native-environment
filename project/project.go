@@ -303,6 +303,10 @@ func (prj *Project) SetCurrentWorkspace(name string) error {
 	return errdefs.NotFound("workspace", name)
 }
 
+func (prj *Project) UpdateWorkspace(ws *Workspace, origin string) {
+	ws.Environment.Origin = origin
+}
+
 // CreateWorkspace creates a new workspace in the project before the provided workspace
 // or at the end if 'before' is an empty string.
 // It returns the pointer to the workspace in the current project.

@@ -223,12 +223,7 @@ func createWorkspaceRunE(cmd *cobra.Command, args []string) error {
 
 func initWorkspace(prj *project.Project, wsName, insert, imgName string) error {
 
-	imgName, err := conf.FullImageName(imgName)
-	if err != nil {
-		return err
-	}
-
-	ws, err := prj.CreateWorkspace(wsName, imgName, insert)
+	ws, err := prj.CreateWorkspace(wsName, "", insert)
 	if err != nil {
 		return err
 	}
@@ -246,6 +241,11 @@ func initWorkspace(prj *project.Project, wsName, insert, imgName string) error {
 		}
 		defer run.Close()
 		ctx = run.WithNamespace(ctx, runCfg.Namespace)
+
+		imgName, err := getImageName(ctx, run, imgName)
+		if err != nil {
+			return err
+		}
 
 		img, err := pullImage(ctx, run, imgName)
 		if err != nil {
@@ -273,6 +273,8 @@ func initWorkspace(prj *project.Project, wsName, insert, imgName string) error {
 		if err != nil {
 			return err
 		}
+
+		prj.UpdateWorkspace(ws, imgName)
 
 		err = support.SetupWorkspace(ctx, ws, img)
 		if err != nil {
