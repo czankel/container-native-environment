@@ -158,7 +158,7 @@ func listImages(ctx context.Context, run runtime.Runtime) error {
 		imgList[i].CreatedAt = timeToAgoString(img.CreatedAt())
 		imgList[i].Size = sizeToSIString(img.Size())
 	}
-	printList(imgList, false)
+	printList(imgList, true)
 
 	return nil
 }
