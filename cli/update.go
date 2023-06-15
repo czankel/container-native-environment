@@ -60,18 +60,18 @@ The system option modifies the system-wide configuration file stored in
 
 var updateConfigRenameEntry string
 
-var updateConfigContextCmd = &cobra.Command{
+var updateContextCmd = &cobra.Command{
 	Use:   "context [context]",
 	Short: "Update context configurations",
 	Args:  cobra.RangeArgs(0, 1),
-	RunE:  updateConfigContextRunE,
+	RunE:  updateContextRunE,
 }
 
-var updateConfigContextOptions string
-var updateConfigContextRuntime string
-var updateConfigContextRegistry string
+var updateContextOptions string
+var updateContextRuntime string
+var updateContextRegistry string
 
-func updateConfigContextRunE(cmd *cobra.Command, args []string) error {
+func updateContextRunE(cmd *cobra.Command, args []string) error {
 
 	tempConf, err := loadConfig()
 	if err != nil {
@@ -106,13 +106,13 @@ func updateConfigContextRunE(cmd *cobra.Command, args []string) error {
 	}
 	var changes []changeInfo
 
-	if err == nil && updateConfigContextOptions != "" {
+	if err == nil && updateContextOptions != "" {
 		opts := make([]string, 0, len(confCtx.Options))
 		for k, v := range confCtx.Options {
 			opts = append(opts, k+"="+v)
 		}
 		orig := strings.Join(opts, ",")
-		err := confCtx.UpdateContextOptions(updateConfigContextOptions)
+		err := confCtx.UpdateContextOptions(updateContextOptions)
 		if err != nil {
 			return err
 		}
@@ -122,21 +122,21 @@ func updateConfigContextRunE(cmd *cobra.Command, args []string) error {
 		}
 		changes = append(changes, changeInfo{"Options", orig, strings.Join(opts, ",")})
 	}
-	if err == nil && updateConfigContextRegistry != "" {
+	if err == nil && updateContextRegistry != "" {
 		if _, ok := tempConf.Registry[confCtx.Registry]; !ok {
 			return errdefs.NotFound("registry", confCtx.Registry)
 		}
 		orig := confCtx.Registry
-		confCtx.Registry = updateConfigContextRegistry
-		changes = append(changes, changeInfo{"Registry", orig, updateConfigContextRegistry})
+		confCtx.Registry = updateContextRegistry
+		changes = append(changes, changeInfo{"Registry", orig, updateContextRegistry})
 	}
-	if err == nil && updateConfigContextRuntime != "" {
+	if err == nil && updateContextRuntime != "" {
 		if _, ok := tempConf.Runtime[confCtx.Runtime]; !ok {
 			return errdefs.NotFound("runtime", confCtx.Runtime)
 		}
 		orig := confCtx.Runtime
-		confCtx.Runtime = updateConfigContextRuntime
-		changes = append(changes, changeInfo{"Runtime", orig, updateConfigContextRuntime})
+		confCtx.Runtime = updateContextRuntime
+		changes = append(changes, changeInfo{"Runtime", orig, updateContextRuntime})
 	}
 	err = writeConfig(tempConf)
 	if err != nil {
@@ -151,7 +151,7 @@ var updateConfigRegistryCmd = &cobra.Command{
 	Use:   "registry [name]",
 	Short: "Update registry configurations",
 	Args:  cobra.RangeArgs(0, 1),
-	RunE:  updateConfigContextRunE,
+	RunE:  updateContextRunE,
 }
 
 var updateConfigRegistryDomain string
@@ -317,14 +317,14 @@ func init() {
 	updateConfigCmd.Flags().BoolVarP(
 		&configProject, "project", "", false, "Update project configuration")
 
-	updateConfigCmd.AddCommand(updateConfigContextCmd)
-	updateConfigContextCmd.Flags().StringVar(
-		&updateConfigContextOptions, "options", "", "Container runtime options")
-	updateConfigContextCmd.Flags().StringVar(
-		&updateConfigContextRuntime, "runtime", "", "Change the runtime for the context")
-	updateConfigContextCmd.Flags().StringVar(
-		&updateConfigContextRegistry, "registry", "", "Change the registry for the context")
-	updateConfigContextCmd.Flags().StringVar(
+	updateCmd.AddCommand(updateContextCmd)
+	updateContextCmd.Flags().StringVar(
+		&updateContextOptions, "options", "", "Container runtime options")
+	updateContextCmd.Flags().StringVar(
+		&updateContextRuntime, "runtime", "", "Change the runtime for the context")
+	updateContextCmd.Flags().StringVar(
+		&updateContextRegistry, "registry", "", "Change the registry for the context")
+	updateContextCmd.Flags().StringVar(
 		&updateConfigRenameEntry, "rename", "", "Rename the entry")
 
 	updateConfigCmd.AddCommand(updateConfigRegistryCmd)
