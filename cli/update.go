@@ -259,8 +259,8 @@ func updateConfigRuntimeRunE(cmd *cobra.Command, args []string) error {
 	var changes []changeInfo
 
 	if err == nil && updateConfigRuntimeRuntime != "" {
-		orig := confRun.Runtime
-		confRun.Runtime = updateConfigRuntimeRuntime
+		orig := confRun.Engine
+		confRun.Engine = updateConfigRuntimeRuntime
 		changes = append(changes, changeInfo{"Runtime", orig, updateConfigRuntimeRuntime})
 	}
 	if err == nil && updateConfigRuntimeSocketName != "" {

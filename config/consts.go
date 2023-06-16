@@ -11,6 +11,7 @@ const (
 	DefaultContextName = "default"
 
 	DefaultRuntimeName       = "containerd"
+	DefaultRuntimeEngine     = "containerd"
 	DefaultRuntimeSocketName = "/run/containerd/containerd.sock"
 	DefaultRuntimeNamespace  = "cne"
 

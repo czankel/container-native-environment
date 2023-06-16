@@ -75,7 +75,7 @@ func createConfigContextRunE(cmd *cobra.Command, args []string) error {
 
 	if createConfigContextRegistry != "" {
 		if _, ok := tempConf.Registry[createConfigContextRegistry]; !ok {
-			return errdefs.NotFound("runtime", createConfigContextRegistry)
+			return errdefs.NotFound("registry", createConfigContextRegistry)
 		}
 		confCtx.Registry = createConfigContextRegistry
 		changes = append(changes, changeInfo{"Registry", createConfigContextRegistry})
@@ -151,7 +151,7 @@ var createConfigRuntimeCmd = &cobra.Command{
 	RunE:  createConfigRuntimeRunE,
 }
 
-var createConfigRuntimeRuntime string
+var createConfigRuntimeEngine string
 var createConfigRuntimeSocketName string
 var createConfigRuntimeNamespace string
 
@@ -173,8 +173,8 @@ func createConfigRuntimeRunE(cmd *cobra.Command, args []string) error {
 	}
 	var changes []changeInfo
 
-	if createConfigRuntimeRuntime != "" {
-		confRun.Runtime = createConfigRuntimeRuntime
+	if createConfigRuntimeEngine != "" {
+		confRun.Engine = createConfigRuntimeEngine
 		changes = append(changes, changeInfo{"SocketName", createConfigRuntimeSocketName})
 	}
 	if createConfigRuntimeSocketName != "" {
@@ -426,7 +426,7 @@ func init() {
 
 	createConfigCmd.AddCommand(createConfigRuntimeCmd)
 	createConfigRuntimeCmd.Flags().StringVar(
-		&createConfigRuntimeRuntime, "runtime", "", "Container runtime")
+		&createConfigRuntimeEngine, "engine", "", "Container engine")
 	createConfigRuntimeCmd.Flags().StringVar(
 		&createConfigRuntimeSocketName, "socketname", "", "Socket name")
 	createConfigRuntimeCmd.Flags().StringVar(

@@ -28,7 +28,7 @@ type Settings struct {
 }
 
 type Runtime struct {
-	Runtime    string `toml:"Runtime,omitempty"`
+	Engine     string `toml:"Engine,omitempty"`
 	SocketName string `toml:"SocketName,omitempty"`
 	Namespace  string `cne:"ReadOnly" toml:"Namespace,omitempty"`
 }
@@ -88,7 +88,7 @@ func (conf *Config) CreateRegistry(name string) (*Registry, error) {
 	return conf.Registry[name], nil
 }
 
-func (conf *Config) CreateRuntime(name, runtime string) (*Runtime, error) {
+func (conf *Config) CreateRuntime(name, engine string) (*Runtime, error) {
 
 	if _, found := conf.Runtime[name]; found {
 		return nil, errdefs.AlreadyExists("context", name)
@@ -97,7 +97,7 @@ func (conf *Config) CreateRuntime(name, runtime string) (*Runtime, error) {
 		conf.Runtime = make(map[string]*Runtime, 1)
 	}
 	conf.Runtime[name] = &Runtime{
-		Runtime:   runtime,
+		Engine:    engine,
 		Namespace: DefaultRuntimeNamespace,
 	}
 	return conf.Runtime[name], nil
@@ -133,12 +133,12 @@ func (conf *Config) GetRuntime(args ...string) (*Runtime, error) {
 	}
 
 	if r, found := conf.Runtime[name]; found {
-		if r.Runtime == "" {
-			r.Runtime = name
+		if r.Engine == "" {
+			r.Engine = name
 		}
 		return r, nil
 	}
-	return nil, errdefs.InvalidArgument("invalid runtime '%s'", name)
+	return nil, errdefs.InvalidArgument("invalid Engine '%s'", name)
 }
 
 // GetRegistry returns the specified registry or context-specific registry if name is empty
@@ -325,8 +325,8 @@ func Load() (*Config, error) {
 				RepoName: DefaultRegistryRepoName,
 			}},
 		Runtime: map[string]*Runtime{
-			DefaultRuntimeName: &Runtime{
-				Runtime:    DefaultRuntimeName,
+			DefaultRuntimeEngine: &Runtime{
+				Engine:     DefaultRuntimeEngine,
 				SocketName: DefaultRuntimeSocketName,
 				Namespace:  DefaultRuntimeNamespace,
 			}},

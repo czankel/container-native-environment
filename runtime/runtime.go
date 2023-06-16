@@ -275,42 +275,42 @@ type ExitStatus struct {
 //
 
 // RuntimeType is a construct that allows to self-register runtime implementations.
-type RuntimeType interface {
+type Engine interface {
 	Open(context.Context, *config.Runtime) (Runtime, error)
 }
 
-var runtimes map[string]RuntimeType
+type EngineEntry struct {
+	engine Engine
+}
+
+var engines map[string]EngineEntry
 
 // Register registers a new Runtime Registrar.
-func Register(name string, runType RuntimeType) error {
-	if runtimes == nil {
-		runtimes = make(map[string]RuntimeType)
+func Register(name string, eng Engine) error {
+	if engines == nil {
+		engines = make(map[string]EngineEntry)
 	}
 
-	_, ok := runtimes[name]
+	_, ok := engines[name]
 	if ok {
-		return errdefs.AlreadyExists("runtime", name)
+		return errdefs.AlreadyExists("engine", name)
 	}
-	runtimes[name] = runType
+	engines[name] = EngineEntry{eng}
 	return nil
 }
 
-// Runtimes returns a list of all registered runtimes.
-func Runtimes() []string {
-	names := make([]string, 0, len(runtimes))
-	for n, _ := range runtimes {
-		names = append(names, n)
-	}
-	return names
+// Engines returns a list of all registered runtime engines
+func Engines() map[string]EngineEntry {
+	return engines
 }
 
 // Open opens a new runtime for the specified name.
 func Open(ctx context.Context, confRun *config.Runtime) (Runtime, error) {
-	reg, ok := runtimes[confRun.Runtime]
+	eng, ok := engines[confRun.Engine]
 	if !ok {
-		return nil, errdefs.NotFound("runtime", confRun.Runtime)
+		return nil, errdefs.NotFound("engine", confRun.Engine)
 	}
-	return reg.Open(ctx, confRun)
+	return eng.engine.Open(ctx, confRun)
 }
 
 // Errorf is an internal function to create an error specific to the runtime.

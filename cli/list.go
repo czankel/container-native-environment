@@ -59,15 +59,15 @@ var listCmd = &cobra.Command{
 }
 
 var listRuntimeCmd = &cobra.Command{
-	Use:     "runtimes",
-	Aliases: []string{"runtime", "r"},
-	Short:   "list runtimes",
+	Use:     "engines",
+	Aliases: []string{"engine", "r"},
+	Short:   "list low-level container engines",
 	Args:    cobra.NoArgs,
 	RunE:    listRuntimeRunE,
 }
 
 func listRuntimeRunE(cmd *cobra.Command, args []string) error {
-	printList(runtime.Runtimes(), false)
+	printList(runtime.Engines(), false)
 	return nil
 }
 

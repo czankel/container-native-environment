@@ -24,16 +24,16 @@ type containerdRuntime struct {
 	client *containerd.Client
 }
 
-type containerdRuntimeType struct {
+type containerdEngine struct {
 }
 
 const contextName = "cne"
 
 func init() {
-	runtime.Register("containerd", &containerdRuntimeType{})
+	runtime.Register("containerd", &containerdEngine{})
 }
 
-func (r *containerdRuntimeType) Open(ctx context.Context,
+func (r *containerdEngine) Open(ctx context.Context,
 	confRun *config.Runtime) (runtime.Runtime, error) {
 
 	// Validate the provided port
