@@ -263,9 +263,10 @@ func initWorkspace(prj *project.Project, wsName, insert, imgName string) error {
 			progress := make(chan []runtime.ProgressStatus)
 			var wg sync.WaitGroup
 			defer wg.Wait()
+			defer close(progress)
+			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				wg.Add(1)
 				showProgress(progress)
 			}()
 			err = img.Unpack(ctx, progress)

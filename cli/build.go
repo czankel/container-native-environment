@@ -25,7 +25,8 @@ const outputLineCount = 100
 // creates the container and outputs progress status.
 // Note that in an error case, it will keep any residual container and snapshots.
 func getContainer(ctx context.Context,
-	run runtime.Runtime, ws *project.Workspace) (runtime.Container, runtime.Image, error) {
+	run runtime.Runtime, ws *project.Workspace,
+	progress chan<- []runtime.ProgressStatus) (runtime.Container, runtime.Image, error) {
 
 	// check and pull the image, if required, for building the container
 	if ws.Environment.Origin == "" {
@@ -44,19 +45,10 @@ func getContainer(ctx context.Context,
 	if err != nil {
 		return nil, nil, err
 	}
-
 	rootName := identity.ChainID(diffIDs).String()
 	_, err = run.GetSnapshot(ctx, rootName)
 	if err != nil && errors.Is(err, errdefs.ErrNotFound) {
-		progress := make(chan []runtime.ProgressStatus)
-		var wg sync.WaitGroup
-		go func() {
-			defer wg.Done()
-			wg.Add(1)
-			showProgress(progress)
-		}()
 		err = img.Unpack(ctx, progress)
-		wg.Wait()
 	}
 	if err != nil {
 		return nil, nil, err
@@ -94,6 +86,7 @@ func buildLayers(ctx context.Context, run runtime.Runtime, ctr runtime.Container
 	progress := make(chan []runtime.ProgressStatus)
 	var wg sync.WaitGroup
 	defer wg.Wait()
+	defer close(progress)
 	go func() {
 		defer wg.Done()
 		wg.Add(1)
@@ -120,8 +113,18 @@ func buildLayers(ctx context.Context, run runtime.Runtime, ctr runtime.Container
 func buildContainer(ctx context.Context, run runtime.Runtime, ws *project.Workspace,
 	layerCount int) (runtime.Container, error) {
 
+	progress := make(chan []runtime.ProgressStatus)
+	var wg sync.WaitGroup
+	defer wg.Wait()
+	defer close(progress)
+	go func() {
+		defer wg.Done()
+		wg.Add(1)
+		showProgress(progress)
+	}()
+
 	params.Upgrade = buildWorkspaceUpgrade
-	ctr, img, err := getContainer(ctx, run, ws)
+	ctr, img, err := getContainer(ctx, run, ws, progress)
 	if err != nil {
 		return nil, err
 	}

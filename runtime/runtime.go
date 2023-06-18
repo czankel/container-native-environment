@@ -36,7 +36,8 @@ type Runtime interface {
 	// PullImage pulls an image into a local registry and returns an image instance.
 	//
 	// PullImage is a blocking call and reports the progress through the optionally provided
-	// channel. The channel can be nil to skip sending updates.
+	// channel. The channel can be nil to skip sending updates. Note that the progress won't
+	// be closed by PullImage but guarantees not to send any further data after exiting.
 	//
 	// Note that the status sent may exclude status information for entries that haven't
 	// changed.

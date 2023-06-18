@@ -19,6 +19,7 @@ func pullImage(ctx context.Context, run runtime.Runtime, imgName string) (runtim
 	progress := make(chan []runtime.ProgressStatus)
 	var wg sync.WaitGroup
 	defer wg.Wait()
+	defer close(progress)
 	go func() {
 		defer wg.Done()
 		wg.Add(1)

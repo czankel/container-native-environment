@@ -109,13 +109,7 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 			return 0, errdefs.InvalidArgument("No such layer: %s", execLayerName)
 		}
 
-		ctr, img, err := getContainer(ctx, run, ws)
-		if err != nil {
-			return 0, err
-		}
-
-		// build all layers including the destinationlayer (i.e. + 1)
-		err = buildLayers(ctx, run, ctr, img, ws, layerIdx+1)
+		ctr, err := buildContainer(ctx, run, ws, layerIdx+1)
 		if err != nil {
 			return 0, err
 		}

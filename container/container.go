@@ -145,8 +145,6 @@ func Build(ctx context.Context, run runtime.Runtime, runCtr runtime.Container,
 	user *config.User, params *config.Parameters,
 	progress chan []runtime.ProgressStatus, stream runtime.Stream) error {
 
-	defer close(progress)
-
 	if layerCount == -1 {
 		layerCount = len(ws.Environment.Layers)
 	}

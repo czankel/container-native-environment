@@ -44,7 +44,6 @@ func updateImageProgress(cctx context.Context, ctx context.Context,
 	)
 
 	defer ticker.Stop()
-	defer close(progress)
 	cs := ctrdRun.client.ContentStore()
 	sn := ctrdRun.client.SnapshotService(containerd.DefaultSnapshotter)
 
@@ -85,7 +84,7 @@ func updateImageStatus(ctx context.Context, start time.Time,
 			}
 			statuses = append(statuses, runtime.ProgressStatus{
 				Reference: active.Ref,
-				Status:    runtime.StatusRunning,
+				Status:    runtime.StatusLoading,
 				Offset:    active.Offset,
 				Total:     active.Total,
 				StartedAt: active.StartedAt,
@@ -100,7 +99,6 @@ func updateImageStatus(ctx context.Context, start time.Time,
 
 	var chain []digest.Digest
 	for _, desc := range *descs {
-
 		ref := remotes.MakeRefKey(ctx, desc)
 		if _, isActive := actStats[ref]; isActive {
 			continue
@@ -115,15 +113,18 @@ func updateImageStatus(ctx context.Context, start time.Time,
 			stat.Status = runtime.StatusPending
 
 		} else if err == nil {
-
-			if snapID, f := info.Labels[labels.LabelUncompressed]; f {
-				chain = append(chain, digest.Digest(snapID))
-				chainID := identity.ChainID(chain)
-				if _, err := sn.Stat(ctx, chainID.String()); err == nil {
-					stat.Status = runtime.StatusComplete
+			if strings.Contains(desc.MediaType, "image.layer") {
+				if snapID, f := info.Labels[labels.LabelUncompressed]; f {
+					chain = append(chain, digest.Digest(snapID))
+					chainID := identity.ChainID(chain)
+					if _, err := sn.Stat(ctx, chainID.String()); err == nil {
+						stat.Status = runtime.StatusComplete
+					}
+				} else {
+					stat.Status = runtime.StatusUnpacking
 				}
 			} else {
-				stat.Status = runtime.StatusUnpacking
+				stat.Status = runtime.StatusComplete
 			}
 			stat.UpdatedAt = info.CreatedAt
 		} else {
@@ -198,11 +199,12 @@ func pullImage(ctx context.Context, ctrdRun *containerdRuntime, name string,
 		}
 		return nil, nil
 	})
-
-	pctx, stopProgress := context.WithCancel(ctx)
-	var wg sync.WaitGroup
-	wg.Add(1)
 	if progress != nil {
+		var wg sync.WaitGroup
+		pctx, stopProgress := context.WithCancel(ctx)
+		defer wg.Wait()
+		defer stopProgress()
+		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			updateImageProgress(pctx, ctx, ctrdRun, &mutex, &descs, progress)
@@ -215,11 +217,6 @@ func pullImage(ctx context.Context, ctrdRun *containerdRuntime, name string,
 	ctrdImg, err := ctrdRun.client.Pull(ctx, name, containerd.WithImageHandler(h))
 
 	signal.Reset()
-
-	if progress != nil {
-		stopProgress()
-		wg.Wait()
-	}
 
 	if err == reference.ErrObjectRequired {
 		return nil, runtime.Errorf("invalid image name '%s': %v", name, err)
@@ -305,8 +302,9 @@ func (img *image) Unpack(ctx context.Context, progress chan<- []runtime.Progress
 
 	if progress != nil {
 		var wg sync.WaitGroup
-
 		cctx, stopProgress := context.WithCancel(ctx)
+		defer wg.Wait()
+		defer stopProgress()
 		wg.Add(1)
 
 		go func() {
@@ -315,10 +313,7 @@ func (img *image) Unpack(ctx context.Context, progress chan<- []runtime.Progress
 			var mutex sync.Mutex
 			updateImageProgress(cctx, ctx, img.ctrdRuntime, &mutex, &descs, progress)
 		}()
-		defer wg.Wait()
-		defer stopProgress()
 	}
-
 	return img.ctrdImage.Unpack(ctx, containerd.DefaultSnapshotter)
 }
 
