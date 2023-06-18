@@ -240,9 +240,9 @@ func printList(list interface{}, withIndex bool) {
 	}
 
 	format := "%s"
-	for i := 0; i < hdr.NumField(); i++ {
-		if hdr.Field(i).Tag.Get("output") != "-" {
-			fmt.Fprintf(w, format, strings.ToUpper(hdr.Field(i).Name))
+	for _, f := range reflect.VisibleFields(hdr) {
+		if f.IsExported() {
+			fmt.Fprintf(w, format, strings.ToUpper(f.Name))
 			format = "\t%s"
 		}
 	}
@@ -296,7 +296,9 @@ func printListRow(w *tabwriter.Writer, i int, item reflect.Value, isPtr bool, hd
 			}
 			fmt.Fprintf(w, format, s)
 		} else {
-			fmt.Fprintf(w, format, val.Interface())
+			if val.CanInterface() {
+				fmt.Fprintf(w, format, val.Interface())
+			}
 		}
 		format = "\t%v"
 	}
