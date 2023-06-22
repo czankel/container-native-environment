@@ -28,25 +28,26 @@ const (
 
 	WorkspaceDefaultName = "main"
 
-	LayerTypeCustom = ""
-	LayerTypeImage  = "image"
-	LayerTypeUbuntu = "ubuntu"
-	LayerTypeDebian = "debian"
-	LayerTypeApt    = "apt"
-	LayerTypeDnf    = "dnf"
-	LayerTypePip    = "pip"
+	LayerNameOS = "os"
 
-	LayerNameImage = "image"
-	LayerNameTop   = ""
+	LayerHandlerNone   = ""
+	LayerHandlerImage  = "image"
+	LayerHandlerUbuntu = "ubuntu"
+	LayerHandlerDebian = "debian"
+	LayerHandlerApt    = "apt"
+	LayerHandlerDnf    = "dnf"
+	LayerHandlerPip    = "pip"
+
+	LayerNameTop = ""
 )
 
-var SystemLayerTypes = [...]string{
-	LayerTypeImage,
-	LayerTypeUbuntu,
-	LayerTypeDebian,
-	LayerTypeApt,
-	LayerTypeDnf,
-	LayerTypePip,
+var LayerHandlers = [...]string{
+	LayerHandlerImage,
+	LayerHandlerUbuntu,
+	LayerHandlerDebian,
+	LayerHandlerApt,
+	LayerHandlerDnf,
+	LayerHandlerPip,
 }
 
 type Header struct {
@@ -90,7 +91,7 @@ type Environment struct {
 // Note that ideally we could use compositions for apt and other handlers
 type Layer struct {
 	Name     string // Unique name for the layer in the workspace; must not contain '/'
-	Type     string // one of the system layer types or custom layer
+	Handler  string // one of the layer handlers
 	Digest   string `output:"-"` // Images/Snaps for faster rebuilds
 	Commands []Command
 }
@@ -443,9 +444,9 @@ func (ws *Workspace) ConfigHash() [16]byte {
 // CreateLayer inserts a new layer (or layers) at the provided index, or at the end if index == -1
 func (ws *Workspace) CreateLayer(systemLayer bool, name string, atIndex int) (*Layer, error) {
 
-	layerType := LayerTypeCustom
+	layerHandler := LayerHandlerNone
 	if systemLayer {
-		layerType = name
+		layerHandler = name
 	}
 
 	if atIndex < -1 || atIndex > len(ws.Environment.Layers) {
@@ -462,7 +463,7 @@ func (ws *Workspace) CreateLayer(systemLayer bool, name string, atIndex int) (*L
 	}
 
 	ws.Environment.Layers = append(ws.Environment.Layers[:atIndex],
-		append([]Layer{Layer{Type: layerType, Name: name}},
+		append([]Layer{Layer{Handler: layerHandler, Name: name}},
 			ws.Environment.Layers[atIndex:]...)...)
 
 	return &ws.Environment.Layers[atIndex], nil
@@ -471,13 +472,24 @@ func (ws *Workspace) CreateLayer(systemLayer bool, name string, atIndex int) (*L
 // FindLayer looks up the layer by name and returns the layer index starting with 0 for the first
 // layer in the list and a pointer to the Layer structure.
 // If the layer cannot be found, it returns an index value of -1 and nil for the layer.
-func (ws *Workspace) FindLayer(name string) (int, *Layer) {
+func (ws *Workspace) FindLayer(name string) (int, *Layer, error) {
 	for i, l := range ws.Environment.Layers {
 		if name == l.Name {
-			return i, &ws.Environment.Layers[i]
+			return i, &ws.Environment.Layers[i], nil
 		}
 	}
-	return -1, nil
+	return -1, nil, errdefs.NotFound("layer", name)
+}
+
+// FindLayerByHandler looks up the layer by handler
+func (ws *Workspace) FindLayerByHandler(handler string, start int) (int, *Layer, error) {
+	layers := ws.Environment.Layers
+	for i := start; i < len(layers); i++ {
+		if handler == layers[i].Handler {
+			return i, &layers[i], nil
+		}
+	}
+	return -1, nil, errdefs.NotFound("layer", handler)
 }
 
 // DeleteLayer removes the specified layer.

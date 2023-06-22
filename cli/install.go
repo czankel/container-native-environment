@@ -8,7 +8,6 @@ import (
 
 	"github.com/containerd/console"
 
-	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/project"
 	"github.com/czankel/cne/runtime"
 	"github.com/czankel/cne/support"
@@ -56,9 +55,9 @@ func installAptRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	aptLayerIdx, aptLayer := ws.FindLayer(project.LayerTypeApt)
-	if aptLayer == nil {
-		return errdefs.InvalidArgument("Workspace has no apt layer")
+	aptLayerIdx, _, err := ws.FindLayer(project.LayerHandlerApt)
+	if err != nil {
+		return err
 	}
 
 	ctr, err := buildContainer(ctx, run, ws, aptLayerIdx+1)

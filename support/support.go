@@ -99,9 +99,9 @@ func GetImageInfo(ctx context.Context, img runtime.Image) (*ImageInfo, error) {
 // CreateSystemLayer creates a system layer
 func CreateSystemLayer(ws *project.Workspace, name string, atIndex int) error {
 	switch name {
-	case project.LayerTypeApt:
+	case project.LayerHandlerApt:
 		return AptCreateLayer(ws, atIndex)
-	case project.LayerTypeUbuntu:
+	case project.LayerHandlerUbuntu:
 		return UbuntuCreateOSLayer(ws, atIndex)
 	default:
 		return errdefs.InvalidArgument("system layer %s not supported", name)

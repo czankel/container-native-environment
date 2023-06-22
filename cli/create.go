@@ -367,7 +367,7 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 		}
 	} else {
 		layerName := args[0]
-		for _, n := range project.SystemLayerTypes {
+		for _, n := range project.LayerHandlers {
 			if layerName == n {
 				return errdefs.InvalidArgument("%s is a reserved layer name, use --system",
 					layerName)

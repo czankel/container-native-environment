@@ -27,12 +27,12 @@ type AptPackage struct {
 
 func AptCreateLayer(ws *project.Workspace, atIndex int) error {
 
-	_, aptLayer := ws.FindLayer(project.LayerTypeApt)
-	if aptLayer != nil {
-		return errdefs.AlreadyExists("Layer", project.LayerTypeApt)
+	_, aptLayer, err := ws.FindLayerByHandler(project.LayerHandlerApt, 0)
+	if err != nil {
+		return err
 	}
 
-	aptLayer, err := ws.CreateLayer(true, project.LayerTypeApt, -1)
+	aptLayer, err = ws.CreateLayer(true, project.LayerHandlerApt, -1)
 	if err != nil {
 		return err
 	}
@@ -54,7 +54,7 @@ func AptCreateLayer(ws *project.Workspace, atIndex int) error {
 }
 
 func AptDeleteLayer(ws *project.Workspace) error {
-	return ws.DeleteLayer(project.LayerTypeApt)
+	return ws.DeleteLayer(project.LayerHandlerApt)
 }
 
 // helper function to return the command args and index

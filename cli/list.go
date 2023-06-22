@@ -35,8 +35,8 @@ func getLayer(prj *project.Project,
 
 	index := len(ws.Environment.Layers) - 1
 	if layerName != "" {
-		index, _ = ws.FindLayer(layerName)
-		if index == -1 {
+		index, _, err = ws.FindLayer(layerName)
+		if err != nil && errors.Is(err, errdefs.ErrNotFound) {
 			index, err = strconv.Atoi(layerName)
 			if err != nil {
 				return nil, nil,
@@ -46,6 +46,8 @@ func getLayer(prj *project.Project,
 				return nil, nil,
 					errdefs.InvalidArgument("Layer index %d out of range", index)
 			}
+		} else if err != nil {
+			return nil, nil, err
 		}
 	}
 	return ws, &ws.Environment.Layers[index], nil

@@ -104,9 +104,9 @@ func execCommands(wsName, layerName string, args []string) (int, error) {
 
 	} else {
 
-		layerIdx, layer := ws.FindLayer(execLayerName)
-		if layer == nil {
-			return 0, errdefs.InvalidArgument("No such layer: %s", execLayerName)
+		layerIdx, layer, err := ws.FindLayer(execLayerName)
+		if err != nil {
+			return 0, err
 		}
 
 		ctr, err := buildContainer(ctx, run, ws, layerIdx+1)

@@ -234,9 +234,9 @@ func deleteCommandRunE(cmd *cobra.Command, args []string) error {
 
 	layer := &ws.Environment.Layers[len(ws.Environment.Layers)-1]
 	if deleteCommandLayer != "" {
-		_, layer = ws.FindLayer(deleteCommandLayer)
-		if layer == nil {
-			return errdefs.InvalidArgument("No such layer: %s", deleteCommandLayer)
+		_, layer, err = ws.FindLayer(deleteCommandLayer)
+		if err != nil {
+			return err
 		}
 	}
 

@@ -7,7 +7,7 @@ import (
 // Note that the commands are never executed by CNE for security reasons
 func DebianCreateOSLayer(ws *project.Workspace, atIndex int) error {
 
-	osLayer, err := ws.CreateLayer(true /* system */, project.LayerTypeDebian, 0)
+	osLayer, err := ws.CreateLayer(true /* system */, project.LayerHandlerDebian, 0)
 	if err != nil {
 		return err
 	}
