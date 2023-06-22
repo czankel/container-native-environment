@@ -60,15 +60,15 @@ var listCmd = &cobra.Command{
 	Args:    cobra.MinimumNArgs(1),
 }
 
-var listRuntimeCmd = &cobra.Command{
+var listEnginesCmd = &cobra.Command{
 	Use:     "engines",
 	Aliases: []string{"engine", "r"},
 	Short:   "list low-level container engines",
 	Args:    cobra.NoArgs,
-	RunE:    listRuntimeRunE,
+	RunE:    listEnginesRunE,
 }
 
-func listRuntimeRunE(cmd *cobra.Command, args []string) error {
+func listEnginesRunE(cmd *cobra.Command, args []string) error {
 	printList(runtime.Engines(), false)
 	return nil
 }
@@ -324,47 +324,58 @@ func listContainersRunE(cmd *cobra.Command, args []string) error {
 	return listContainers(ctx, run, prj)
 }
 
-var listConfigCmd = &cobra.Command{
-	Use:   "config",
-	Short: "list configurations",
+var listContextCmd = &cobra.Command{
+	Use:     "contexts",
+	Aliases: []string{"context"},
+	Short:   "list available contexts",
+	Args:    cobra.NoArgs,
+	RunE:    listContextRunE,
 }
 
-var listConfigContextCmd = &cobra.Command{
-	Use:   "context",
-	Short: "list available contexts",
-	Args:  cobra.NoArgs,
-	RunE:  listConfigContextRunE,
+var listRegistryCmd = &cobra.Command{
+	Use:     "registries",
+	Aliases: []string{"registry"},
+	Short:   "list available registries",
+	Args:    cobra.NoArgs,
+	RunE:    listRegistryRunE,
 }
 
-var listConfigRuntimeCmd = &cobra.Command{
-	Use:   "registry",
-	Short: "list available registries",
-	Args:  cobra.NoArgs,
-	RunE:  listConfigRegistryRunE,
-}
-var listConfigRegistryCmd = &cobra.Command{
-	Use:   "runtime",
-	Short: "list available runtimes",
-	Args:  cobra.NoArgs,
-	RunE:  listConfigRuntimeRunE,
+var listRuntimeCmd = &cobra.Command{
+	Use:     "runtimes",
+	Aliases: []string{"runtime"},
+	Short:   "list available runtimes",
+	Args:    cobra.NoArgs,
+	RunE:    listRuntimeRunE,
 }
 
-func listConfigContextRunE(cmd *cobra.Command, args []string) error {
-	printList(conf.Context, false)
+func listContextRunE(cmd *cobra.Command, args []string) error {
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+	printList(cfg.Context, false)
 	return nil
 }
-func listConfigRegistryRunE(cmd *cobra.Command, args []string) error {
-	printList(conf.Registry, false)
+func listRegistryRunE(cmd *cobra.Command, args []string) error {
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+	printList(cfg.Registry, false)
 	return nil
 }
-func listConfigRuntimeRunE(cmd *cobra.Command, args []string) error {
-	printList(conf.Runtime, false)
+func listRuntimeRunE(cmd *cobra.Command, args []string) error {
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+	printList(cfg.Runtime, false)
 	return nil
 }
 
 func init() {
 	rootCmd.AddCommand(listCmd)
-	listCmd.AddCommand(listRuntimeCmd)
+	listCmd.AddCommand(listEnginesCmd)
 	listCmd.AddCommand(listImagesCmd)
 	listCmd.AddCommand(listContainersCmd)
 	listContainersCmd.Flags().BoolVarP(
@@ -375,8 +386,19 @@ func init() {
 		&listCommandsWorkspace, "workspace", "w", "", "Name of the workspace")
 	listCommandsCmd.Flags().StringVarP(
 		&listCommandsLayer, "layer", "l", "", "Name or index of the layer")
-	listCmd.AddCommand(listConfigCmd)
-	listConfigCmd.AddCommand(listConfigContextCmd)
-	listConfigCmd.AddCommand(listConfigRuntimeCmd)
-	listConfigCmd.AddCommand(listConfigRegistryCmd)
+	listCmd.AddCommand(listContextCmd)
+	listContextCmd.Flags().BoolVarP(
+		&configSystem, "system", "", false, "System configuration")
+	listContextCmd.Flags().BoolVarP(
+		&configProject, "project", "", false, "Project configuration")
+	listCmd.AddCommand(listRuntimeCmd)
+	listRuntimeCmd.Flags().BoolVarP(
+		&configSystem, "system", "", false, "System configuration")
+	listRuntimeCmd.Flags().BoolVarP(
+		&configProject, "project", "", false, "Project configuration")
+	listCmd.AddCommand(listRegistryCmd)
+	listRegistryCmd.Flags().BoolVarP(
+		&configSystem, "system", "", false, "System configuration")
+	listRegistryCmd.Flags().BoolVarP(
+		&configProject, "project", "", false, "Project configuration")
 }
