@@ -24,22 +24,18 @@ var createCmd = &cobra.Command{
 	Args:    cobra.MinimumNArgs(1),
 }
 
-var createConfigCmd = &cobra.Command{
-	Use: "config",
-}
-
-var createConfigContextCmd = &cobra.Command{
+var createContextCmd = &cobra.Command{
 	Use:   "context name",
 	Short: "Create a new context",
 	Args:  cobra.ExactArgs(1),
-	RunE:  createConfigContextRunE,
+	RunE:  createContextRunE,
 }
 
-var createConfigContextOptions string
-var createConfigContextRegistry string
-var createConfigContextRuntime string
+var createContextOptions string
+var createContextRegistry string
+var createContextRuntime string
 
-func createConfigContextRunE(cmd *cobra.Command, args []string) error {
+func createContextRunE(cmd *cobra.Command, args []string) error {
 
 	tempConf, err := loadConfig()
 	if err != nil {
@@ -65,28 +61,28 @@ func createConfigContextRunE(cmd *cobra.Command, args []string) error {
 	}
 	var changes []changeInfo
 
-	if createConfigContextOptions != "" {
-		err := confCtx.UpdateContextOptions(createConfigContextOptions)
+	if createContextOptions != "" {
+		err := confCtx.UpdateContextOptions(createContextOptions)
 		if err != nil {
 			return err
 		}
-		changes = append(changes, changeInfo{"Options", createConfigContextOptions})
+		changes = append(changes, changeInfo{"Options", createContextOptions})
 	}
 
-	if createConfigContextRegistry != "" {
-		if _, ok := tempConf.Registry[createConfigContextRegistry]; !ok {
-			return errdefs.NotFound("registry", createConfigContextRegistry)
+	if createContextRegistry != "" {
+		if _, ok := tempConf.Registry[createContextRegistry]; !ok {
+			return errdefs.NotFound("registry", createContextRegistry)
 		}
-		confCtx.Registry = createConfigContextRegistry
-		changes = append(changes, changeInfo{"Registry", createConfigContextRegistry})
+		confCtx.Registry = createContextRegistry
+		changes = append(changes, changeInfo{"Registry", createContextRegistry})
 	}
 
-	if createConfigContextRuntime != "" {
-		if _, ok := tempConf.Runtime[createConfigContextRuntime]; !ok {
-			return errdefs.NotFound("runtime", createConfigContextRuntime)
+	if createContextRuntime != "" {
+		if _, ok := tempConf.Runtime[createContextRuntime]; !ok {
+			return errdefs.NotFound("runtime", createContextRuntime)
 		}
-		confCtx.Runtime = createConfigContextRuntime
-		changes = append(changes, changeInfo{"Runtime", createConfigContextRuntime})
+		confCtx.Runtime = createContextRuntime
+		changes = append(changes, changeInfo{"Runtime", createContextRuntime})
 	}
 
 	err = writeConfig(tempConf)
@@ -98,17 +94,17 @@ func createConfigContextRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-var createConfigRegistryCmd = &cobra.Command{
+var createRegistryCmd = &cobra.Command{
 	Use:   "registry name",
 	Short: "Create a new registry",
 	Args:  cobra.ExactArgs(1),
-	RunE:  createConfigRegistryRunE,
+	RunE:  createRegistryRunE,
 }
 
-var createConfigRegistryDomain string
-var createConfigRegistryRepoName string
+var createRegistryDomain string
+var createRegistryRepoName string
 
-func createConfigRegistryRunE(cmd *cobra.Command, args []string) error {
+func createRegistryRunE(cmd *cobra.Command, args []string) error {
 
 	tempConf, err := loadConfig()
 	if err != nil {
@@ -126,13 +122,13 @@ func createConfigRegistryRunE(cmd *cobra.Command, args []string) error {
 	}
 	var changes []changeInfo
 
-	if createConfigRegistryDomain != "" {
-		confReg.Domain = createConfigRegistryDomain
-		changes = append(changes, changeInfo{"Domain", createConfigRegistryDomain})
+	if createRegistryDomain != "" {
+		confReg.Domain = createRegistryDomain
+		changes = append(changes, changeInfo{"Domain", createRegistryDomain})
 	}
-	if createConfigRegistryRepoName != "" {
-		confReg.RepoName = createConfigRegistryRepoName
-		changes = append(changes, changeInfo{"RepoName", createConfigRegistryRepoName})
+	if createRegistryRepoName != "" {
+		confReg.RepoName = createRegistryRepoName
+		changes = append(changes, changeInfo{"RepoName", createRegistryRepoName})
 	}
 
 	err = writeConfig(tempConf)
@@ -144,18 +140,18 @@ func createConfigRegistryRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-var createConfigRuntimeCmd = &cobra.Command{
+var createRuntimeCmd = &cobra.Command{
 	Use:   "runtime name runtime",
 	Short: "Create a new runtime",
 	Args:  cobra.ExactArgs(2),
-	RunE:  createConfigRuntimeRunE,
+	RunE:  createRuntimeRunE,
 }
 
-var createConfigRuntimeEngine string
-var createConfigRuntimeSocketName string
-var createConfigRuntimeNamespace string
+var createRuntimeEngine string
+var createRuntimeSocketName string
+var createRuntimeNamespace string
 
-func createConfigRuntimeRunE(cmd *cobra.Command, args []string) error {
+func createRuntimeRunE(cmd *cobra.Command, args []string) error {
 
 	tempConf, err := loadConfig()
 	if err != nil {
@@ -173,17 +169,17 @@ func createConfigRuntimeRunE(cmd *cobra.Command, args []string) error {
 	}
 	var changes []changeInfo
 
-	if createConfigRuntimeEngine != "" {
-		confRun.Engine = createConfigRuntimeEngine
-		changes = append(changes, changeInfo{"SocketName", createConfigRuntimeSocketName})
+	if createRuntimeEngine != "" {
+		confRun.Engine = createRuntimeEngine
+		changes = append(changes, changeInfo{"SocketName", createRuntimeSocketName})
 	}
-	if createConfigRuntimeSocketName != "" {
-		confRun.SocketName = createConfigRuntimeSocketName
-		changes = append(changes, changeInfo{"SocketName", createConfigRuntimeSocketName})
+	if createRuntimeSocketName != "" {
+		confRun.SocketName = createRuntimeSocketName
+		changes = append(changes, changeInfo{"SocketName", createRuntimeSocketName})
 	}
-	if createConfigRuntimeNamespace != "" {
-		confRun.Namespace = createConfigRuntimeNamespace
-		changes = append(changes, changeInfo{"Namespace", createConfigRuntimeNamespace})
+	if createRuntimeNamespace != "" {
+		confRun.Namespace = createRuntimeNamespace
+		changes = append(changes, changeInfo{"Namespace", createRuntimeNamespace})
 	}
 
 	err = writeConfig(tempConf)
@@ -405,33 +401,39 @@ func init() {
 
 	rootCmd.AddCommand(createCmd)
 
-	createCmd.AddCommand(createConfigCmd)
-	createConfigCmd.Flags().BoolVarP(
+	createCmd.AddCommand(createContextCmd)
+	createContextCmd.Flags().StringVar(
+		&createContextOptions, "options", "", "Context options")
+	createContextCmd.Flags().StringVar(
+		&createContextRegistry, "registry", "", "Context registry")
+	createContextCmd.Flags().StringVar(
+		&createContextRuntime, "runtime", "", "Context registry")
+	createContextCmd.Flags().BoolVarP(
 		&configSystem, "system", "", false, "Update system configuration")
-	createConfigCmd.Flags().BoolVarP(
+	createContextCmd.Flags().BoolVarP(
 		&configProject, "project", "", false, "Update project configuration")
 
-	createConfigCmd.AddCommand(createConfigContextCmd)
-	createConfigContextCmd.Flags().StringVar(
-		&createConfigContextOptions, "options", "", "Context options")
-	createConfigContextCmd.Flags().StringVar(
-		&createConfigContextRegistry, "registry", "", "Context registry")
-	createConfigContextCmd.Flags().StringVar(
-		&createConfigContextRuntime, "runtime", "", "Context registry")
+	createCmd.AddCommand(createRegistryCmd)
+	createRegistryCmd.Flags().StringVar(
+		&createRegistryDomain, "domain", "", "Registry domain")
+	createRegistryCmd.Flags().StringVar(
+		&createRegistryRepoName, "reponame", "", "Registry repooname")
+	createRegistryCmd.Flags().BoolVarP(
+		&configSystem, "system", "", false, "Update system configuration")
+	createRegistryCmd.Flags().BoolVarP(
+		&configProject, "project", "", false, "Update project configuration")
 
-	createConfigCmd.AddCommand(createConfigRegistryCmd)
-	createConfigRegistryCmd.Flags().StringVar(
-		&createConfigRegistryDomain, "domain", "", "Registry domain")
-	createConfigRegistryCmd.Flags().StringVar(
-		&createConfigRegistryRepoName, "reponame", "", "Registry repooname")
-
-	createConfigCmd.AddCommand(createConfigRuntimeCmd)
-	createConfigRuntimeCmd.Flags().StringVar(
-		&createConfigRuntimeEngine, "engine", "", "Container engine")
-	createConfigRuntimeCmd.Flags().StringVar(
-		&createConfigRuntimeSocketName, "socketname", "", "Socket name")
-	createConfigRuntimeCmd.Flags().StringVar(
-		&createConfigRuntimeNamespace, "namespace", "", "Namespace")
+	createCmd.AddCommand(createRuntimeCmd)
+	createRuntimeCmd.Flags().StringVar(
+		&createRuntimeEngine, "engine", "", "Container engine")
+	createRuntimeCmd.Flags().StringVar(
+		&createRuntimeSocketName, "socketname", "", "Socket name")
+	createRuntimeCmd.Flags().StringVar(
+		&createRuntimeNamespace, "namespace", "", "Namespace")
+	createRuntimeCmd.Flags().BoolVarP(
+		&configSystem, "system", "", false, "Update system configuration")
+	createRuntimeCmd.Flags().BoolVarP(
+		&configProject, "project", "", false, "Update project configuration")
 
 	createCmd.AddCommand(createWorkspaceCmd)
 	createWorkspaceCmd.Flags().StringVar(
