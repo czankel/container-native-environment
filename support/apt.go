@@ -32,11 +32,12 @@ func AptCreateLayer(ws *project.Workspace, atIndex int) error {
 		return err
 	}
 
-	aptLayer, err = ws.CreateLayer(project.LayerHandlerApt, project.LayerHandlerApt, -1)
+	_, aptLayer, err = ws.CreateLayer(project.LayerHandlerApt, "")
 	if err != nil {
 		return err
 	}
 
+	aptLayer.Handler = project.LayerHandlerApt
 	aptLayer.Commands = []project.Command{{
 		aptLayerCmdUpdate, []string{}, []string{"apt", "update"},
 	}, {

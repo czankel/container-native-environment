@@ -7,11 +7,12 @@ import (
 // Note that the commands are never executed by CNE for security reasons
 func UbuntuCreateOSLayer(ws *project.Workspace, atIndex int) error {
 
-	osLayer, err := ws.CreateLayer(project.LayerHandlerUbuntu, project.LayerHandlerUbuntu, 0)
+	_, osLayer, err := ws.CreateLayer(project.LayerHandlerUbuntu, "")
 	if err != nil {
 		return err
 	}
 
+	osLayer.Handler = project.LayerHandlerUbuntu
 	osLayer.Commands = []project.Command{{
 		Name: "ubuntu-user",
 		Args: []string{

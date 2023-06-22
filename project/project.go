@@ -441,27 +441,28 @@ func (ws *Workspace) ConfigHash() [16]byte {
 	return gen
 }
 
-// CreateLayer inserts a new layer (or layers) at the provided index, or at the end if index == -1
-func (ws *Workspace) CreateLayer(name, handler string, atIndex int) (*Layer, error) {
+// CreateLayer inserts a new layer at the provided index, or at the end if 'at' is ""
+func (ws *Workspace) CreateLayer(name string, at string) (int, *Layer, error) {
 
-	if atIndex < -1 || atIndex > len(ws.Environment.Layers) {
-		return nil, errdefs.InvalidArgument("invalid index: %d", atIndex)
-	}
-	if atIndex == -1 {
-		atIndex = len(ws.Environment.Layers)
-	}
-
-	for _, l := range ws.Environment.Layers {
-		if name == l.Name {
-			return nil, errdefs.AlreadyExists("layer", name)
+	atIndex := len(ws.Environment.Layers)
+	if at != "" {
+		if i, err := strconv.Atoi(at); err == nil {
+			if i < 0 || i > len(ws.Environment.Layers) {
+				return -1, nil, errdefs.InvalidArgument("invalid index: %d", atIndex)
+			}
+			atIndex = i
+		} else {
+			atIndex, _, err = ws.FindLayer(name)
+			if err != nil {
+				return -1, nil, err
+			}
 		}
 	}
 
 	ws.Environment.Layers = append(ws.Environment.Layers[:atIndex],
-		append([]Layer{Layer{Name: name, Handler: handler}},
-			ws.Environment.Layers[atIndex:]...)...)
+		append([]Layer{Layer{Name: name}}, ws.Environment.Layers[atIndex:]...)...)
 
-	return &ws.Environment.Layers[atIndex], nil
+	return atIndex, &ws.Environment.Layers[atIndex], nil
 }
 
 // FindLayer looks up the layer by name and returns the layer index starting with 0 for the first

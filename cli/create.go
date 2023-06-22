@@ -180,7 +180,8 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 			}
 		}
 
-		layer, err := ws.CreateLayer(layerName, createLayerHandler, atIndex)
+		_, layer, err := ws.CreateLayer(layerName, createLayerInsert)
+		layer.Handler = createLayerHandler
 		layer.Commands = commands
 		if err != nil {
 			return err

@@ -7,11 +7,12 @@ import (
 // Note that the commands are never executed by CNE for security reasons
 func DebianCreateOSLayer(ws *project.Workspace, atIndex int) error {
 
-	osLayer, err := ws.CreateLayer(project.LayerHandlerDebian, project.LayerHandlerDebian, 0)
+	_, osLayer, err := ws.CreateLayer(project.LayerHandlerDebian, "")
 	if err != nil {
 		return err
 	}
 
+	osLayer.Handler = project.LayerHandlerDebian
 	osLayer.Commands = []project.Command{{
 		Name: "debian-user",
 		Args: []string{
