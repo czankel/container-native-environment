@@ -32,7 +32,7 @@ func AptCreateLayer(ws *project.Workspace, atIndex int) error {
 		return err
 	}
 
-	aptLayer, err = ws.CreateLayer(true, project.LayerHandlerApt, -1)
+	aptLayer, err = ws.CreateLayer(project.LayerHandlerApt, project.LayerHandlerApt, -1)
 	if err != nil {
 		return err
 	}

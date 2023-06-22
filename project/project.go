@@ -442,12 +442,7 @@ func (ws *Workspace) ConfigHash() [16]byte {
 }
 
 // CreateLayer inserts a new layer (or layers) at the provided index, or at the end if index == -1
-func (ws *Workspace) CreateLayer(systemLayer bool, name string, atIndex int) (*Layer, error) {
-
-	layerHandler := LayerHandlerNone
-	if systemLayer {
-		layerHandler = name
-	}
+func (ws *Workspace) CreateLayer(name, handler string, atIndex int) (*Layer, error) {
 
 	if atIndex < -1 || atIndex > len(ws.Environment.Layers) {
 		return nil, errdefs.InvalidArgument("invalid index: %d", atIndex)
@@ -463,7 +458,7 @@ func (ws *Workspace) CreateLayer(systemLayer bool, name string, atIndex int) (*L
 	}
 
 	ws.Environment.Layers = append(ws.Environment.Layers[:atIndex],
-		append([]Layer{Layer{Handler: layerHandler, Name: name}},
+		append([]Layer{Layer{Name: name, Handler: handler}},
 			ws.Environment.Layers[atIndex:]...)...)
 
 	return &ws.Environment.Layers[atIndex], nil

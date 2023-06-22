@@ -288,7 +288,7 @@ func initWorkspace(prj *project.Project, wsName, insert, imgName string) error {
 	return prj.Write()
 }
 
-var createLayerSystem bool
+var createLayerHandler string
 var createLayerInsert string
 
 var createLayerCmd = &cobra.Command{
@@ -359,8 +359,8 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	rebuildContainer := createLayerSystem
-	if createLayerSystem {
+	rebuildContainer := createLayerHandler != ""
+	if createLayerHandler != "" {
 		err = support.CreateSystemLayer(ws, args[0], atIndex)
 		if err != nil {
 			return err
@@ -369,12 +369,12 @@ func createLayerRunE(cmd *cobra.Command, args []string) error {
 		layerName := args[0]
 		for _, n := range project.LayerHandlers {
 			if layerName == n {
-				return errdefs.InvalidArgument("%s is a reserved layer name, use --system",
+				return errdefs.InvalidArgument("%s is a reserved layer name, use --handler",
 					layerName)
 			}
 		}
 
-		layer, err := ws.CreateLayer(createLayerSystem, layerName, atIndex)
+		layer, err := ws.CreateLayer(layerName, createLayerHandler, atIndex)
 		layer.Commands = commands
 		if err != nil {
 			return err
@@ -442,7 +442,7 @@ func init() {
 	createCmd.AddCommand(createLayerCmd)
 	createLayerCmd.Flags().StringVar(
 		&createLayerInsert, "insert", "", "Insert before this layer")
-	createLayerCmd.Flags().BoolVarP(
-		&createLayerSystem, "system", "s", false,
-		"User the system handler of the same name")
+	createLayerCmd.Flags().StringVarP(
+		&createLayerHandler, "handler", "h", "",
+		"Handler of the layer, such as apt")
 }

@@ -121,7 +121,9 @@ func init() {
 	rootCmd.Flags().BoolVar(
 		&rootCneVersion, "version", false, "Get version information")
 	rootCmd.PersistentFlags().StringVarP(
-		&projectPath, "project", "P", "", "Projet path")
+		&projectPath, "path", "P", "", "Projet path")
+	// Remove the -h help shorthand
+	rootCmd.PersistentFlags().BoolP("help", "", false, "help for cne")
 	rootCmd.AddCommand(rootVersionCmd)
 	cobra.OnInitialize(initConfig)
 }
