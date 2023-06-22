@@ -94,6 +94,119 @@ func createContextRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+var createLayerCmd = &cobra.Command{
+	Use:     "layer [name] [cmdline]",
+	Short:   "Create a new layer",
+	Aliases: []string{"l"},
+	Args:    cobra.MinimumNArgs(1),
+	RunE:    createLayerRunE,
+}
+
+var createLayerHandler string
+var createLayerInsert string
+
+func createLayerRunE(cmd *cobra.Command, args []string) error {
+
+	prj, err := loadProject()
+	if err != nil {
+		return err
+	}
+
+	runCfg, err := conf.GetRuntime()
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+
+	run, err := runtime.Open(ctx, runCfg)
+	if err != nil {
+		return err
+	}
+	defer run.Close()
+	ctx = run.WithNamespace(ctx, runCfg.Namespace)
+
+	ws, err := prj.CurrentWorkspace()
+	if err != nil {
+		return err
+	}
+
+	oldCtr, err := container.GetContainer(ctx, run, ws)
+	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
+		return err
+	}
+
+	isTerminal := term.IsTerminal(int(os.Stdin.Fd()))
+	if len(args) > 1 && !isTerminal {
+		return errdefs.InvalidArgument("too many arguments")
+	}
+
+	var commands []project.Command
+	if len(args) > 1 {
+		commands = scanLine(args[1])
+	} else if !isTerminal {
+
+		commands, err = readCommands(os.Stdin)
+		if err != nil {
+			return err
+		}
+	}
+
+	atIndex := -1
+	if createLayerInsert != "" {
+		for i, l := range ws.Environment.Layers {
+			if l.Name == createLayerInsert {
+				atIndex = i
+				break
+			}
+		}
+		if atIndex == -1 {
+			return errdefs.InvalidArgument("invalid index")
+		}
+	}
+
+	rebuildContainer := createLayerHandler != ""
+	if createLayerHandler != "" {
+		err = support.CreateSystemLayer(ws, args[0], atIndex)
+		if err != nil {
+			return err
+		}
+	} else {
+		layerName := args[0]
+		for _, n := range project.LayerHandlers {
+			if layerName == n {
+				return errdefs.InvalidArgument("%s is a reserved layer name, use --handler",
+					layerName)
+			}
+		}
+
+		layer, err := ws.CreateLayer(layerName, createLayerHandler, atIndex)
+		layer.Commands = commands
+		if err != nil {
+			return err
+		}
+		rebuildContainer = len(commands) > 0
+	}
+
+	if rebuildContainer {
+		_, err := buildContainer(ctx, run, ws, -1)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = prj.Write()
+	if err != nil {
+		return err
+	}
+	if oldCtr != nil {
+		// Ignore any errors, TOOD: add warning
+		oldCtr.Delete(ctx)
+	}
+
+	return nil
+}
+
 var createRegistryCmd = &cobra.Command{
 	Use:   "registry name",
 	Short: "Create a new registry",
@@ -282,119 +395,6 @@ func initWorkspace(prj *project.Project, wsName, insert, imgName string) error {
 	prj.CurrentWorkspaceName = wsName
 
 	return prj.Write()
-}
-
-var createLayerHandler string
-var createLayerInsert string
-
-var createLayerCmd = &cobra.Command{
-	Use:     "layer [name] [cmdline]",
-	Short:   "Create a new layer",
-	Aliases: []string{"l"},
-	Args:    cobra.MinimumNArgs(1),
-	RunE:    createLayerRunE,
-}
-
-func createLayerRunE(cmd *cobra.Command, args []string) error {
-
-	prj, err := loadProject()
-	if err != nil {
-		return err
-	}
-
-	runCfg, err := conf.GetRuntime()
-	if err != nil {
-		return err
-	}
-
-	ctx := context.Background()
-
-	run, err := runtime.Open(ctx, runCfg)
-	if err != nil {
-		return err
-	}
-	defer run.Close()
-	ctx = run.WithNamespace(ctx, runCfg.Namespace)
-
-	ws, err := prj.CurrentWorkspace()
-	if err != nil {
-		return err
-	}
-
-	oldCtr, err := container.GetContainer(ctx, run, ws)
-	if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
-		return err
-	}
-
-	isTerminal := term.IsTerminal(int(os.Stdin.Fd()))
-	if len(args) > 1 && !isTerminal {
-		return errdefs.InvalidArgument("too many arguments")
-	}
-
-	var commands []project.Command
-	if len(args) > 1 {
-		commands = scanLine(args[1])
-	} else if !isTerminal {
-
-		commands, err = readCommands(os.Stdin)
-		if err != nil {
-			return err
-		}
-	}
-
-	atIndex := -1
-	if createLayerInsert != "" {
-		for i, l := range ws.Environment.Layers {
-			if l.Name == createLayerInsert {
-				atIndex = i
-				break
-			}
-		}
-		if atIndex == -1 {
-			return errdefs.InvalidArgument("invalid index")
-		}
-	}
-
-	rebuildContainer := createLayerHandler != ""
-	if createLayerHandler != "" {
-		err = support.CreateSystemLayer(ws, args[0], atIndex)
-		if err != nil {
-			return err
-		}
-	} else {
-		layerName := args[0]
-		for _, n := range project.LayerHandlers {
-			if layerName == n {
-				return errdefs.InvalidArgument("%s is a reserved layer name, use --handler",
-					layerName)
-			}
-		}
-
-		layer, err := ws.CreateLayer(layerName, createLayerHandler, atIndex)
-		layer.Commands = commands
-		if err != nil {
-			return err
-		}
-		rebuildContainer = len(commands) > 0
-	}
-
-	if rebuildContainer {
-		_, err := buildContainer(ctx, run, ws, -1)
-		if err != nil {
-			return err
-		}
-	}
-
-	err = prj.Write()
-	if err != nil {
-		return err
-	}
-	if oldCtr != nil {
-		// Ignore any errors, TOOD: add warning
-		oldCtr.Delete(ctx)
-	}
-
-	return nil
 }
 
 func init() {

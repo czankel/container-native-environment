@@ -53,65 +53,7 @@ func getLayer(prj *project.Project,
 	return ws, &ws.Environment.Layers[index], nil
 }
 
-var listCmd = &cobra.Command{
-	Use:     "list",
-	Short:   "List resources",
-	Aliases: []string{"l"},
-	Args:    cobra.MinimumNArgs(1),
-}
-
-var listEnginesCmd = &cobra.Command{
-	Use:     "engines",
-	Aliases: []string{"engine", "r"},
-	Short:   "list low-level container engines",
-	Args:    cobra.NoArgs,
-	RunE:    listEnginesRunE,
-}
-
-func listEnginesRunE(cmd *cobra.Command, args []string) error {
-	printList(runtime.Engines(), false)
-	return nil
-}
-
-var listCommandsCmd = &cobra.Command{
-	Use:     "commands [name]",
-	Short:   "List all commands",
-	Aliases: []string{"command", "cmd"},
-	RunE:    listCommandsRunE,
-	Args:    cobra.NoArgs,
-}
-
-var listCommandsWorkspace string
-var listCommandsLayer string
-
-func listCommandsRunE(cmd *cobra.Command, args []string) error {
-
-	prj, err := loadProject()
-	if err != nil {
-		return err
-	}
-
-	_, layer, err := getLayer(prj, listCommandsWorkspace, listCommandsLayer)
-	if err != nil {
-		return err
-	}
-
-	printList(layer.Commands, true)
-
-	return nil
-}
-
-var listImagesCmd = &cobra.Command{
-	Use:     "images",
-	Aliases: []string{"image", "i"},
-	Short:   "list images",
-	Args:    cobra.NoArgs,
-	RunE:    listImagesRunE,
-}
-
-const displayHashLength = 8
-
-// getImageName upda
+// getImageName is a helper function that returns the real image name from a user-provided name
 func getImageName(ctx context.Context, run runtime.Runtime, imgName string) (string, error) {
 
 	if len(imgName) == 0 {
@@ -161,108 +103,39 @@ func splitRepoNameTag(name string) (string, string) {
 	return dispName, name[tPos+1:]
 }
 
-func listImages(ctx context.Context, run runtime.Runtime) error {
-
-	images, err := run.Images(ctx)
-	if err != nil {
-		return err
-	}
-
-	imgList := make([]struct {
-		Name      string
-		Tag       string
-		ID        string
-		CreatedAt string
-		Size      string
-	}, len(images), len(images))
-	for i, img := range images {
-		name, tag := splitRepoNameTag(img.Name())
-		imgList[i].Name = name
-		imgList[i].Tag = tag
-		digest := img.Digest().String()
-		dPos := strings.Index(digest, ":")
-		if len(digest) >= dPos+1+displayHashLength {
-			imgList[i].ID = digest[dPos+1 : dPos+1+displayHashLength]
-		} else {
-			imgList[i].ID = ""
-		}
-		imgList[i].CreatedAt = timeToAgoString(img.CreatedAt())
-		imgList[i].Size = sizeToSIString(img.Size())
-	}
-	printList(imgList, true)
-
-	return nil
+var listCmd = &cobra.Command{
+	Use:     "list",
+	Short:   "List resources",
+	Aliases: []string{"l"},
+	Args:    cobra.MinimumNArgs(1),
 }
 
-func listImagesRunE(cmd *cobra.Command, args []string) error {
-
-	runCfg, err := conf.GetRuntime()
-	if err != nil {
-		return err
-	}
-
-	ctx := context.Background()
-	run, err := runtime.Open(ctx, runCfg)
-	if err != nil {
-		return err
-	}
-	defer run.Close()
-	ctx = run.WithNamespace(ctx, runCfg.Namespace)
-
-	return listImages(ctx, run)
-}
-
-var listSnapshotsCmd = &cobra.Command{
-	Use:     "snapshots",
-	Aliases: []string{"snapshot", "s"},
-	Short:   "list snapshots",
+var listCommandsCmd = &cobra.Command{
+	Use:     "commands [name]",
+	Short:   "List all commands",
+	Aliases: []string{"command", "cmd"},
+	RunE:    listCommandsRunE,
 	Args:    cobra.NoArgs,
-	RunE:    listSnapshotsRunE,
 }
 
-func listSnapshots(ctx context.Context, run runtime.Runtime) error {
+var listCommandsWorkspace string
+var listCommandsLayer string
 
-	snapshots, err := run.Snapshots(ctx)
+func listCommandsRunE(cmd *cobra.Command, args []string) error {
+
+	prj, err := loadProject()
 	if err != nil {
 		return err
 	}
 
-	snapList := make([]struct {
-		Name      string
-		Parent    string
-		CreatedAt string
-		Size      int64
-		Inodes    int64
-	}, len(snapshots), len(snapshots))
-
-	for i, snap := range snapshots {
-		snapList[i].Name = snap.Name()
-		snapList[i].Parent = snap.Parent()
-		snapList[i].CreatedAt = timeToAgoString(snap.CreatedAt())
-		snapList[i].Size = snap.Size()
-		snapList[i].Inodes = snap.Inodes()
+	_, layer, err := getLayer(prj, listCommandsWorkspace, listCommandsLayer)
+	if err != nil {
+		return err
 	}
-	printList(snapList, false)
+
+	printList(layer.Commands, true)
 
 	return nil
-}
-
-func listSnapshotsRunE(cmd *cobra.Command, args []string) error {
-
-	runCfg, err := conf.GetRuntime()
-	if err != nil {
-		return err
-	}
-
-	ctx := context.Background()
-	run, err := runtime.Open(ctx, runCfg)
-	if err != nil {
-		return err
-	}
-	defer run.Close()
-	ctx = run.WithNamespace(ctx, runCfg.Namespace)
-
-	return listSnapshots(ctx, run)
 }
 
 var listContainersCmd = &cobra.Command{
@@ -332,12 +205,104 @@ var listContextCmd = &cobra.Command{
 	RunE:    listContextRunE,
 }
 
+func listContextRunE(cmd *cobra.Command, args []string) error {
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+	printList(cfg.Context, false)
+	return nil
+}
+
+var listEnginesCmd = &cobra.Command{
+	Use:     "engines",
+	Aliases: []string{"engine", "r"},
+	Short:   "list low-level container engines",
+	Args:    cobra.NoArgs,
+	RunE:    listEnginesRunE,
+}
+
+func listEnginesRunE(cmd *cobra.Command, args []string) error {
+	printList(runtime.Engines(), false)
+	return nil
+}
+
+var listImagesCmd = &cobra.Command{
+	Use:     "images",
+	Aliases: []string{"image", "i"},
+	Short:   "list images",
+	Args:    cobra.NoArgs,
+	RunE:    listImagesRunE,
+}
+
+const displayHashLength = 8
+
+func listImages(ctx context.Context, run runtime.Runtime) error {
+
+	images, err := run.Images(ctx)
+	if err != nil {
+		return err
+	}
+
+	imgList := make([]struct {
+		Name      string
+		Tag       string
+		ID        string
+		CreatedAt string
+		Size      string
+	}, len(images), len(images))
+	for i, img := range images {
+		name, tag := splitRepoNameTag(img.Name())
+		imgList[i].Name = name
+		imgList[i].Tag = tag
+		digest := img.Digest().String()
+		dPos := strings.Index(digest, ":")
+		if len(digest) >= dPos+1+displayHashLength {
+			imgList[i].ID = digest[dPos+1 : dPos+1+displayHashLength]
+		} else {
+			imgList[i].ID = ""
+		}
+		imgList[i].CreatedAt = timeToAgoString(img.CreatedAt())
+		imgList[i].Size = sizeToSIString(img.Size())
+	}
+	printList(imgList, true)
+
+	return nil
+}
+
+func listImagesRunE(cmd *cobra.Command, args []string) error {
+
+	runCfg, err := conf.GetRuntime()
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+	run, err := runtime.Open(ctx, runCfg)
+	if err != nil {
+		return err
+	}
+	defer run.Close()
+	ctx = run.WithNamespace(ctx, runCfg.Namespace)
+
+	return listImages(ctx, run)
+}
+
 var listRegistryCmd = &cobra.Command{
 	Use:     "registries",
 	Aliases: []string{"registry"},
 	Short:   "list available registries",
 	Args:    cobra.NoArgs,
 	RunE:    listRegistryRunE,
+}
+
+func listRegistryRunE(cmd *cobra.Command, args []string) error {
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+	printList(cfg.Registry, false)
+	return nil
 }
 
 var listRuntimeCmd = &cobra.Command{
@@ -348,22 +313,6 @@ var listRuntimeCmd = &cobra.Command{
 	RunE:    listRuntimeRunE,
 }
 
-func listContextRunE(cmd *cobra.Command, args []string) error {
-	cfg, err := loadConfig()
-	if err != nil {
-		return err
-	}
-	printList(cfg.Context, false)
-	return nil
-}
-func listRegistryRunE(cmd *cobra.Command, args []string) error {
-	cfg, err := loadConfig()
-	if err != nil {
-		return err
-	}
-	printList(cfg.Registry, false)
-	return nil
-}
 func listRuntimeRunE(cmd *cobra.Command, args []string) error {
 	cfg, err := loadConfig()
 	if err != nil {
@@ -373,32 +322,91 @@ func listRuntimeRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+var listSnapshotsCmd = &cobra.Command{
+	Use:     "snapshots",
+	Aliases: []string{"snapshot", "s"},
+	Short:   "list snapshots",
+	Args:    cobra.NoArgs,
+	RunE:    listSnapshotsRunE,
+}
+
+func listSnapshots(ctx context.Context, run runtime.Runtime) error {
+
+	snapshots, err := run.Snapshots(ctx)
+	if err != nil {
+		return err
+	}
+
+	snapList := make([]struct {
+		Name      string
+		Parent    string
+		CreatedAt string
+		Size      int64
+		Inodes    int64
+	}, len(snapshots), len(snapshots))
+
+	for i, snap := range snapshots {
+		snapList[i].Name = snap.Name()
+		snapList[i].Parent = snap.Parent()
+		snapList[i].CreatedAt = timeToAgoString(snap.CreatedAt())
+		snapList[i].Size = snap.Size()
+		snapList[i].Inodes = snap.Inodes()
+	}
+	printList(snapList, false)
+
+	return nil
+}
+
+func listSnapshotsRunE(cmd *cobra.Command, args []string) error {
+
+	runCfg, err := conf.GetRuntime()
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+	run, err := runtime.Open(ctx, runCfg)
+	if err != nil {
+		return err
+	}
+	defer run.Close()
+	ctx = run.WithNamespace(ctx, runCfg.Namespace)
+
+	return listSnapshots(ctx, run)
+}
+
 func init() {
 	rootCmd.AddCommand(listCmd)
-	listCmd.AddCommand(listEnginesCmd)
-	listCmd.AddCommand(listImagesCmd)
-	listCmd.AddCommand(listContainersCmd)
-	listContainersCmd.Flags().BoolVarP(
-		&listContainersAll, "all", "A", false, "list containers of all projects")
-	listCmd.AddCommand(listSnapshotsCmd)
 	listCmd.AddCommand(listCommandsCmd)
 	listCommandsCmd.Flags().StringVarP(
 		&listCommandsWorkspace, "workspace", "w", "", "Name of the workspace")
 	listCommandsCmd.Flags().StringVarP(
 		&listCommandsLayer, "layer", "l", "", "Name or index of the layer")
+
+	listCmd.AddCommand(listContainersCmd)
+	listContainersCmd.Flags().BoolVarP(
+		&listContainersAll, "all", "A", false, "list containers of all projects")
+
 	listCmd.AddCommand(listContextCmd)
 	listContextCmd.Flags().BoolVarP(
 		&configSystem, "system", "", false, "System configuration")
 	listContextCmd.Flags().BoolVarP(
 		&configProject, "project", "", false, "Project configuration")
-	listCmd.AddCommand(listRuntimeCmd)
-	listRuntimeCmd.Flags().BoolVarP(
-		&configSystem, "system", "", false, "System configuration")
-	listRuntimeCmd.Flags().BoolVarP(
-		&configProject, "project", "", false, "Project configuration")
+
+	listCmd.AddCommand(listEnginesCmd)
+	listCmd.AddCommand(listImagesCmd)
+
 	listCmd.AddCommand(listRegistryCmd)
 	listRegistryCmd.Flags().BoolVarP(
 		&configSystem, "system", "", false, "System configuration")
 	listRegistryCmd.Flags().BoolVarP(
 		&configProject, "project", "", false, "Project configuration")
+
+	listCmd.AddCommand(listRuntimeCmd)
+	listRuntimeCmd.Flags().BoolVarP(
+		&configSystem, "system", "", false, "System configuration")
+	listRuntimeCmd.Flags().BoolVarP(
+		&configProject, "project", "", false, "Project configuration")
+
+	listCmd.AddCommand(listSnapshotsCmd)
 }
