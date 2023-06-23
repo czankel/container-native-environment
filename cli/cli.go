@@ -93,13 +93,6 @@ machine learning or analytics.
 	Run: rootRun,
 }
 
-var rootVersionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Display the version",
-	Args:  cobra.NoArgs,
-	Run:   rootVersionRun,
-}
-
 func rootRun(cmd *cobra.Command, args []string) {
 	if rootCneVersion {
 		rootVersionRun(cmd, args)
@@ -111,21 +104,16 @@ func rootRun(cmd *cobra.Command, args []string) {
 	}
 }
 
+var rootVersionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Display the version",
+	Args:  cobra.NoArgs,
+	Run:   rootVersionRun,
+}
+
 func rootVersionRun(cmd *cobra.Command, args []string) {
 	fmt.Printf("%s version %s\n", basename, config.CneVersion)
 	os.Exit(0)
-}
-
-func init() {
-	rootCmd.Use = filepath.Base(os.Args[0])
-	rootCmd.Flags().BoolVar(
-		&rootCneVersion, "version", false, "Get version information")
-	rootCmd.PersistentFlags().StringVarP(
-		&projectPath, "path", "P", "", "Projet path")
-	// Remove the -h help shorthand
-	rootCmd.PersistentFlags().BoolP("help", "", false, "help for cne")
-	rootCmd.AddCommand(rootVersionCmd)
-	cobra.OnInitialize(initConfig)
 }
 
 // Execute is the main entry point to the CLI. It executes the commands and arguments provided
@@ -155,4 +143,16 @@ func initConfig() {
 		fmt.Printf("%s: %v\n", basename, err)
 		os.Exit(1)
 	}
+}
+
+func init() {
+	rootCmd.Use = filepath.Base(os.Args[0])
+	rootCmd.Flags().BoolVar(
+		&rootCneVersion, "version", false, "Get version information")
+	rootCmd.PersistentFlags().StringVarP(
+		&projectPath, "path", "P", "", "Projet path")
+	// Remove the -h help shorthand
+	rootCmd.PersistentFlags().BoolP("help", "", false, "help for cne")
+	rootCmd.AddCommand(rootVersionCmd)
+	cobra.OnInitialize(initConfig)
 }
