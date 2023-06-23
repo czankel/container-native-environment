@@ -17,6 +17,73 @@ import (
 	"github.com/czankel/cne/support"
 )
 
+func initWorkspace(prj *project.Project, wsName, insert, imgName string) error {
+
+	ws, err := prj.CreateWorkspace(wsName, "", insert)
+	if err != nil {
+		return err
+	}
+
+	if imgName != "" {
+		runCfg, err := conf.GetRuntime()
+		if err != nil {
+			return err
+		}
+
+		ctx := context.Background()
+		run, err := runtime.Open(ctx, runCfg)
+		if err != nil {
+			return err
+		}
+		defer run.Close()
+		ctx = run.WithNamespace(ctx, runCfg.Namespace)
+
+		imgName, err := getImageName(ctx, run, imgName)
+		if err != nil {
+			return err
+		}
+
+		img, err := pullImage(ctx, run, imgName)
+		if err != nil {
+			return err
+		}
+
+		diffIDs, err := img.RootFS(ctx)
+		if err != nil {
+			return err
+		}
+
+		rootName := identity.ChainID(diffIDs).String()
+		_, err = run.GetSnapshot(ctx, rootName)
+		if err != nil && errors.Is(err, errdefs.ErrNotFound) {
+			progress := make(chan []runtime.ProgressStatus)
+			var wg sync.WaitGroup
+			defer wg.Wait()
+			defer close(progress)
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				showProgress(progress)
+			}()
+			err = img.Unpack(ctx, progress)
+		}
+		if err != nil {
+			return err
+		}
+
+		prj.UpdateWorkspace(ws, imgName)
+
+		err = support.SetupWorkspace(ctx, ws, img)
+		if err != nil {
+			return err
+		}
+	}
+
+	prj.CurrentWorkspaceName = wsName
+
+	return prj.Write()
+}
+
 var createCmd = &cobra.Command{
 	Use:     "create",
 	Short:   "Create a new resource",
@@ -329,73 +396,6 @@ func createWorkspaceRunE(cmd *cobra.Command, args []string) error {
 	}
 
 	return initWorkspace(prj, wsName, createWorkspaceImage, createWorkspaceInsert)
-}
-
-func initWorkspace(prj *project.Project, wsName, insert, imgName string) error {
-
-	ws, err := prj.CreateWorkspace(wsName, "", insert)
-	if err != nil {
-		return err
-	}
-
-	if imgName != "" {
-		runCfg, err := conf.GetRuntime()
-		if err != nil {
-			return err
-		}
-
-		ctx := context.Background()
-		run, err := runtime.Open(ctx, runCfg)
-		if err != nil {
-			return err
-		}
-		defer run.Close()
-		ctx = run.WithNamespace(ctx, runCfg.Namespace)
-
-		imgName, err := getImageName(ctx, run, imgName)
-		if err != nil {
-			return err
-		}
-
-		img, err := pullImage(ctx, run, imgName)
-		if err != nil {
-			return err
-		}
-
-		diffIDs, err := img.RootFS(ctx)
-		if err != nil {
-			return err
-		}
-
-		rootName := identity.ChainID(diffIDs).String()
-		_, err = run.GetSnapshot(ctx, rootName)
-		if err != nil && errors.Is(err, errdefs.ErrNotFound) {
-			progress := make(chan []runtime.ProgressStatus)
-			var wg sync.WaitGroup
-			defer wg.Wait()
-			defer close(progress)
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				showProgress(progress)
-			}()
-			err = img.Unpack(ctx, progress)
-		}
-		if err != nil {
-			return err
-		}
-
-		prj.UpdateWorkspace(ws, imgName)
-
-		err = support.SetupWorkspace(ctx, ws, img)
-		if err != nil {
-			return err
-		}
-	}
-
-	prj.CurrentWorkspaceName = wsName
-
-	return prj.Write()
 }
 
 func init() {
