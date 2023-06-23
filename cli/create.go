@@ -25,18 +25,18 @@ func initWorkspace(prj *project.Project, wsName, insert, imgName string) error {
 	}
 
 	if imgName != "" {
-		runCfg, err := conf.GetRuntime()
+		cfgRun, err := conf.GetRuntime()
 		if err != nil {
 			return err
 		}
 
 		ctx := context.Background()
-		run, err := runtime.Open(ctx, runCfg)
+		run, err := runtime.Open(ctx, cfgRun)
 		if err != nil {
 			return err
 		}
 		defer run.Close()
-		ctx = run.WithNamespace(ctx, runCfg.Namespace)
+		ctx = run.WithNamespace(ctx, cfgRun.Namespace)
 
 		imgName, err := getImageName(ctx, run, imgName)
 		if err != nil {
@@ -122,18 +122,11 @@ func createContextRunE(cmd *cobra.Command, args []string) error {
 	confCtx.Runtime = c.Runtime
 	confCtx.Registry = c.Registry
 
-	type changeInfo struct {
-		Configuration string
-		Value         string
-	}
-	var changes []changeInfo
-
 	if createContextOptions != "" {
 		err := confCtx.UpdateContextOptions(createContextOptions)
 		if err != nil {
 			return err
 		}
-		changes = append(changes, changeInfo{"Options", createContextOptions})
 	}
 
 	if createContextRegistry != "" {
@@ -141,7 +134,6 @@ func createContextRunE(cmd *cobra.Command, args []string) error {
 			return errdefs.NotFound("registry", createContextRegistry)
 		}
 		confCtx.Registry = createContextRegistry
-		changes = append(changes, changeInfo{"Registry", createContextRegistry})
 	}
 
 	if createContextRuntime != "" {
@@ -149,7 +141,6 @@ func createContextRunE(cmd *cobra.Command, args []string) error {
 			return errdefs.NotFound("runtime", createContextRuntime)
 		}
 		confCtx.Runtime = createContextRuntime
-		changes = append(changes, changeInfo{"Runtime", createContextRuntime})
 	}
 
 	err = writeConfig(tempConf)
@@ -157,12 +148,11 @@ func createContextRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	printList(changes, false)
 	return nil
 }
 
 var createLayerCmd = &cobra.Command{
-	Use:     "layer [name] [cmdline]",
+	Use:     "layer name [cmdline]",
 	Short:   "Create a new layer",
 	Aliases: []string{"l"},
 	Args:    cobra.MinimumNArgs(1),
@@ -297,19 +287,11 @@ func createRegistryRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	type changeInfo struct {
-		Configuration string
-		Value         string
-	}
-	var changes []changeInfo
-
 	if createRegistryDomain != "" {
 		confReg.Domain = createRegistryDomain
-		changes = append(changes, changeInfo{"Domain", createRegistryDomain})
 	}
 	if createRegistryRepoName != "" {
 		confReg.RepoName = createRegistryRepoName
-		changes = append(changes, changeInfo{"RepoName", createRegistryRepoName})
 	}
 
 	err = writeConfig(tempConf)
@@ -317,7 +299,6 @@ func createRegistryRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	printList(changes, false)
 	return nil
 }
 
@@ -344,23 +325,14 @@ func createRuntimeRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	type changeInfo struct {
-		Configuration string
-		Value         string
-	}
-	var changes []changeInfo
-
 	if createRuntimeEngine != "" {
 		confRun.Engine = createRuntimeEngine
-		changes = append(changes, changeInfo{"SocketName", createRuntimeSocketName})
 	}
 	if createRuntimeSocketName != "" {
 		confRun.SocketName = createRuntimeSocketName
-		changes = append(changes, changeInfo{"SocketName", createRuntimeSocketName})
 	}
 	if createRuntimeNamespace != "" {
 		confRun.Namespace = createRuntimeNamespace
-		changes = append(changes, changeInfo{"Namespace", createRuntimeNamespace})
 	}
 
 	err = writeConfig(tempConf)
@@ -368,7 +340,6 @@ func createRuntimeRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	printList(changes, false)
 	return nil
 }
 
