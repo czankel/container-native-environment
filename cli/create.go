@@ -379,11 +379,18 @@ func init() {
 	createContextCmd.Flags().StringVar(
 		&createContextRegistry, "registry", "", "Context registry")
 	createContextCmd.Flags().StringVar(
-		&createContextRuntime, "runtime", "", "Context registry")
+		&createContextRuntime, "runtime", "", "Context runtime")
 	createContextCmd.Flags().BoolVarP(
-		&configSystem, "system", "", false, "Update system configuration")
+		&configSystem, "system", "", false, "System configuration")
 	createContextCmd.Flags().BoolVarP(
-		&configProject, "project", "", false, "Update project configuration")
+		&configProject, "project", "", false, "Project configuration")
+
+	createCmd.AddCommand(createLayerCmd)
+	createLayerCmd.Flags().StringVar(
+		&createLayerInsert, "insert", "", "Insert before this layer")
+	createLayerCmd.Flags().StringVarP(
+		&createLayerHandler, "handler", "h", "",
+		"Handler for this layer. Use 'list handlers' for the list.")
 
 	createCmd.AddCommand(createRegistryCmd)
 	createRegistryCmd.Flags().StringVar(
@@ -391,9 +398,9 @@ func init() {
 	createRegistryCmd.Flags().StringVar(
 		&createRegistryRepoName, "reponame", "", "Registry repooname")
 	createRegistryCmd.Flags().BoolVarP(
-		&configSystem, "system", "", false, "Update system configuration")
+		&configSystem, "system", "", false, "System configuration")
 	createRegistryCmd.Flags().BoolVarP(
-		&configProject, "project", "", false, "Update project configuration")
+		&configProject, "project", "", false, "Project configuration")
 
 	createCmd.AddCommand(createRuntimeCmd)
 	createRuntimeCmd.Flags().StringVar(
@@ -403,20 +410,13 @@ func init() {
 	createRuntimeCmd.Flags().StringVar(
 		&createRuntimeNamespace, "namespace", "", "Namespace")
 	createRuntimeCmd.Flags().BoolVarP(
-		&configSystem, "system", "", false, "Update system configuration")
+		&configSystem, "system", "", false, "System configuration")
 	createRuntimeCmd.Flags().BoolVarP(
-		&configProject, "project", "", false, "Update project configuration")
+		&configProject, "project", "", false, "Project configuration")
 
 	createCmd.AddCommand(createWorkspaceCmd)
 	createWorkspaceCmd.Flags().StringVar(
 		&createWorkspaceImage, "image", "", "Base image for the workspace")
 	createWorkspaceCmd.Flags().StringVar(
 		&createWorkspaceInsert, "insert", "", "Insert before this workspace")
-
-	createCmd.AddCommand(createLayerCmd)
-	createLayerCmd.Flags().StringVar(
-		&createLayerInsert, "insert", "", "Insert before this layer")
-	createLayerCmd.Flags().StringVarP(
-		&createLayerHandler, "handler", "h", "",
-		"Handler of the layer, such as apt")
 }
