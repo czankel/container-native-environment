@@ -5,15 +5,9 @@ import (
 )
 
 // Note that the commands are never executed by CNE for security reasons
-func UbuntuCreateOSLayer(ws *project.Workspace, atIndex int) error {
+func UbuntuOSLayerInit(layer *project.Layer) error {
 
-	_, osLayer, err := ws.CreateLayer(project.LayerHandlerUbuntu, "")
-	if err != nil {
-		return err
-	}
-
-	osLayer.Handler = project.LayerHandlerUbuntu
-	osLayer.Commands = []project.Command{{
+	layer.Commands = []project.Command{{
 		Name: "ubuntu-user",
 		Args: []string{
 			"adduser",

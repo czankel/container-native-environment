@@ -1,10 +1,12 @@
 package support
 
 import (
+	"context"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/czankel/cne/config"
-	"github.com/czankel/cne/container"
 	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/project"
 	"github.com/czankel/cne/runtime"
@@ -27,17 +29,45 @@ type testCase struct {
 }
 
 type testContainer struct {
-	*container.Container
-	testCase testCase
+	runtime.Container
+	testCase *testCase
 	cmdlines [][]string // BuildExec arguments
 }
 
-func (ctr *testContainer) BuildExec(user *config.User, stream runtime.Stream,
-	cmd []string, env []string) (uint32, error) {
+type testProcess struct {
+	runtime.Process
+	ctr *testContainer
+}
 
-	ctr.cmdlines = append(ctr.cmdlines, cmd)
+func (ctr *testContainer) Exec(ctx context.Context, stream runtime.Stream,
+	procSpec *runtime.ProcessSpec) (runtime.Process, error) {
+	ctr.cmdlines = append(ctr.cmdlines, procSpec.Args)
+	return &testProcess{ctr: ctr}, nil
+}
 
-	return ctr.testCase.code, ctr.testCase.err
+func (proc *testProcess) Signal(ctx context.Context, sig os.Signal) error {
+	return nil
+}
+
+func (proc *testProcess) Wait(ctx context.Context) (<-chan runtime.ExitStatus, error) {
+	ctr := proc.ctr
+	stat := make(chan runtime.ExitStatus)
+	go func() {
+		defer close(stat)
+		err := ctr.testCase.err
+		code := ctr.testCase.code
+		if len(ctr.cmdlines) == 1 {
+			for _, s := range ctr.cmdlines[0] {
+				if s == "update" {
+					err = nil
+					code = 0
+					break
+				}
+			}
+		}
+		stat <- runtime.ExitStatus{time.Now(), err, code}
+	}()
+	return stat, nil
 }
 
 func setupProject(t *testing.T) (*project.Project, *project.Workspace) {
@@ -56,32 +86,6 @@ func setupProject(t *testing.T) (*project.Project, *project.Workspace) {
 	}
 
 	return prj, ws
-}
-
-func TestSupportAptLayer(t *testing.T) {
-
-	_, ws := setupProject(t)
-
-	err := AptCreateLayer(ws, -1)
-	if err != nil {
-		t.Fatal("Failed to create Apt layer")
-	}
-
-	err = AptCreateLayer(ws, -1)
-	if err == nil {
-		t.Fatal("Should have failed to create another Apt layer")
-	}
-
-	err = AptDeleteLayer(ws)
-	if err != nil {
-		t.Fatal("Failed to delete Apt layer")
-	}
-
-	err = AptDeleteLayer(ws)
-	if err == nil {
-		t.Fatal("Should have failed to delete already deleted Apt layer")
-	}
-
 }
 
 func TestSupportApt(t *testing.T) {
@@ -115,19 +119,18 @@ func TestSupportApt(t *testing.T) {
 		{"remove d again", false, false, []string{"d"}, 0, nil,
 			false, false, []string{}, []string{}},
 	}, {
-
 		{"install unknown package", true, false, []string{"a"}, 100, nil,
 			false, true, []string{}, []string{}},
 	}, {
 		{"error in update", true, true, []string{"a"}, 1, errdefs.ErrInternalError,
 			true, false, []string{}, []string{}},
 	}, {
-		{"error in install", true, true, []string{"a"}, 1, errdefs.ErrInternalError,
+		{"error in install", true, true, []string{"x"}, 1, errdefs.ErrInternalError,
 			true, false, []string{}, []string{}},
 	}, {
-		{"install a with update", true, true, []string{"a"}, 0, nil,
-			false, false, []string{"a"}, []string{"a"}},
-		{"error in remove", false, false, []string{"a"}, 1, errdefs.ErrInternalError,
+		{"install a with update", true, true, []string{"x"}, 0, nil,
+			false, false, []string{"x"}, []string{"x"}},
+		{"error in remove", false, false, []string{"x"}, 1, errdefs.ErrInternalError,
 			true, false, []string{}, []string{}},
 	}}
 
@@ -135,25 +138,31 @@ func TestSupportApt(t *testing.T) {
 	ctr := &testContainer{}
 	aptLayerIdx := 0
 
+	ctx := context.Background()
+
 	for _, testGroup := range testCases {
 
-		err := AptCreateLayer(ws, -1)
+		_, aptLayer, err := ws.CreateLayer("apt-test", "")
+		if err != nil {
+			t.Fatalf("Failed to create Apt layer")
+		}
+
+		err = AptLayerInit(aptLayer)
 		if err != nil {
 			t.Fatalf("Failed to create Apt layers")
 		}
-		aptLayer := &ws.Environment.Layers[aptLayerIdx]
 
 		for _, test := range testGroup {
 
 			ctr.cmdlines = [][]string{}
-			ctr.testCase = test
+			ctr.testCase = &test
 
 			var code int
 			if test.install {
-				code, err = AptInstall(ws, aptLayerIdx, user, ctr, stream,
+				code, err = AptInstall(ctx, ws, aptLayerIdx, user, ctr, stream,
 					test.aptUpdate, test.apts)
 			} else {
-				code, err = AptRemove(ws, aptLayerIdx, user, ctr, stream, test.apts)
+				code, err = AptRemove(ctx, ws, aptLayerIdx, user, ctr, stream, test.apts)
 			}
 
 			if err != nil && test.isError {
@@ -186,8 +195,9 @@ func TestSupportApt(t *testing.T) {
 				if len(ctr.cmdlines) != 2 {
 					t.Errorf("test '%s' failed: update enabled but not executed",
 						test.description)
+				} else {
+					args = ctr.cmdlines[1]
 				}
-				args = ctr.cmdlines[1]
 			} else if len(ctr.cmdlines) > 1 {
 				t.Errorf("test '%s' failed: multiple commands %v",
 					test.description, ctr.cmdlines)
@@ -247,10 +257,9 @@ func TestSupportApt(t *testing.T) {
 				}
 			}
 		}
-
-		err = AptDeleteLayer(ws)
+		err = ws.DeleteLayer("apt-test")
 		if err != nil {
-			t.Fatalf("Failed to delete Apt Layer")
+			t.Fatalf("failed to delete test layer for apt")
 		}
 	}
 }

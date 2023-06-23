@@ -19,26 +19,22 @@ const (
 	aptLayerCmdRemove  = "apt-remove"
 )
 
-type AptPackage struct {
-	Name    string
-	Version string
-	Layer   string
+// helper function to return the command args and index
+func getAptInstallCommand(aptLayer *project.Layer) (int, *project.Command) {
+
+	for i := 0; i < len(aptLayer.Commands); i++ {
+		c := &aptLayer.Commands[i]
+		if c.Name == aptLayerCmdInstall {
+			return i, c
+		}
+	}
+	return -1, nil
 }
 
-func AptCreateLayer(ws *project.Workspace, atIndex int) error {
+// AptLayerInit initializes the newly created handler for the apt handler
+func AptLayerInit(layer *project.Layer) error {
 
-	_, aptLayer, err := ws.FindLayerByHandler(project.LayerHandlerApt, 0)
-	if err != nil {
-		return err
-	}
-
-	_, aptLayer, err = ws.CreateLayer(project.LayerHandlerApt, "")
-	if err != nil {
-		return err
-	}
-
-	aptLayer.Handler = project.LayerHandlerApt
-	aptLayer.Commands = []project.Command{{
+	layer.Commands = []project.Command{{
 		aptLayerCmdUpdate, []string{}, []string{"apt", "update"},
 	}, {
 		aptLayerCmdUpgrade,
@@ -52,22 +48,6 @@ func AptCreateLayer(ws *project.Workspace, atIndex int) error {
 		},
 	}}
 	return nil
-}
-
-func AptDeleteLayer(ws *project.Workspace) error {
-	return ws.DeleteLayer(project.LayerHandlerApt)
-}
-
-// helper function to return the command args and index
-func getAptInstallCommand(aptLayer *project.Layer) (int, *project.Command) {
-
-	for i := 0; i < len(aptLayer.Commands); i++ {
-		c := &aptLayer.Commands[i]
-		if c.Name == aptLayerCmdInstall {
-			return i, c
-		}
-	}
-	return -1, nil
 }
 
 // AptInstall attempts to install the specified app and adds it to the apt layer if successful.
@@ -98,6 +78,7 @@ func AptInstall(ctx context.Context, ws *project.Workspace, aptLayerIdx int, use
 			}
 		}
 
+		// no more apts to add
 		if len(aptNames) == 0 {
 			return 0, nil
 		}

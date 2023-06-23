@@ -22,19 +22,24 @@ type ImageInfo struct {
 }
 
 func SetupWorkspace(ctx context.Context, ws *project.Workspace, img runtime.Image) error {
-
+	fmt.Printf("AAH\n")
 	info, err := GetImageInfo(ctx, img)
 	if err != nil {
 		return err
 	}
 
+	_, layer, err := ws.CreateLayer(project.LayerNameOS, "")
+	if err != nil {
+		return nil
+	}
+
 	switch info.ID {
 	case "ubuntu":
-		err = UbuntuCreateOSLayer(ws, -1)
+		err = UbuntuOSLayerInit(layer)
 	case "debian":
-		err = DebianCreateOSLayer(ws, -1)
+		err = DebianOSLayerInit(layer)
 	default:
-		fmt.Printf("Uknown OS: %v\n", info.ID) // FIXME
+		fmt.Printf("Uknown OS: %v\n", info.ID)
 	}
 	if err != nil {
 		return err
@@ -96,14 +101,16 @@ func GetImageInfo(ctx context.Context, img runtime.Image) (*ImageInfo, error) {
 	return &imageinfo, nil
 }
 
-// CreateSystemLayer creates a system layer
-func CreateSystemLayer(ws *project.Workspace, name string, atIndex int) error {
-	switch name {
+// InitHandler initializes a newly created layer for the specified handler name
+func InitHandler(layer *project.Layer, handler string) error {
+	switch handler {
 	case project.LayerHandlerApt:
-		return AptCreateLayer(ws, atIndex)
+		return AptLayerInit(layer)
 	case project.LayerHandlerUbuntu:
-		return UbuntuCreateOSLayer(ws, atIndex)
+		return UbuntuOSLayerInit(layer)
+	case project.LayerHandlerDebian:
+		return UbuntuOSLayerInit(layer)
 	default:
-		return errdefs.InvalidArgument("system layer %s not supported", name)
+		return errdefs.InvalidArgument("handler: '%s' not supported", handler)
 	}
 }

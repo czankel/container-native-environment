@@ -5,15 +5,9 @@ import (
 )
 
 // Note that the commands are never executed by CNE for security reasons
-func DebianCreateOSLayer(ws *project.Workspace, atIndex int) error {
+func DebianOSLayerInit(layer *project.Layer) error {
 
-	_, osLayer, err := ws.CreateLayer(project.LayerHandlerDebian, "")
-	if err != nil {
-		return err
-	}
-
-	osLayer.Handler = project.LayerHandlerDebian
-	osLayer.Commands = []project.Command{{
+	layer.Commands = []project.Command{{
 		Name: "debian-user",
 		Args: []string{
 			"adduser",

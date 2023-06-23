@@ -532,3 +532,62 @@ func (ws *Workspace) UpdateLayer(layer *Layer) {
 		}
 	}
 }
+
+func getCommandIndex(layer *Layer, at string) (int, error) {
+
+	if at == "" {
+		return len(layer.Commands), nil
+	} else if i, err := strconv.Atoi(at); err == nil {
+		if i < 0 || i > len(layer.Commands) {
+			return -1, errdefs.InvalidArgument("invalid command index: %d", i)
+		}
+		return i, nil
+	} else {
+		for i, c := range layer.Commands {
+			if c.Name == at {
+				return i, nil
+			}
+		}
+	}
+	return -1, errdefs.InvalidArgument("no such command entry: '%s'", at)
+}
+
+func (ws *Workspace) InsertCommands(layer *Layer, at string, commands []Command) error {
+
+	atIndex, err := getCommandIndex(layer, at)
+	if err != nil {
+		return err
+	}
+
+	c := append(layer.Commands[:atIndex], commands...)
+	layer.Commands = append(c, layer.Commands[atIndex:]...)
+
+	return nil
+}
+
+func (ws *Workspace) UpdateCommands(layer *Layer, at string, commands Command) error {
+
+	atIndex, err := getCommandIndex(layer, at)
+	if err != nil {
+		return err
+	}
+	if atIndex >= len(layer.Commands) {
+		return errdefs.InvalidArgument("no command entry specified")
+	}
+
+	layer.Commands[atIndex] = commands
+
+	return nil
+}
+
+func (ws *Workspace) RemoveCommands(layer *Layer, at string) error {
+
+	atIndex, err := getCommandIndex(layer, at)
+	if err != nil {
+		return err
+	}
+
+	layer.Commands = append(layer.Commands[:atIndex], layer.Commands[atIndex+1:]...)
+
+	return nil
+}
