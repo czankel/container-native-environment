@@ -384,7 +384,7 @@ func (confCtx *Context) UpdateContextOptions(line string) error {
 	for _, o := range opts {
 		kv := strings.Split(strings.TrimSpace(o), "=")
 		if len(kv) != 2 {
-			return errdefs.InvalidArgument("Optiono '%`' must be in the form key=[value]", o)
+			return errdefs.InvalidArgument("Option '%v' must be in the form key=[value]", o)
 		}
 		updated := false
 		for k, _ := range confCtx.Options {
