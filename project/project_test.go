@@ -52,7 +52,7 @@ func TestProjectCreate(t *testing.T) {
 		t.Errorf("Loaded project: Name field mismatch")
 	}
 
-	if prjChk.path != prj.path {
+	if prjChk.Path != prj.Path {
 		t.Errorf("Loaded project: path field mismatch")
 	}
 }
@@ -100,7 +100,7 @@ func TestProjectCopyProjects(t *testing.T) {
 		t.Errorf("Project ID still 0")
 	}
 
-	src, err := os.Open(dir + "/test1/" + projectFileName)
+	src, err := os.Open(dir + "/test1/" + ProjectFileName)
 	if err != nil {
 		t.Fatalf("Failed to open project file: %v", err)
 	}
@@ -111,7 +111,7 @@ func TestProjectCopyProjects(t *testing.T) {
 		t.Fatalf("Failed to create destination directory")
 	}
 
-	dst, err := os.Create(dir + "/test2/" + projectFileName)
+	dst, err := os.Create(dir + "/test2/" + ProjectFileName)
 	if err != nil {
 		t.Fatalf("Failed to create destination file")
 	}
@@ -141,7 +141,6 @@ func TestProjectCopyProjects(t *testing.T) {
 
 }
 
-//
 func TestProjectCreateTwoProjects(t *testing.T) {
 	dir1, err := ioutil.TempDir("", testDir)
 	if err != nil {
@@ -410,16 +409,16 @@ func TestProjectLayers(t *testing.T) {
 	layer2Name := "Layer2" // -> layer[2]
 	layer3Name := "Layer3" // -> layer[0]
 
-	_, err = ws.CreateLayer(false, layer1Name, -2)
+	_, _, err = ws.CreateLayer(layer1Name, "-2")
 	if err == nil {
 		t.Fatalf("Inserting Layer1 at negative index should fail")
 	}
-	_, err = ws.CreateLayer(false, layer1Name, 1)
+	_, _, err = ws.CreateLayer(layer1Name, "1")
 	if err == nil {
 		t.Fatalf("Inserting Layer1 at invalid index should fail")
 	}
 
-	_, err = ws.CreateLayer(false, layer1Name, 0)
+	_, _, err = ws.CreateLayer(layer1Name, "0")
 	if err != nil {
 		t.Fatalf("Inserting Layer1 at 0 should succeed %v", err)
 	}
@@ -429,7 +428,7 @@ func TestProjectLayers(t *testing.T) {
 		t.Fatalf("TopLayer should be layer1")
 	}
 
-	_, err = ws.CreateLayer(false, layer2Name, 1)
+	_, _, err = ws.CreateLayer(layer2Name, "1")
 	if err != nil {
 		t.Fatalf("Appending layer at the end should succeed")
 	}
@@ -448,7 +447,7 @@ func TestProjectLayers(t *testing.T) {
 		t.Fatalf("TopLayer should be layer1")
 	}
 
-	_, err = ws.CreateLayer(false, layer3Name, 0)
+	_, _, err = ws.CreateLayer(layer3Name, "0")
 	if err != nil {
 		t.Fatalf("Inserting Layer3 at 0 should succeed")
 	}
