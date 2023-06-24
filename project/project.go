@@ -5,7 +5,6 @@ import (
 	"crypto/md5"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -213,9 +212,11 @@ func GetProjectPath(path string) (string, error) {
 // It also scans all parent paths for the project file if path is a directory.
 func Load(path string) (*Project, error) {
 
-	prjStr, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, errdefs.SystemError(err, "failed to read project file '%s'", path)
+	prjStr, err := os.ReadFile(path)
+	if err != nil && os.IsNotExist(err) {
+		return nil, errdefs.NotFound("file", "path")
+	} else if err != nil {
+		return nil, err
 	}
 
 	var header Header
@@ -262,7 +263,7 @@ func (prj *Project) Write() error {
 		return errdefs.InvalidArgument("project file corrupt")
 	}
 
-	err = ioutil.WriteFile(prj.Path, append(hStr, pStr...), projectFilePerm)
+	err = os.WriteFile(prj.Path, append(hStr, pStr...), projectFilePerm)
 	if err != nil {
 		return errdefs.SystemError(err, "failed to write project")
 	}

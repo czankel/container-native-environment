@@ -6,7 +6,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -52,12 +51,13 @@ func SetupWorkspace(ctx context.Context, ws *project.Workspace, img runtime.Imag
 // Returns nil if the OS couldn't be identified.
 func GetImageInfo(ctx context.Context, img runtime.Image) (*ImageInfo, error) {
 
-	tmpDir, err := ioutil.TempDir("/tmp", "cne-mount")
+	tmpDir, err := os.MkdirTemp("/tmp", "cne-mount")
 	if err != nil {
 		return nil, errdefs.InternalError("failed to create temporary directory: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
 
+	// FIXME: not working always ...
 	err = img.Mount(ctx, tmpDir)
 	if err != nil {
 		return nil, err
