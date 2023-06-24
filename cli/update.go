@@ -1,12 +1,54 @@
 package cli
 
 import (
+	"context"
+	"errors"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/czankel/cne/container"
 	"github.com/czankel/cne/errdefs"
+	"github.com/czankel/cne/runtime"
 )
+
+// helper function to update container options
+func updateContainerOptions(options map[string]string) error {
+
+	// TODO: create custom boilerplate function
+	prj, err := loadProject()
+	if err != nil {
+		return err
+	}
+
+	ws, err := prj.CurrentWorkspace()
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+	runCfg, err := conf.GetRuntime()
+	if err != nil {
+		return err
+	}
+
+	run, err := runtime.Open(ctx, runCfg)
+	if err != nil {
+		return err
+	}
+
+	defer run.Close()
+	ctx = run.WithNamespace(ctx, runCfg.Namespace)
+
+	ctr, err := container.GetContainer(ctx, run, ws)
+	if err != nil && errors.Is(err, errdefs.ErrNotFound) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+
+	return ctr.Update(ctx, options)
+}
 
 var updateCmd = &cobra.Command{
 	Use:     "update",
@@ -49,16 +91,7 @@ func updateWorkspaceRunE(cmd *cobra.Command, args []string) error {
 	return err
 }
 
-var updateConfigCmd = &cobra.Command{
-	Use:   "config config",
-	Short: "Update the configuration",
-	Long: `Update the user or system configuration for the environment.
-By default, the configuration is written to the user configuration file.
-The system option modifies the system-wide configuration file stored in
-/etc, and requires system permissions.`,
-}
-
-var updateConfigRenameEntry string
+var updateRenameEntry string
 
 var updateContextCmd = &cobra.Command{
 	Use:   "context [context]",
@@ -88,12 +121,12 @@ func updateContextRunE(cmd *cobra.Command, args []string) error {
 		return errdefs.NotFound("context", name)
 	}
 
-	if updateConfigRenameEntry != "" {
+	if updateRenameEntry != "" {
 		entry := cmd.CalledAs()
 		if len(args) == 0 {
 			return errdefs.InvalidArgument("original name not provided")
 		}
-		err = tempConf.RenameEntry(entry, args[0], updateConfigRenameEntry)
+		err = tempConf.RenameEntry(entry, args[0], updateRenameEntry)
 		if err != nil {
 			return err
 		}
@@ -106,7 +139,7 @@ func updateContextRunE(cmd *cobra.Command, args []string) error {
 	}
 	var changes []changeInfo
 
-	if err == nil && updateContextOptions != "" {
+	if updateContextOptions != "" {
 		opts := make([]string, 0, len(confCtx.Options))
 		for k, v := range confCtx.Options {
 			opts = append(opts, k+"="+v)
@@ -121,8 +154,15 @@ func updateContextRunE(cmd *cobra.Command, args []string) error {
 			opts = append(opts, k+"="+v)
 		}
 		changes = append(changes, changeInfo{"Options", orig, strings.Join(opts, ",")})
+
+		if updateContextRuntime == "" {
+			err = updateContainerOptions(confCtx.Options)
+			if err != nil {
+				return err
+			}
+		}
 	}
-	if err == nil && updateContextRegistry != "" {
+	if updateContextRegistry != "" {
 		if _, ok := tempConf.Registry[confCtx.Registry]; !ok {
 			return errdefs.NotFound("registry", confCtx.Registry)
 		}
@@ -130,7 +170,7 @@ func updateContextRunE(cmd *cobra.Command, args []string) error {
 		confCtx.Registry = updateContextRegistry
 		changes = append(changes, changeInfo{"Registry", orig, updateContextRegistry})
 	}
-	if err == nil && updateContextRuntime != "" {
+	if updateContextRuntime != "" {
 		if _, ok := tempConf.Runtime[confCtx.Runtime]; !ok {
 			return errdefs.NotFound("runtime", confCtx.Runtime)
 		}
@@ -138,6 +178,7 @@ func updateContextRunE(cmd *cobra.Command, args []string) error {
 		confCtx.Runtime = updateContextRuntime
 		changes = append(changes, changeInfo{"Runtime", orig, updateContextRuntime})
 	}
+
 	err = writeConfig(tempConf)
 	if err != nil {
 		return err
@@ -147,17 +188,17 @@ func updateContextRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-var updateConfigRegistryCmd = &cobra.Command{
+var updateRegistryCmd = &cobra.Command{
 	Use:   "registry [name]",
 	Short: "Update registry configurations",
 	Args:  cobra.RangeArgs(0, 1),
 	RunE:  updateContextRunE,
 }
 
-var updateConfigRegistryDomain string
-var updateConfigRegistryRepoName string
+var updateRegistryDomain string
+var updateRegistryRepoName string
 
-func updateConfigRegistryRunE(cmd *cobra.Command, args []string) error {
+func updateRegistryRunE(cmd *cobra.Command, args []string) error {
 
 	tempConf, err := loadConfig()
 	if err != nil {
@@ -175,11 +216,11 @@ func updateConfigRegistryRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if updateConfigRenameEntry != "" {
+	if updateRenameEntry != "" {
 		if len(args) == 0 {
 			return errdefs.InvalidArgument("original name not provided")
 		}
-		err = tempConf.RenameEntry("registry", args[0], updateConfigRenameEntry)
+		err = tempConf.RenameEntry("registry", args[0], updateRenameEntry)
 		if err != nil {
 			return err
 		}
@@ -192,15 +233,15 @@ func updateConfigRegistryRunE(cmd *cobra.Command, args []string) error {
 	}
 	var changes []changeInfo
 
-	if err == nil && updateConfigRegistryDomain != "" {
+	if err == nil && updateRegistryDomain != "" {
 		orig := confReg.Domain
-		confReg.Domain = updateConfigRegistryDomain
-		changes = append(changes, changeInfo{"Domain", orig, updateConfigRegistryDomain})
+		confReg.Domain = updateRegistryDomain
+		changes = append(changes, changeInfo{"Domain", orig, updateRegistryDomain})
 	}
-	if err == nil && updateConfigRegistryRepoName != "" {
+	if err == nil && updateRegistryRepoName != "" {
 		orig := confReg.RepoName
-		confReg.RepoName = updateConfigRegistryRepoName
-		changes = append(changes, changeInfo{"RepoName", orig, updateConfigRegistryRepoName})
+		confReg.RepoName = updateRegistryRepoName
+		changes = append(changes, changeInfo{"RepoName", orig, updateRegistryRepoName})
 	}
 
 	err = writeConfig(tempConf)
@@ -212,18 +253,18 @@ func updateConfigRegistryRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-var updateConfigRuntimeCmd = &cobra.Command{
+var updateRuntimeCmd = &cobra.Command{
 	Use:   "runtime [name]",
 	Short: "Update runtime configurations",
 	Args:  cobra.RangeArgs(0, 1),
-	RunE:  updateConfigRuntimeRunE,
+	RunE:  updateRuntimeRunE,
 }
 
-var updateConfigRuntimeRuntime string
-var updateConfigRuntimeSocketName string
-var updateConfigRuntimeNamespace string
+var updateRuntimeRuntime string
+var updateRuntimeSocketName string
+var updateRuntimeNamespace string
 
-func updateConfigRuntimeRunE(cmd *cobra.Command, args []string) error {
+func updateRuntimeRunE(cmd *cobra.Command, args []string) error {
 
 	tempConf, err := loadConfig()
 	if err != nil {
@@ -241,11 +282,11 @@ func updateConfigRuntimeRunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if updateConfigRenameEntry != "" {
+	if updateRenameEntry != "" {
 		if len(args) == 0 {
 			return errdefs.InvalidArgument("original name not provided")
 		}
-		err = tempConf.RenameEntry("runtime", args[0], updateConfigRenameEntry)
+		err = tempConf.RenameEntry("runtime", args[0], updateRenameEntry)
 		if err != nil {
 			return err
 		}
@@ -258,20 +299,20 @@ func updateConfigRuntimeRunE(cmd *cobra.Command, args []string) error {
 	}
 	var changes []changeInfo
 
-	if err == nil && updateConfigRuntimeRuntime != "" {
+	if err == nil && updateRuntimeRuntime != "" {
 		orig := confRun.Engine
-		confRun.Engine = updateConfigRuntimeRuntime
-		changes = append(changes, changeInfo{"Runtime", orig, updateConfigRuntimeRuntime})
+		confRun.Engine = updateRuntimeRuntime
+		changes = append(changes, changeInfo{"Runtime", orig, updateRuntimeRuntime})
 	}
-	if err == nil && updateConfigRuntimeSocketName != "" {
+	if err == nil && updateRuntimeSocketName != "" {
 		orig := confRun.SocketName
-		confRun.SocketName = updateConfigRuntimeSocketName
-		changes = append(changes, changeInfo{"socketname", orig, updateConfigRuntimeSocketName})
+		confRun.SocketName = updateRuntimeSocketName
+		changes = append(changes, changeInfo{"socketname", orig, updateRuntimeSocketName})
 	}
-	if err == nil && updateConfigRuntimeNamespace != "" {
+	if err == nil && updateRuntimeNamespace != "" {
 		orig := confRun.Namespace
-		confRun.Namespace = updateConfigRuntimeNamespace
-		changes = append(changes, changeInfo{"namespace", orig, updateConfigRuntimeNamespace})
+		confRun.Namespace = updateRuntimeNamespace
+		changes = append(changes, changeInfo{"namespace", orig, updateRuntimeNamespace})
 	}
 
 	err = writeConfig(tempConf)
@@ -311,12 +352,6 @@ func updateProjectRunE(cmd *cobra.Command, args []string) error {
 func init() {
 	rootCmd.AddCommand(updateCmd)
 
-	updateCmd.AddCommand(updateConfigCmd)
-	updateConfigCmd.Flags().BoolVarP(
-		&configSystem, "system", "", false, "Update system configuration")
-	updateConfigCmd.Flags().BoolVarP(
-		&configProject, "project", "", false, "Update project configuration")
-
 	updateCmd.AddCommand(updateContextCmd)
 	updateContextCmd.Flags().StringVar(
 		&updateContextOptions, "options", "", "Container runtime options")
@@ -325,27 +360,11 @@ func init() {
 	updateContextCmd.Flags().StringVar(
 		&updateContextRegistry, "registry", "", "Change the registry for the context")
 	updateContextCmd.Flags().StringVar(
-		&updateConfigRenameEntry, "rename", "", "Rename the entry")
-
-	updateConfigCmd.AddCommand(updateConfigRegistryCmd)
-	updateConfigRegistryCmd.Flags().StringVar(
-		&updateConfigRegistryDomain, "domain", "", "Change the registry domain address")
-	updateConfigRegistryCmd.Flags().StringVar(
-		&updateConfigRegistryRepoName, "reponame", "", "Change the registry repo-name")
-	updateConfigRegistryCmd.Flags().StringVar(
-		&updateConfigRenameEntry, "rename", "", "Rename the entry")
-
-	updateConfigCmd.AddCommand(updateConfigRuntimeCmd)
-	updateConfigRuntimeCmd.Flags().StringVar(
-		&updateConfigRuntimeRuntime, "runtime", "", "Change the container runtime")
-	updateConfigRuntimeCmd.Flags().StringVar(
-		&updateConfigRuntimeSocketName,
-		"socketname", "", "Change the socket name to the container runtime")
-	updateConfigRuntimeCmd.Flags().StringVar(
-		&updateConfigRuntimeNamespace,
-		"namespace", "", "Change the namespace for the container runtime")
-	updateConfigRuntimeCmd.Flags().StringVar(
-		&updateConfigRenameEntry, "rename", "", "Rename the entry")
+		&updateRenameEntry, "rename", "", "Rename the entry")
+	updateContextCmd.Flags().BoolVarP(
+		&configSystem, "system", "", false, "Update system configuration")
+	updateContextCmd.Flags().BoolVarP(
+		&configProject, "project", "", false, "Update project configuration")
 
 	updateCmd.AddCommand(updateProjectCmd)
 	updateProjectCmd.Flags().StringVar(
@@ -353,8 +372,35 @@ func init() {
 	updateProjectCmd.Flags().StringVar(
 		&updateProjectWorkspace, "ws", "", "Change the current workspace for the project")
 
+	updateCmd.AddCommand(updateRegistryCmd)
+	updateRegistryCmd.Flags().StringVar(
+		&updateRegistryDomain, "domain", "", "Change the registry domain address")
+	updateRegistryCmd.Flags().StringVar(
+		&updateRegistryRepoName, "reponame", "", "Change the registry repo-name")
+	updateRegistryCmd.Flags().StringVar(
+		&updateRenameEntry, "rename", "", "Rename the entry")
+	updateRegistryCmd.Flags().BoolVarP(
+		&configSystem, "system", "", false, "Update system configuration")
+	updateRegistryCmd.Flags().BoolVarP(
+		&configProject, "project", "", false, "Update project configuration")
+
+	updateCmd.AddCommand(updateRuntimeCmd)
+	updateRuntimeCmd.Flags().StringVar(
+		&updateRuntimeRuntime, "runtime", "", "Change the container runtime")
+	updateRuntimeCmd.Flags().StringVar(
+		&updateRuntimeSocketName,
+		"socketname", "", "Change the socket name to the container runtime")
+	updateRuntimeCmd.Flags().StringVar(
+		&updateRuntimeNamespace,
+		"namespace", "", "Change the namespace for the container runtime")
+	updateRuntimeCmd.Flags().StringVar(
+		&updateRenameEntry, "rename", "", "Rename the entry")
+	updateRuntimeCmd.Flags().BoolVarP(
+		&configSystem, "system", "", false, "Update system configuration")
+	updateRuntimeCmd.Flags().BoolVarP(
+		&configProject, "project", "", false, "Update project configuration")
+
 	updateCmd.AddCommand(updateWorkspaceCmd)
 	updateWorkspaceCmd.Flags().StringVarP(
 		&updateWorkspaceName, "rename", "", "", "Rename the workspace")
-
 }
