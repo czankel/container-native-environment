@@ -32,16 +32,17 @@ var configProject bool // use project configuration file
 // user configuration
 func loadConfig() (*config.Config, error) {
 
+	var err error
+	conf := config.NewConfig()
+
 	if configSystem {
-		return config.LoadSystemConfig()
+		err = conf.Update(config.SystemConfigFile)
 	} else if configProject {
-		prj, err := loadProject()
-		if err != nil {
-			return nil, err
-		}
-		return config.LoadProjectConfig(filepath.Dir(prj.Path))
+		err = conf.Update(filepath.Dir(projectPath) + "/" + config.ProjectConfigFile)
+	} else { // config user
+		err = conf.Update(user.HomeDir + "/" + config.UserConfigFile)
 	}
-	return config.LoadUserConfig()
+	return conf, err
 }
 
 // helper function to write the configuration to a specific file:
@@ -66,8 +67,7 @@ func loadProject() (*project.Project, error) {
 		return nil, err
 	}
 	projectPath = prj.Path
-
-	return prj, conf.UpdateProjectConfig(filepath.Dir(prj.Path))
+	return prj, nil
 }
 
 var rootCmd = &cobra.Command{
@@ -120,22 +120,25 @@ func Execute() error {
 func initConfig() {
 
 	var err error
+
 	basename = filepath.Base(os.Args[0])
+	conf = config.NewDefault()
+	user, err = conf.User()
 
-	conf, err = config.Load()
-	if err != nil {
-		fmt.Printf("%s: %v\n", basename, err)
-		os.Exit(1)
-	}
-
-	if projectPath == "" {
+	if err == nil && projectPath == "" {
 		projectPath, err = os.Getwd()
 	}
 	if err == nil {
 		projectPath, err = project.GetProjectPath(projectPath)
 	}
 	if err == nil {
-		user, err = conf.User()
+		err = conf.Update(config.SystemConfigFile)
+	}
+	if err == nil {
+		err = conf.Update(user.HomeDir + "/" + config.UserConfigFile)
+	}
+	if err == nil {
+		err = conf.Update(filepath.Dir(projectPath) + "/" + config.ProjectConfigFile)
 	}
 
 	if err != nil {
