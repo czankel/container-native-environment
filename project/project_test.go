@@ -3,7 +3,6 @@ package project
 import (
 	"errors"
 	"io"
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -15,13 +14,21 @@ const testDir = "cnetest"
 
 func TestProjectCreate(t *testing.T) {
 
-	dir, err := ioutil.TempDir("", testDir)
+	dir, err := os.MkdirTemp("", testDir)
 	if err != nil {
 		t.Fatalf("Failed to create a temporary directory")
 	}
 	defer os.RemoveAll(dir)
 
-	_, err = Load(dir)
+	path, err := GetProjectPath(dir)
+	if err != nil {
+		t.Fatalf("Should not have failed to get the project path: %v", err)
+	}
+	if path != dir+"/"+ProjectFileName {
+		t.Fatalf("Project path %v should be %v\n", path, dir+"/"+ProjectFileName)
+	}
+
+	_, err = Load(path)
 	if !errors.Is(err, errdefs.ErrNotFound) {
 		t.Fatalf("Should have failed to load non-existent project: %v", err)
 	}
@@ -39,7 +46,7 @@ func TestProjectCreate(t *testing.T) {
 		t.Errorf("modifiedAt earlier than 1s: %v", timediff)
 	}
 
-	prjChk, err := Load(dir)
+	prjChk, err := Load(path)
 	if err != nil {
 		t.Fatalf("Failed to load project: %v", err)
 	}
@@ -59,7 +66,7 @@ func TestProjectCreate(t *testing.T) {
 
 func TestProjectCreateExistingProject(t *testing.T) {
 
-	dir, err := ioutil.TempDir("", testDir)
+	dir, err := os.MkdirTemp("", testDir)
 	if err != nil {
 		t.Fatalf("Failed to create a temporary directory")
 	}
@@ -81,7 +88,7 @@ func TestProjectCreateExistingProject(t *testing.T) {
 // update project
 func TestProjectCopyProjects(t *testing.T) {
 
-	dir, err := ioutil.TempDir("", testDir)
+	dir, err := os.MkdirTemp("", testDir)
 	if err != nil {
 		t.Fatalf("Failed to create a temporary directory")
 	}
@@ -125,14 +132,14 @@ func TestProjectCopyProjects(t *testing.T) {
 		t.Fatalf("0 bytes copied")
 	}
 
-	prjChk, err := Load(dir + "/test2")
+	prjChk, err := Load(dir + "/test2/" + ProjectFileName)
 	if prjChk.instanceID == prj.instanceID {
 		t.Fatalf("Copying project should have changed node id")
 	}
 
 	err = prjChk.Write()
 
-	prj3, err := Load(dir + "/test2")
+	prj3, err := Load(dir + "/test2/" + ProjectFileName)
 	if err != nil {
 		t.Fatalf("Failed to load project")
 	} else if prj3.instanceID != prjChk.instanceID {
@@ -142,13 +149,13 @@ func TestProjectCopyProjects(t *testing.T) {
 }
 
 func TestProjectCreateTwoProjects(t *testing.T) {
-	dir1, err := ioutil.TempDir("", testDir)
+	dir1, err := os.MkdirTemp("", testDir)
 	if err != nil {
 		t.Fatalf("Failed to create a temporary directory")
 	}
 	defer os.RemoveAll(dir1)
 
-	dir2, err := ioutil.TempDir("", testDir)
+	dir2, err := os.MkdirTemp("", testDir)
 	if err != nil {
 		t.Fatalf("Failed to create a temporary directory")
 	}
@@ -174,7 +181,7 @@ func TestProjectCreateTwoProjects(t *testing.T) {
 
 func TestProjectWorkspace(t *testing.T) {
 
-	dir, err := ioutil.TempDir("", testDir)
+	dir, err := os.MkdirTemp("", testDir)
 	if err != nil {
 		t.Fatalf("Failed to create a temporary directory")
 	}
@@ -306,7 +313,7 @@ func TestProjectWorkspaceNaming(t *testing.T) {
 
 func TestProjectCurrentWorkspace(t *testing.T) {
 
-	dir, err := ioutil.TempDir("", testDir)
+	dir, err := os.MkdirTemp("", testDir)
 	if err != nil {
 		t.Fatalf("Failed to create a temporary directory")
 	}
@@ -379,7 +386,7 @@ func TestProjectCurrentWorkspace(t *testing.T) {
 
 func TestProjectLayers(t *testing.T) {
 
-	dir, err := ioutil.TempDir("", testDir)
+	dir, err := os.MkdirTemp("", testDir)
 	if err != nil {
 		t.Fatalf("Failed to create a temporary directory")
 	}

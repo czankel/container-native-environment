@@ -214,7 +214,7 @@ func Load(path string) (*Project, error) {
 
 	prjStr, err := os.ReadFile(path)
 	if err != nil && os.IsNotExist(err) {
-		return nil, errdefs.NotFound("file", "path")
+		return nil, errdefs.NotFound("file", path)
 	} else if err != nil {
 		return nil, err
 	}

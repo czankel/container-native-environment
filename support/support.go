@@ -21,7 +21,7 @@ type ImageInfo struct {
 }
 
 func SetupWorkspace(ctx context.Context, ws *project.Workspace, img runtime.Image) error {
-	fmt.Printf("AAH\n")
+
 	info, err := GetImageInfo(ctx, img)
 	if err != nil {
 		return err
