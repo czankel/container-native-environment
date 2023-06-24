@@ -55,8 +55,8 @@ func SetContextName(name string) {
 	contextName = name
 }
 
-// update updates the configuration with the values from the specified configuration file
-func (conf *Config) update(path string) error {
+// Update updates the configuration with the values from the specified configuration file
+func (conf *Config) Update(path string) error {
 	_, err := toml.DecodeFile(path, conf)
 	if err != nil && !os.IsNotExist(err) {
 		return errdefs.InvalidArgument("config file '%s' corrupt", path)
@@ -306,11 +306,15 @@ func (conf *Config) RenameEntry(entry, from, to string) error {
 	return err
 }
 
-// Load returns the default configuration amended by the configuration stored in the
-// system and user configuration file.
-func Load() (*Config, error) {
+// NewConfig returns an empty confguration
+func NewConfig() *Config {
+	return &Config{}
+}
 
-	conf := &Config{
+// NewDefault returns a new default configuration
+func NewDefault() *Config {
+
+	return &Config{
 		Settings: Settings{
 			Context: DefaultContextName,
 		},
@@ -331,12 +335,19 @@ func Load() (*Config, error) {
 				Namespace:  DefaultRuntimeNamespace,
 			}},
 	}
+}
 
-	conf.update(SystemConfigFile)
+// Load returns the default configuration amended by the configuration stored in the
+// system and user configuration file.
+func Load() (*Config, error) {
+
+	conf := NewDefault()
+
+	conf.Update(SystemConfigFile)
 
 	usr, err := user.Current()
 	if err == nil {
-		err = conf.update(usr.HomeDir + "/" + UserConfigFile)
+		err = conf.Update(usr.HomeDir + "/" + UserConfigFile)
 	}
 	return conf, err
 }
@@ -345,7 +356,7 @@ func Load() (*Config, error) {
 func LoadSystemConfig() (*Config, error) {
 
 	conf := &Config{}
-	err := conf.update(SystemConfigFile)
+	err := conf.Update(SystemConfigFile)
 
 	return conf, err
 }
@@ -357,7 +368,7 @@ func LoadUserConfig() (*Config, error) {
 
 	usr, err := user.Current()
 	if err == nil {
-		conf.update(usr.HomeDir + "/" + UserConfigFile)
+		conf.Update(usr.HomeDir + "/" + UserConfigFile)
 	}
 
 	return conf, err
@@ -367,7 +378,7 @@ func LoadUserConfig() (*Config, error) {
 func LoadProjectConfig(path string) (*Config, error) {
 
 	conf := &Config{}
-	err := conf.update(path + "/" + ProjectConfigFile)
+	err := conf.Update(path + "/" + ProjectConfigFile)
 
 	return conf, err
 }
@@ -375,7 +386,7 @@ func LoadProjectConfig(path string) (*Config, error) {
 // UpdateProjectConfig updates the configuration from the config file in the project path
 func (conf *Config) UpdateProjectConfig(path string) error {
 
-	return conf.update(path + "/" + ProjectConfigFile)
+	return conf.Update(path + "/" + ProjectConfigFile)
 }
 
 func (confCtx *Context) UpdateContextOptions(line string) error {
