@@ -61,16 +61,6 @@ func writeConfig(conf *config.Config) error {
 // helper function to load the project
 func loadProject() (*project.Project, error) {
 
-	if projectPath == "" {
-		var err error
-		projectPath, err = os.Getwd()
-		if err != nil {
-			return nil, errdefs.SystemError(err,
-				"failed to load project file in '%s'",
-				projectPath)
-		}
-	}
-
 	prj, err := project.Load(projectPath)
 	if err != nil {
 		return nil, err
@@ -138,7 +128,16 @@ func initConfig() {
 		os.Exit(1)
 	}
 
-	user, err = conf.User()
+	if projectPath == "" {
+		projectPath, err = os.Getwd()
+	}
+	if err == nil {
+		projectPath, err = project.GetProjectPath(projectPath)
+	}
+	if err == nil {
+		user, err = conf.User()
+	}
+
 	if err != nil {
 		fmt.Printf("%s: %v\n", basename, err)
 		os.Exit(1)

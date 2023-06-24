@@ -173,39 +173,47 @@ func Create(name, path string) (*Project, error) {
 	return prj, err
 }
 
-// Load loads the project from the provided path.
-// It also scans all parent paths for the project file if path is a directory.
-func Load(path string) (*Project, error) {
+// GetProjectPath returns the path to the project, which could be in an upper directory.
+// If no project cannot be found, the path for the current path is returned
+func GetProjectPath(path string) (string, error) {
 
 	if len(path) == 0 {
-		return nil, errdefs.InvalidArgument("invalid project path: '%s'", path)
+		return "", errdefs.InvalidArgument("invalid project path: '%s'", path)
 	}
 
 	fileInfo, err := os.Stat(path)
 	if err != nil {
-		return nil, errdefs.NotFound("project", path)
+		return "", errdefs.NotFound("project", path)
 	}
 
-	var prjStr []byte
 	if fileInfo.Mode().IsDir() {
 		if path[len(path)-1] != '/' {
 			path = path + "/"
 		}
+
 		dir := path
 		path = path + ProjectFileName
 
-		prjStr, err = ioutil.ReadFile(path)
-		for err != nil && os.IsNotExist(err) {
+		_, err = os.Stat(path)
+		for temp := path; err != nil && os.IsNotExist(err); {
 			if dir == "/" || dir == "." {
-				return nil, errdefs.NotFound("project", path)
+				path = temp
+				break
 			}
 			dir = filepath.Dir(dir)
 			path = dir + "/" + ProjectFileName
-			prjStr, err = ioutil.ReadFile(path)
+			_, err = os.Stat(path)
 		}
-	} else {
-		prjStr, err = ioutil.ReadFile(path)
 	}
+
+	return path, nil
+}
+
+// Load loads the project from the provided path.
+// It also scans all parent paths for the project file if path is a directory.
+func Load(path string) (*Project, error) {
+
+	prjStr, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, errdefs.SystemError(err, "failed to read project file '%s'", path)
 	}
@@ -222,8 +230,9 @@ func Load(path string) (*Project, error) {
 		return nil, errdefs.InvalidArgument("project file corrupt: %v", err)
 	}
 
-	fileInfo, err = os.Stat(path)
+	fileInfo, err := os.Stat(path)
 	prj.Path = path
+
 	prj.modifiedAt = fileInfo.ModTime()
 	stat, ok := fileInfo.Sys().(*syscall.Stat_t)
 	if ok {
