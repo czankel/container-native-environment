@@ -186,7 +186,7 @@ var createContextRuntime string
 
 func createContextRunE(cmd *cobra.Command, args []string) error {
 
-	tempConf, err := loadConfig()
+	tempConf, err := loadConfig(false)
 	if err != nil {
 		return err
 	}
@@ -292,7 +292,7 @@ var createRegistryRepoName string
 
 func createRegistryRunE(cmd *cobra.Command, args []string) error {
 
-	tempConf, err := loadConfig()
+	tempConf, err := loadConfig(false)
 	if err != nil {
 		return err
 	}
@@ -330,7 +330,7 @@ var createRuntimeNamespace string
 
 func createRuntimeRunE(cmd *cobra.Command, args []string) error {
 
-	tempConf, err := loadConfig()
+	tempConf, err := loadConfig(false)
 	if err != nil {
 		return err
 	}

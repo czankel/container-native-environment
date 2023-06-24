@@ -279,7 +279,7 @@ var deleteConfigContextCmd = &cobra.Command{
 
 func deleteConfigContextRunE(cmd *cobra.Command, args []string) error {
 
-	tempConf, err := loadConfig()
+	tempConf, err := loadConfig(false)
 	if err != nil {
 		return err
 	}
@@ -301,7 +301,7 @@ var deleteConfigRegistryCmd = &cobra.Command{
 
 func deleteConfigRegistryRunE(cmd *cobra.Command, args []string) error {
 
-	tempConf, err := loadConfig()
+	tempConf, err := loadConfig(false)
 	if err != nil {
 		return err
 	}
@@ -323,7 +323,7 @@ var deleteConfigRuntimeCmd = &cobra.Command{
 
 func deleteConfigRuntimeRunE(cmd *cobra.Command, args []string) error {
 
-	tempConf, err := loadConfig()
+	tempConf, err := loadConfig(false)
 	if err != nil {
 		return err
 	}

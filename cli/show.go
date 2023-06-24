@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -28,6 +29,7 @@ var showContextCmd = &cobra.Command{
 
 func showContextRunE(cmd *cobra.Command, args []string) error {
 
+	fmt.Printf("conf %v\n", conf.Settings)
 	entry := conf.Settings.Context
 	if len(args) > 0 {
 		entry = args[0]

@@ -206,7 +206,7 @@ var listContextCmd = &cobra.Command{
 }
 
 func listContextRunE(cmd *cobra.Command, args []string) error {
-	cfg, err := loadConfig()
+	cfg, err := loadConfig(true)
 	if err != nil {
 		return err
 	}
@@ -297,7 +297,7 @@ var listRegistryCmd = &cobra.Command{
 }
 
 func listRegistryRunE(cmd *cobra.Command, args []string) error {
-	cfg, err := loadConfig()
+	cfg, err := loadConfig(true)
 	if err != nil {
 		return err
 	}
@@ -314,7 +314,7 @@ var listRuntimeCmd = &cobra.Command{
 }
 
 func listRuntimeRunE(cmd *cobra.Command, args []string) error {
-	cfg, err := loadConfig()
+	cfg, err := loadConfig(true)
 	if err != nil {
 		return err
 	}

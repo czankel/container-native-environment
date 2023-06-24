@@ -106,7 +106,7 @@ var updateContextRegistry string
 
 func updateContextRunE(cmd *cobra.Command, args []string) error {
 
-	tempConf, err := loadConfig()
+	tempConf, err := loadConfig(false)
 	if err != nil {
 		return err
 	}
@@ -200,7 +200,7 @@ var updateRegistryRepoName string
 
 func updateRegistryRunE(cmd *cobra.Command, args []string) error {
 
-	tempConf, err := loadConfig()
+	tempConf, err := loadConfig(false)
 	if err != nil {
 		return err
 	}
@@ -266,7 +266,7 @@ var updateRuntimeNamespace string
 
 func updateRuntimeRunE(cmd *cobra.Command, args []string) error {
 
-	tempConf, err := loadConfig()
+	tempConf, err := loadConfig(false)
 	if err != nil {
 		return err
 	}

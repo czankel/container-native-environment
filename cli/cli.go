@@ -30,10 +30,13 @@ var configProject bool // use project configuration file
 // system configuration, if configSystem is set
 // project configuration, if configProject is set
 // user configuration
-func loadConfig() (*config.Config, error) {
+func loadConfig(useDefault bool) (*config.Config, error) {
 
 	var err error
 	conf := config.NewConfig()
+	if useDefault {
+		conf = config.NewDefault()
+	}
 
 	if configSystem {
 		err = conf.Update(config.SystemConfigFile)

@@ -44,12 +44,12 @@ func contextRunE(cmd *cobra.Command, args []string) error {
 		}
 		if !configUser && !configProject && err == nil {
 			configProject = true
-			tempConf, err = loadConfig()
+			tempConf, err = loadConfig(false)
 			configUser = err != nil
 			configProject = err == nil
 		}
 		if configUser || (configProject && err == nil) {
-			tempConf, err = loadConfig()
+			tempConf, err = loadConfig(false)
 		}
 		if err != nil && !errors.Is(err, errdefs.ErrNotFound) {
 			return err
