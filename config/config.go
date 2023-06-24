@@ -337,52 +337,6 @@ func NewDefault() *Config {
 	}
 }
 
-// Load returns the default configuration amended by the configuration stored in the
-// system and user configuration file.
-func Load() (*Config, error) {
-
-	conf := NewDefault()
-
-	conf.Update(SystemConfigFile)
-
-	usr, err := user.Current()
-	if err == nil {
-		err = conf.Update(usr.HomeDir + "/" + UserConfigFile)
-	}
-	return conf, err
-}
-
-// LoadSystemConfig loads only the system configuration
-func LoadSystemConfig() (*Config, error) {
-
-	conf := &Config{}
-	err := conf.Update(SystemConfigFile)
-
-	return conf, err
-}
-
-// LoadUserConfig loads only the system configuration
-func LoadUserConfig() (*Config, error) {
-
-	conf := &Config{}
-
-	usr, err := user.Current()
-	if err == nil {
-		conf.Update(usr.HomeDir + "/" + UserConfigFile)
-	}
-
-	return conf, err
-}
-
-// LoadProjectConfig loads only the project configuration, if exists
-func LoadProjectConfig(path string) (*Config, error) {
-
-	conf := &Config{}
-	err := conf.Update(path + "/" + ProjectConfigFile)
-
-	return conf, err
-}
-
 // UpdateProjectConfig updates the configuration from the config file in the project path
 func (conf *Config) UpdateProjectConfig(path string) error {
 
