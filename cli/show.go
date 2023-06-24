@@ -3,11 +3,9 @@ package cli
 import (
 	"context"
 	"errors"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 
-	"github.com/czankel/cne/config"
 	"github.com/czankel/cne/errdefs"
 	"github.com/czankel/cne/project"
 	"github.com/czankel/cne/runtime"
@@ -21,131 +19,25 @@ var showCmd = &cobra.Command{
 	Args:    cobra.MinimumNArgs(1),
 }
 
-var showConfigCmd = &cobra.Command{
-	Use:   "config",
-	Short: "Show the environment configuration",
-	Long: `Show the configuration for the environment in the current directory or globally
-for all environments of the current user.
-By default, this command returns the configuration derived from all
-configuration files. The system option returns only the syste-wide
-configuration and the user option the configuration for the user.`,
-	RunE: showConfigRunE,
-	Args: cobra.NoArgs,
-}
-
-var showConfigContextCmd = &cobra.Command{
+var showContextCmd = &cobra.Command{
 	Use:   "context [name]",
 	Short: "Show context configurartion",
-	RunE:  showConfigRunE,
+	RunE:  showContextRunE,
 	Args:  cobra.RangeArgs(0, 1),
 }
 
-var showConfigRegistryCmd = &cobra.Command{
-	Use:   "registry [name]",
-	Short: "Show registry configurartion",
-	RunE:  showConfigRunE,
-	Args:  cobra.RangeArgs(0, 1),
-}
+func showContextRunE(cmd *cobra.Command, args []string) error {
 
-var showConfigRuntimeCmd = &cobra.Command{
-	Use:   "runtime [name]",
-	Short: "Show runtime configurartion",
-	RunE:  showConfigRunE,
-	Args:  cobra.RangeArgs(0, 1),
-}
-
-var showSystemConfig bool
-var showUserConfig bool
-var showProjectConfig bool
-
-func showConfigRunE(cmd *cobra.Command, args []string) error {
-
-	var err error
-
-	if showSystemConfig {
-		conf, err = config.LoadSystemConfig()
-	} else if showUserConfig {
-		conf, err = config.LoadUserConfig()
-	} else if showProjectConfig {
-		prj, err := loadProject()
-		if err != nil {
-			return err
-		}
-		conf, err = config.LoadProjectConfig(filepath.Dir(prj.Path))
-	} else {
-		conf, err = config.Load()
-		prj, err := loadProject()
-		if err == nil {
-			err = conf.UpdateProjectConfig(filepath.Dir(prj.Path))
-		}
-	}
-
-	if err != nil {
-		return err
-	}
-
-	entry := cmd.CalledAs()
-	if entry == "config" {
-		printValue("Configuration", "Value", "", conf)
-	} else {
-		if len(args) > 0 {
-			entry = entry + "/" + args[0]
-		}
-		_, val, err := conf.GetAllByName(entry)
-		if err == nil {
-			printValue("Configuration2", "Value", "", val)
-		}
-	}
-	return err
-}
-
-var showProjectCmd = &cobra.Command{
-	Use:     "project",
-	Short:   "Show the project configuration",
-	Aliases: []string{"prj"},
-	RunE:    showProjectRunE,
-	Args:    cobra.NoArgs,
-}
-
-func showProjectRunE(cmd *cobra.Command, args []string) error {
-
-	prj, err := loadProject()
-	if err != nil {
-		return err
-	}
-
-	printValue("Field", "Value", "", prj)
-
-	return nil
-}
-
-var showWorkspaceCmd = &cobra.Command{
-	Use:   "workspace [name]",
-	Short: "Show workspace details",
-	RunE:  showWorkspaceRunE,
-	Args:  cobra.RangeArgs(0, 1),
-}
-
-func showWorkspaceRunE(cmd *cobra.Command, args []string) error {
-
-	prj, err := loadProject()
-	if err != nil {
-		return err
-	}
-
-	var ws *project.Workspace
-
+	entry := conf.Settings.Context
 	if len(args) > 0 {
-		ws, err = prj.Workspace(args[0])
-	} else {
-		ws, err = prj.CurrentWorkspace()
+		entry = args[0]
+	} else if entry == "" {
+		return errdefs.NotFound("context", "")
 	}
-	if err != nil {
-		return err
+	_, val, err := conf.GetAllByName("context/" + entry)
+	if err == nil {
+		printValue("Configuration", "Value", "", val)
 	}
-
-	printValue("Field", "Value", "", ws)
-
 	return nil
 }
 
@@ -241,20 +133,127 @@ func showImageRunE(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+var showProjectCmd = &cobra.Command{
+	Use:     "project",
+	Short:   "Show the project configuration",
+	Aliases: []string{"prj"},
+	RunE:    showProjectRunE,
+	Args:    cobra.NoArgs,
+}
+
+func showProjectRunE(cmd *cobra.Command, args []string) error {
+
+	prj, err := loadProject()
+	if err != nil {
+		return err
+	}
+	printValue("Field", "Value", "", prj)
+	return nil
+}
+
+var showRegistryCmd = &cobra.Command{
+	Use:   "registry [name]",
+	Short: "Show registry configurartion",
+	RunE:  showRegistryRunE,
+	Args:  cobra.RangeArgs(0, 1),
+}
+
+func showRegistryRunE(cmd *cobra.Command, args []string) error {
+
+	var entry string
+	if len(args) > 0 {
+		entry = args[0]
+	} else {
+		cfgCtx, _, err := conf.GetContext()
+		if err != nil {
+			return err
+		}
+		entry = cfgCtx.Registry
+	}
+	_, val, err := conf.GetAllByName("registry/" + entry)
+	if err == nil {
+		printValue("Configuration", "Value", "", val)
+	}
+	return nil
+}
+
+var showRuntimeCmd = &cobra.Command{
+	Use:   "runtime [name]",
+	Short: "Show runtime configurartion",
+	RunE:  showRuntimeRunE,
+	Args:  cobra.RangeArgs(0, 1),
+}
+
+var showSystemConfig bool
+var showUserConfig bool
+var showProjectConfig bool
+
+func showRuntimeRunE(cmd *cobra.Command, args []string) error {
+
+	var entry string
+	if len(args) > 0 {
+		entry = args[0]
+	} else {
+		cfgCtx, _, err := conf.GetContext()
+		if err != nil {
+			return err
+		}
+		entry = cfgCtx.Runtime
+	}
+	_, val, err := conf.GetAllByName("runtime/" + entry)
+	if err == nil {
+		printValue("Configuration", "Value", "", val)
+	}
+	return nil
+}
+
+var showWorkspaceCmd = &cobra.Command{
+	Use:   "workspace [name]",
+	Short: "Show workspace details",
+	RunE:  showWorkspaceRunE,
+	Args:  cobra.RangeArgs(0, 1),
+}
+
+func showWorkspaceRunE(cmd *cobra.Command, args []string) error {
+
+	prj, err := loadProject()
+	if err != nil {
+		return err
+	}
+
+	var ws *project.Workspace
+
+	if len(args) > 0 {
+		ws, err = prj.Workspace(args[0])
+	} else {
+		ws, err = prj.CurrentWorkspace()
+	}
+	if err != nil {
+		return err
+	}
+
+	printValue("Field", "Value", "", ws)
+
+	return nil
+}
+
 func init() {
 	rootCmd.AddCommand(showCmd)
-	showCmd.AddCommand(showConfigCmd)
-	showConfigCmd.Flags().BoolVarP(
-		&showSystemConfig, "system", "", false, "Show only system configurations")
-	showConfigCmd.Flags().BoolVarP(
-		&showProjectConfig, "project", "", false, "Show only project configurations")
-	showConfigCmd.Flags().BoolVarP(
-		&showUserConfig, "user", "", false, "Show only user configurations")
-	showConfigCmd.AddCommand(showConfigContextCmd)
-	showConfigCmd.AddCommand(showConfigRegistryCmd)
-	showConfigCmd.AddCommand(showConfigRuntimeCmd)
 
-	showCmd.AddCommand(showProjectCmd)
-	showCmd.AddCommand(showWorkspaceCmd)
+	showCmd.AddCommand(showContextCmd)
+	showContextCmd.Flags().BoolVarP(
+		&showSystemConfig, "system", "", false, "Show only system configurations")
+	showContextCmd.Flags().BoolVarP(
+		&showProjectConfig, "project", "", false, "Show only project configurations")
+	showContextCmd.Flags().BoolVarP(
+		&showUserConfig, "user", "", false, "Show only user configurations")
+
 	showCmd.AddCommand(showImageCmd)
+	showCmd.AddCommand(showProjectCmd)
+
+	showCmd.AddCommand(showRegistryCmd)
+
+	showCmd.AddCommand(showRuntimeCmd)
+
+	showCmd.AddCommand(showWorkspaceCmd)
 }
