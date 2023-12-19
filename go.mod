@@ -5,17 +5,16 @@ go 1.13
 require (
 	github.com/BurntSushi/toml v0.4.1
 	github.com/containerd/console v1.0.3
-	github.com/containerd/containerd v1.6.18
+	github.com/containerd/containerd v1.6.26
 	github.com/containerd/typeurl v1.0.2
 	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/google/uuid v1.3.0
-	github.com/klauspost/compress v1.13.6 // indirect
 	github.com/opencontainers/go-digest v1.0.0
-	github.com/opencontainers/image-spec v1.0.3-0.20211202183452-c5a74bcca799
+	github.com/opencontainers/image-spec v1.1.0-rc2.0.20221005185240-3a7f492d3f1b
 	github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417
 	github.com/spf13/cobra v1.3.0
-	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f
-	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
+	golang.org/x/sys v0.13.0
+	golang.org/x/term v0.13.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
